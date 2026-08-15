@@ -24,7 +24,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     goLogin();
     throw new Error("Please log in");
   }
-  if (res.status === 401 || res.status === 502 || res.status === 503) {
+  if (res.status === 401) {
     goLogin();
     throw new Error("Please log in");
   }

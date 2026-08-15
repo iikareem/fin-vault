@@ -26,8 +26,8 @@ export default function LoginPage() {
       });
       localStorage.removeItem("fb_space");
       router.replace("/");
-    } catch {
-      setError(t("loginFailed"));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("loginFailed"));
     } finally {
       setBusy(false);
     }
