@@ -37,9 +37,9 @@ function fail(target: string, reason: string) {
 
 async function proxy(
   req: NextRequest,
-  ctx: { params: { path: string[] } | Promise<{ path: string[] }> },
+  ctx: { params: Promise<{ path: string[] }> },
 ) {
-  const { path } = await Promise.resolve(ctx.params);
+  const { path } = await ctx.params;
   const origin = apiOrigin();
   const target = `${origin}/${path.join("/")}${req.nextUrl.search}`;
   const headers = new Headers();
