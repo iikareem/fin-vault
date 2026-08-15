@@ -1,5 +1,7 @@
 # Fin Vault
 
+[![GitHub](https://img.shields.io/badge/GitHub-iikareem%2Ffin--vault-181717?logo=github)](https://github.com/iikareem/fin-vault)
+
 **Fin Vault** (مال البيت) is a private household cash app — house money and personal money in one place.
 
 Built for daily family use: what’s on hand, what was spent, and a clear day-by-day story. Arabic-first (RTL). Currency defaults to EGP.
@@ -80,11 +82,3 @@ After it succeeds you can delete `FAMILY_SEED` from Railway. Existing logins sta
 - `api/prisma/family.seed.json` — real names, emails, and passwords
 
 Use the `*.example` files as templates.
-
-## Rename this GitHub repo
-
-To match the project name, rename the repository to **`fin-vault`**:
-
-**GitHub → Settings → General → Repository name → `fin-vault` → Rename**
-
-Old links redirect automatically. Update Railway / deploy remotes if they still point at `family-budget`.
