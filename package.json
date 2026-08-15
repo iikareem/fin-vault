@@ -1,5 +1,5 @@
 {
-  "name": "family-budget",
+  "name": "fin-vault",
   "private": true,
   "scripts": {
     "db:up": "docker compose up -d",

@@ -1,22 +1,29 @@
-# Family Budget
+# Fin Vault
 
-I built this for my own daily household money tracking — cash on hand, spending, and a simple day-by-day history. It is a personal app, not a product.
+**Fin Vault** (مال البيت) is a private household cash app — house money and personal money in one place.
 
-The UI is Arabic-first (RTL). Currency defaults to EGP.
+Built for daily family use: what’s on hand, what was spent, and a clear day-by-day story. Arabic-first (RTL). Currency defaults to EGP.
+
+> Personal app, not a product.
+
+## What it does
+
+- **Two money spaces:** house books and each person’s own cash
+- **Wallets:** current + savings
+- **Moves:** income, spending, allowances, and paybacks
+- **Spending types:** purchases (مشتريات), food, clothes, transport, bills, and more
+- **History:** day-by-day list you can edit
+- **Reports:** totals by day, category, and person
+- **Between us:** loans between family members
+- **Charity:** monthly mosque / zakat tracking from house or personal cash
 
 ## Stack
 
-- PostgreSQL (Docker, port 5433)
-- NestJS API on port 3001
-- Next.js app on port 3000
-
-## What it tracks
-
-- House money and personal money (current + savings)
-- Income, expenses, and allowances
-- Day-by-day history
-- Month totals by day, category, and person
-- Charity spending from personal current cash
+| Layer | Tech |
+|--------|------|
+| Web | Next.js (port 3000) |
+| API | NestJS (port 3001) |
+| Database | PostgreSQL (Docker, port 5433) |
 
 ## Run locally
 
@@ -43,9 +50,9 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000 and sign in with an email from your seed file.
+Open [http://localhost:3000](http://localhost:3000) and sign in with an email from your seed file.
 
-Household size comes from `family.seed.json`. The app does not let people add members after seed.
+Household size comes from `family.seed.json`. Members are not added from the UI after seed.
 
 ## Seed on Railway
 
@@ -73,3 +80,11 @@ After it succeeds you can delete `FAMILY_SEED` from Railway. Existing logins sta
 - `api/prisma/family.seed.json` — real names, emails, and passwords
 
 Use the `*.example` files as templates.
+
+## Rename this GitHub repo
+
+To match the project name, rename the repository to **`fin-vault`**:
+
+**GitHub → Settings → General → Repository name → `fin-vault` → Rename**
+
+Old links redirect automatically. Update Railway / deploy remotes if they still point at `family-budget`.
