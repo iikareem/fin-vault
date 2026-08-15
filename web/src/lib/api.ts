@@ -3,6 +3,8 @@ import { isoLocal } from "./calendar";
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 const TIMEOUT_MS = 20000;
 
+export const AUTH_REQUIRED = "Please log in";
+
 function goLogin() {
   if (typeof window !== "undefined" && window.location.pathname !== "/login") {
     window.location.href = "/login";
@@ -35,14 +37,14 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     if (onLogin) {
       throw new Error(timedOut ? "LOGIN_TIMEOUT" : "LOGIN_NETWORK");
     }
-    goLogin();
-    throw new Error("Please log in");
+    // Keep the session: network blips must not force a new login.
+    throw new Error(timedOut ? "REQUEST_TIMEOUT" : "NETWORK_ERROR");
   } finally {
     clearTimeout(timer);
   }
   if (res.status === 401) {
     goLogin();
-    throw new Error("Please log in");
+    throw new Error(AUTH_REQUIRED);
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({ message: "Request failed" }));

@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { AUTH_REQUIRED } from "@/lib/api";
 import { loadSpace, setActiveSpace, type Space } from "@/lib/space";
 
 type BooksValue = {
@@ -29,6 +30,7 @@ const HOUSE_ONLY = ["/between", "/family", "/charity", "/more"];
 export function BooksProvider({ children }: { children: ReactNode }) {
   const path = usePathname();
   const router = useRouter();
+  const onLogin = path === "/login";
   const [userId, setUserId] = useState("");
   const [name, setName] = useState("");
   const [house, setHouse] = useState<Space | null>(null);
@@ -37,12 +39,15 @@ export function BooksProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (path === "/login") {
+    if (onLogin) {
       setLoading(false);
       return;
     }
+    let cancelled = false;
+    setLoading(true);
     loadSpace()
       .then(({ id, name: n, spaces, space }) => {
+        if (cancelled) return;
         setUserId(id);
         setName(n);
         const h = spaces.find((s) => s.kind === "HOUSE") ?? null;
@@ -51,11 +56,20 @@ export function BooksProvider({ children }: { children: ReactNode }) {
         setPersonal(p);
         setActive(space ?? h ?? p);
       })
-      .catch(() => {
-        router.replace("/login");
+      .catch((err) => {
+        if (cancelled) return;
+        // Only leave the app when the session is actually gone.
+        if (err instanceof Error && err.message === AUTH_REQUIRED) {
+          router.replace("/login");
+        }
       })
-      .finally(() => setLoading(false));
-  }, [path, router]);
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [onLogin, router]);
 
   const setKind = useCallback(
     (kind: "HOUSE" | "PERSONAL") => {

@@ -1,9 +1,9 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { api } from "@/lib/api";
+import { AUTH_REQUIRED, api } from "@/lib/api";
 import { useI18n } from "@/components/I18nProvider";
 import { LanguageSwitch } from "@/components/LanguageSwitch";
 import { Hint } from "@/components/Hint";
@@ -13,6 +13,21 @@ export default function LoginPage() {
   const { t } = useI18n();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    api("/auth/me")
+      .then(() => {
+        if (!cancelled) router.replace("/");
+      })
+      .catch(() => {
+        if (!cancelled) setChecking(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -40,11 +55,27 @@ export default function LoginPage() {
       const code = err instanceof Error ? err.message : "";
       if (code === "LOGIN_TIMEOUT") setError(t("loginTimeout"));
       else if (code === "LOGIN_NETWORK") setError(t("loginNetwork"));
-      else if (code === "Please log in") setError(t("loginFailed"));
+      else if (code === AUTH_REQUIRED) setError(t("loginFailed"));
       else setError(code || t("loginFailed"));
     } finally {
       setBusy(false);
     }
+  }
+
+  if (checking) {
+    return (
+      <main className="mx-auto flex min-h-dvh max-w-md flex-col items-center justify-center px-4">
+        <Image
+          src="/icon.png"
+          alt="Fin Vault"
+          width={64}
+          height={64}
+          priority
+          className="rounded-2xl shadow-sm"
+        />
+        <p className="mt-4 text-stone-600">{t("loggingIn")}</p>
+      </main>
+    );
   }
 
   return (

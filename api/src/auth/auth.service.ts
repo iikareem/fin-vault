@@ -21,7 +21,7 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('Wrong email or password');
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) throw new UnauthorizedException('Wrong email or password');
-    const token = await this.jwt.signAsync({ sub: user.id });
+    const token = await this.issueToken(user.id);
     return {
       token,
       user: {
@@ -30,6 +30,10 @@ export class AuthService {
         email: user.email,
       },
     };
+  }
+
+  issueToken(userId: string) {
+    return this.jwt.signAsync({ sub: userId });
   }
 
   async me(userId: string) {

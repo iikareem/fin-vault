@@ -6,6 +6,19 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser } from './current-user.decorator';
 import { AuthUser } from './auth-user';
 
+const SESSION_DAYS = 90;
+const SESSION_MS = 1000 * 60 * 60 * 24 * SESSION_DAYS;
+
+function sessionCookieOptions() {
+  return {
+    httpOnly: true as const,
+    sameSite: 'lax' as const,
+    path: '/',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: SESSION_MS,
+  };
+}
+
 @Controller('auth')
 export class AuthController {
   constructor(private auth: AuthService) {}
@@ -16,25 +29,30 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.auth.login(dto);
-    res.cookie('fb_token', result.token, {
-      httpOnly: true,
-      sameSite: 'lax',
-      path: '/',
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 1000 * 60 * 60 * 24 * 30,
-    });
+    res.cookie('fb_token', result.token, sessionCookieOptions());
     return result.user;
   }
 
   @Post('logout')
   logout(@Res({ passthrough: true }) res: Response) {
-    res.clearCookie('fb_token', { path: '/' });
+    res.clearCookie('fb_token', {
+      path: '/',
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+    });
     return { ok: true };
   }
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  me(@CurrentUser() user: AuthUser) {
-    return this.auth.me(user.id);
+  async me(
+    @CurrentUser() user: AuthUser,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const profile = await this.auth.me(user.id);
+    // Sliding session: renew cookie while the user stays active.
+    const token = await this.auth.issueToken(user.id);
+    res.cookie('fb_token', token, sessionCookieOptions());
+    return profile;
   }
 }
