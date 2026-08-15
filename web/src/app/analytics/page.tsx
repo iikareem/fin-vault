@@ -220,7 +220,7 @@ export default function AnalyticsPage() {
       {period === "month" ? (
         <section className="mt-5 rounded-3xl bg-white p-4 shadow-sm">
           <h2 className="text-xl font-semibold">{t("savingsTitle")}</h2>
-          <Hint>{t("savingsHint")}</Hint>
+          <Hint>{t("chartsSavingsHint")}</Hint>
           <div className="mt-3 grid grid-cols-1 gap-2 text-base">
             <p className="flex justify-between">
               <span className="text-stone-500">{t("broughtFromBefore")}</span>
