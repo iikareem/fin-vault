@@ -16,7 +16,6 @@ The UI is Arabic-first (RTL). Currency defaults to EGP.
 - Income, expenses, and allowances
 - Day-by-day history
 - Month totals by day, category, and person
-- Informal loans between people (no cash movement)
 - Charity spending from personal current cash
 
 ## Run locally
