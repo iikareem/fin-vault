@@ -5,11 +5,11 @@ services:
     environment:
       POSTGRES_USER: family
       POSTGRES_PASSWORD: family
-      POSTGRES_DB: family_budget
+      POSTGRES_DB: fin_vault
     ports:
       - "5433:5432"
     volumes:
-      - family_budget_pg:/var/lib/postgresql/data
+      - fin_vault_pg:/var/lib/postgresql/data
 
 volumes:
-  family_budget_pg:
+  fin_vault_pg:

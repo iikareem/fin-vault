@@ -9,12 +9,12 @@ const arabic = Noto_Sans_Arabic({
 });
 
 export const metadata: Metadata = {
-  title: "مال البيت",
-  description: "فلوس البيت، المدفوعات، وتاريخ كل يوم",
+  title: "Fin Vault · مال البيت",
+  description: "Fin Vault — house and personal cash, spending, and day-by-day history",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "مال البيت",
+    title: "Fin Vault",
   },
   formatDetection: {
     telephone: false,

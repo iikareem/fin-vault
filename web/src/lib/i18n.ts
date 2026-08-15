@@ -297,7 +297,7 @@ const ar = {
 };
 
 const en = {
-  appTitle: "Family money",
+  appTitle: "Fin Vault",
   appSubtitle: "See what you have, what you paid, and the story of each day.",
   email: "Email",
   password: "Password",
