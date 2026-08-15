@@ -44,6 +44,13 @@ npx prisma db seed
 npm run start:dev
 ```
 
+If you previously used the old `family_budget` database volume, reset it once:
+
+```bash
+docker compose down -v
+docker compose up -d
+```
+
 In another terminal:
 
 ```bash
