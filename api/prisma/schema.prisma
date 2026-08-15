@@ -1,0 +1,265 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+enum HouseholdKind {
+  PERSONAL
+  HOUSE
+}
+
+enum AccountType {
+  CASH
+  BANK
+  OTHER
+}
+
+enum CategoryKind {
+  EXPENSE
+  INCOME
+  PEER
+}
+
+enum TxType {
+  EXPENSE
+  INCOME
+  REIMBURSEMENT
+}
+
+enum LoanStatus {
+  OPEN
+  SETTLED
+}
+
+enum ClaimStatus {
+  OPEN
+  PARTIAL
+  REIMBURSED
+}
+
+model Household {
+  id          String         @id @default(cuid())
+  name        String
+  currency    String         @default("EGP")
+  kind        HouseholdKind  @default(HOUSE)
+  createdAt   DateTime       @default(now())
+  memberships Membership[]
+  accounts    Account[]
+  categories  Category[]
+  txs          Transaction[]
+  loans        PeerLoan[]
+  claims       HouseClaim[]
+  charityTypes CharityType[]
+  charityGifts CharityGift[]
+  payouts      HousePayout[]
+}
+
+model User {
+  id             String          @id @default(cuid())
+  name           String
+  email          String          @unique
+  passwordHash   String
+  relation       String          @default("")
+  createdAt      DateTime        @default(now())
+  memberships    Membership[]
+  txs            Transaction[]
+  loansGiven     PeerLoan[]      @relation("LoansGiven")
+  loansReceived  PeerLoan[]      @relation("LoansReceived")
+  loanRepayments LoanRepayment[]
+  claims         HouseClaim[]
+  reimbursements Reimbursement[]
+  charityGifts   CharityGift[]
+  payoutsReceived HousePayout[] @relation("PayoutsReceived")
+  payoutsRecorded HousePayout[] @relation("PayoutsRecorded")
+}
+
+model Membership {
+  id          String     @id @default(cuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  householdId String
+  household   Household  @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  role        Role       @default(MEMBER)
+  createdAt   DateTime   @default(now())
+
+  @@unique([userId, householdId])
+}
+
+model Account {
+  id             String          @id @default(cuid())
+  householdId    String
+  household      Household       @relation(fields: [householdId], references: [id])
+  name           String
+  type           AccountType     @default(CASH)
+  openingBalance Decimal         @default(0) @db.Decimal(14, 2)
+  archived       Boolean         @default(false)
+  txs            Transaction[]
+  reimbursements Reimbursement[]
+}
+
+model Category {
+  id          String        @id @default(cuid())
+  householdId String
+  household   Household     @relation(fields: [householdId], references: [id])
+  name        String
+  kind        CategoryKind
+  color       String        @default("#2563eb")
+  txs         Transaction[]
+  loans       PeerLoan[]
+  claims      HouseClaim[]
+
+  @@unique([householdId, name, kind])
+}
+
+model Transaction {
+  id            String         @id @default(cuid())
+  householdId   String
+  household     Household      @relation(fields: [householdId], references: [id])
+  accountId     String
+  account       Account        @relation(fields: [accountId], references: [id])
+  categoryId    String
+  category      Category       @relation(fields: [categoryId], references: [id])
+  userId        String
+  user          User           @relation(fields: [userId], references: [id])
+  type          TxType
+  amount        Decimal        @db.Decimal(14, 2)
+  occurredOn    DateTime       @db.Date
+  note          String         @default("")
+  createdAt     DateTime       @default(now())
+  reimbursement Reimbursement?
+  charityGift   CharityGift?
+  payoutHouse    HousePayout? @relation("PayoutHouseTx")
+  payoutPersonal HousePayout? @relation("PayoutPersonalTx")
+  claimPersonal  HouseClaim? @relation("ClaimPersonalTx")
+  reimbursePersonal Reimbursement? @relation("ReimbursePersonalTx")
+
+  @@index([householdId, occurredOn])
+  @@index([householdId, categoryId])
+  @@index([householdId, userId])
+}
+
+model PeerLoan {
+  id             String          @id @default(cuid())
+  householdId    String
+  household      Household       @relation(fields: [householdId], references: [id])
+  fromUserId     String
+  fromUser       User            @relation("LoansGiven", fields: [fromUserId], references: [id])
+  toUserId       String
+  toUser         User            @relation("LoansReceived", fields: [toUserId], references: [id])
+  categoryId     String
+  category       Category        @relation(fields: [categoryId], references: [id])
+  originalAmount Decimal         @db.Decimal(14, 2)
+  note           String          @default("")
+  occurredOn     DateTime        @db.Date
+  status         LoanStatus      @default(OPEN)
+  createdAt      DateTime        @default(now())
+  repayments     LoanRepayment[]
+}
+
+model LoanRepayment {
+  id               String   @id @default(cuid())
+  loanId           String
+  loan             PeerLoan @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  amount           Decimal  @db.Decimal(14, 2)
+  occurredOn       DateTime @db.Date
+  note             String   @default("")
+  recordedByUserId String
+  recordedBy       User     @relation(fields: [recordedByUserId], references: [id])
+  createdAt        DateTime @default(now())
+}
+
+model HouseClaim {
+  id             String          @id @default(cuid())
+  householdId    String
+  household      Household       @relation(fields: [householdId], references: [id])
+  memberId       String
+  member         User            @relation(fields: [memberId], references: [id])
+  categoryId     String
+  category       Category        @relation(fields: [categoryId], references: [id])
+  amount         Decimal         @db.Decimal(14, 2)
+  occurredOn     DateTime        @db.Date
+  note           String          @default("")
+  status         ClaimStatus     @default(OPEN)
+  createdAt      DateTime        @default(now())
+  reimbursements Reimbursement[]
+  personalTxId   String?         @unique
+  personalTx     Transaction?    @relation("ClaimPersonalTx", fields: [personalTxId], references: [id])
+}
+
+model Reimbursement {
+  id               String      @id @default(cuid())
+  claimId          String
+  claim            HouseClaim  @relation(fields: [claimId], references: [id], onDelete: Cascade)
+  amount           Decimal     @db.Decimal(14, 2)
+  occurredOn       DateTime    @db.Date
+  accountId        String
+  account          Account     @relation(fields: [accountId], references: [id])
+  transactionId    String?     @unique
+  transaction      Transaction? @relation(fields: [transactionId], references: [id])
+  personalTxId     String?     @unique
+  personalTx       Transaction? @relation("ReimbursePersonalTx", fields: [personalTxId], references: [id])
+  recordedByUserId String
+  recordedBy       User        @relation(fields: [recordedByUserId], references: [id])
+  createdAt        DateTime    @default(now())
+}
+
+model CharityType {
+  id          String        @id @default(cuid())
+  householdId String
+  household   Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  name        String
+  color       String        @default("#0f766e")
+  monthlyGoal Decimal       @default(0) @db.Decimal(14, 2)
+  archived    Boolean       @default(false)
+  gifts       CharityGift[]
+
+  @@unique([householdId, name])
+}
+
+model CharityGift {
+  id           String      @id @default(cuid())
+  householdId  String
+  household    Household   @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  typeId       String
+  type         CharityType @relation(fields: [typeId], references: [id], onDelete: Cascade)
+  memberId     String
+  member       User        @relation(fields: [memberId], references: [id])
+  amount       Decimal     @db.Decimal(14, 2)
+  occurredOn   DateTime    @db.Date
+  note         String      @default("")
+  personalTxId String?     @unique
+  personalTx   Transaction? @relation(fields: [personalTxId], references: [id])
+  createdAt    DateTime    @default(now())
+
+  @@index([householdId, occurredOn])
+  @@index([typeId])
+}
+
+model HousePayout {
+  id               String      @id @default(cuid())
+  householdId      String
+  household        Household   @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  toUserId         String
+  toUser           User        @relation("PayoutsReceived", fields: [toUserId], references: [id])
+  recordedByUserId String
+  recordedBy       User        @relation("PayoutsRecorded", fields: [recordedByUserId], references: [id])
+  amount           Decimal     @db.Decimal(14, 2)
+  occurredOn       DateTime    @db.Date
+  note             String      @default("")
+  houseTxId        String      @unique
+  houseTx          Transaction @relation("PayoutHouseTx", fields: [houseTxId], references: [id])
+  personalTxId     String      @unique
+  personalTx       Transaction @relation("PayoutPersonalTx", fields: [personalTxId], references: [id])
+  createdAt        DateTime    @default(now())
+
+  @@index([householdId, occurredOn])
+}

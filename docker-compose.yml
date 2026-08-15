@@ -1,0 +1,15 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: family
+      POSTGRES_PASSWORD: family
+      POSTGRES_DB: family_budget
+    ports:
+      - "5433:5432"
+    volumes:
+      - family_budget_pg:/var/lib/postgresql/data
+
+volumes:
+  family_budget_pg:

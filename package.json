@@ -1,0 +1,9 @@
+{
+  "name": "family-budget",
+  "private": true,
+  "scripts": {
+    "db:up": "docker compose up -d",
+    "api": "npm run start:dev --prefix api",
+    "web": "npm run dev --prefix web"
+  }
+}

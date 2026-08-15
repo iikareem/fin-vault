@@ -1,0 +1,92 @@
+import { existsSync, readFileSync } from 'fs';
+import { join } from 'path';
+import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
+import { seedHouseBooks, seedPersonalSpace } from '../src/households/space-defaults';
+
+const prisma = new PrismaClient();
+
+type Person = {
+  name: string;
+  email: string;
+  password: string;
+  relation: string;
+  role: 'ADMIN' | 'MEMBER';
+};
+
+function loadFamily(): Person[] {
+  const local = join(__dirname, 'family.seed.json');
+  const example = join(__dirname, 'family.seed.example.json');
+  const file = existsSync(local) ? local : example;
+  return JSON.parse(readFileSync(file, 'utf8')) as Person[];
+}
+
+async function syncNames(family: Person[]) {
+  await prisma.household.updateMany({
+    where: { kind: 'HOUSE' },
+    data: { name: 'House' },
+  });
+  for (const person of family) {
+    const user = await prisma.user.findUnique({ where: { email: person.email } });
+    if (!user) continue;
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { name: person.name, relation: person.relation },
+    });
+    await prisma.household.updateMany({
+      where: {
+        kind: 'PERSONAL',
+        memberships: { some: { userId: user.id } },
+      },
+      data: { name: `${person.name}` },
+    });
+  }
+}
+
+async function main() {
+  const family = loadFamily();
+  const already = await prisma.user.count();
+  if (already > 0) {
+    await syncNames(family);
+    console.log(`Family is fixed (${family.length} people). Names synced.`);
+    return;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const house = await tx.household.create({
+      data: { name: 'House', kind: 'HOUSE', currency: 'EGP' },
+    });
+    await seedHouseBooks(tx, house.id);
+
+    for (const person of family) {
+      const passwordHash = await bcrypt.hash(person.password, 10);
+      const user = await tx.user.create({
+        data: {
+          name: person.name,
+          email: person.email,
+          passwordHash,
+          relation: person.relation,
+        },
+      });
+      await seedPersonalSpace(tx, user.id, person.name);
+      await tx.membership.create({
+        data: {
+          userId: user.id,
+          householdId: house.id,
+          role: person.role,
+        },
+      });
+    }
+  });
+
+  console.log(`Seeded ${family.length} people. Copy prisma/family.seed.example.json to family.seed.json to use your own names.`);
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

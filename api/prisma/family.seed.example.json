@@ -1,0 +1,44 @@
+[
+  {
+    "name": "Parent",
+    "email": "parent@example.com",
+    "password": "changeme",
+    "relation": "Dad",
+    "role": "ADMIN"
+  },
+  {
+    "name": "Parent two",
+    "email": "parent2@example.com",
+    "password": "changeme",
+    "relation": "Mom",
+    "role": "ADMIN"
+  },
+  {
+    "name": "Child one",
+    "email": "child1@example.com",
+    "password": "changeme",
+    "relation": "Son",
+    "role": "MEMBER"
+  },
+  {
+    "name": "Child two",
+    "email": "child2@example.com",
+    "password": "changeme",
+    "relation": "Son",
+    "role": "MEMBER"
+  },
+  {
+    "name": "Child three",
+    "email": "child3@example.com",
+    "password": "changeme",
+    "relation": "Daughter",
+    "role": "MEMBER"
+  },
+  {
+    "name": "Child four",
+    "email": "child4@example.com",
+    "password": "changeme",
+    "relation": "Daughter",
+    "role": "MEMBER"
+  }
+]
