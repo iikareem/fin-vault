@@ -2,20 +2,30 @@ import { isoLocal } from "./calendar";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "/api";
 
+function goLogin() {
+  if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+    window.location.href = "/login";
+  }
+}
+
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = new Headers(init?.headers);
   if (init?.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
-  const res = await fetch(`${BASE}${path}`, {
-    ...init,
-    credentials: "include",
-    headers,
-  });
-  if (res.status === 401) {
-    if (typeof window !== "undefined" && window.location.pathname !== "/login") {
-      window.location.href = "/login";
-    }
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      ...init,
+      credentials: "include",
+      headers,
+    });
+  } catch {
+    goLogin();
+    throw new Error("Please log in");
+  }
+  if (res.status === 401 || res.status === 502 || res.status === 503) {
+    goLogin();
     throw new Error("Please log in");
   }
   if (!res.ok) {

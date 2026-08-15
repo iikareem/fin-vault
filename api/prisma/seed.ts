@@ -15,6 +15,14 @@ type Person = {
 };
 
 function loadFamily(): Person[] {
+  const fromEnv = process.env.FAMILY_SEED?.trim();
+  if (fromEnv) {
+    const parsed = JSON.parse(fromEnv) as Person[];
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      throw new Error('FAMILY_SEED must be a JSON array of people');
+    }
+    return parsed;
+  }
   const local = join(__dirname, 'family.seed.json');
   const example = join(__dirname, 'family.seed.example.json');
   const file = existsSync(local) ? local : example;
@@ -79,7 +87,7 @@ async function main() {
     }
   });
 
-  console.log(`Seeded ${family.length} people. Copy prisma/family.seed.example.json to family.seed.json to use your own names.`);
+  console.log(`Seeded ${family.length} people.`);
 }
 
 main()

@@ -51,8 +51,11 @@ export function BooksProvider({ children }: { children: ReactNode }) {
         setPersonal(p);
         setActive(space ?? h ?? p);
       })
+      .catch(() => {
+        router.replace("/login");
+      })
       .finally(() => setLoading(false));
-  }, [path]);
+  }, [path, router]);
 
   const setKind = useCallback(
     (kind: "HOUSE" | "PERSONAL") => {
