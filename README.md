@@ -1,4 +1,4 @@
-# Fin Vault
+# Fin Vault Web App
 
 Household and personal cash management for everyday use.
 
