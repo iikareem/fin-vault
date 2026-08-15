@@ -8,8 +8,6 @@ This project is a **monorepo**: the NestJS API (`api/`) and the Next.js web app 
 
 Fin Vault keeps shared household finances and individual wallets in one place. Track balances, record income and spending, review day-by-day history, and understand spending patterns — with an Arabic-first interface and EGP as the default currency.
 
-**Repository:** [github.com/iikareem/fin-vault](https://github.com/iikareem/fin-vault)
-
 ---
 
 ## Repository structure
