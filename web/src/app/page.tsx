@@ -185,20 +185,25 @@ export default function HomePage() {
       {error ? <p className="mt-2 text-red-700">{error}</p> : null}
 
       <section
-        className={`mt-3 rounded-[1.75rem] p-5 text-white shadow-lg ${
-          isHouse
-            ? "bg-gradient-to-br from-emerald-700 to-emerald-950"
-            : "bg-gradient-to-br from-sky-700 to-sky-950"
-        }`}
+        className="mt-3 rounded-[1.75rem] p-5 shadow-lg"
+        style={{
+          color: "#fff",
+          background: isHouse
+            ? "linear-gradient(to bottom right, #047857, #022c22)"
+            : "linear-gradient(to bottom right, #0369a1, #082f49)",
+        }}
       >
-        <p className={`text-base ${isHouse ? "text-emerald-100" : "text-sky-100"}`}>
+        <p className="text-base" style={{ color: "#fff" }}>
           💵 {isHouse ? t("houseMoneyNow") : t("yourMoneyNow")}
         </p>
         <p className="mt-1 amount text-[clamp(1.4rem,7.2vw,2.25rem)] font-bold leading-tight">
           {accounts.length ? money(cashTotal, currency, locale) : "…"}
         </p>
         <div className="mt-4 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
-          <div className="rounded-2xl bg-white/15 px-3 py-2">
+          <div
+            className="rounded-2xl px-3 py-2"
+            style={{ background: "rgba(255,255,255,0.18)" }}
+          >
             <p className="text-sm opacity-90">💵 {t("currentWallet")}</p>
             <p className="amount text-xl font-semibold leading-tight">
               {accounts.length
@@ -207,7 +212,10 @@ export default function HomePage() {
             </p>
             <p className="mt-1 text-xs opacity-80">{t("currentHint")}</p>
           </div>
-          <div className="rounded-2xl bg-white/15 px-3 py-2">
+          <div
+            className="rounded-2xl px-3 py-2"
+            style={{ background: "rgba(255,255,255,0.18)" }}
+          >
             <p className="text-sm opacity-90">💰 {t("savingsWallet")}</p>
             <p className="amount text-xl font-semibold leading-tight">
               {accounts.length
@@ -218,14 +226,20 @@ export default function HomePage() {
           </div>
         </div>
         <div className="mt-3 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
-          <div className="rounded-2xl bg-white/15 px-3 py-2">
+          <div
+            className="rounded-2xl px-3 py-2"
+            style={{ background: "rgba(255,255,255,0.18)" }}
+          >
             <p className="text-sm opacity-90">📈 {t("monthIn")}</p>
             <p className="amount text-lg font-semibold leading-tight">
               {summary ? money(summary.monthIncome, currency, locale) : "…"}
             </p>
             <p className="mt-1 text-xs opacity-80">{t("monthInHint")}</p>
           </div>
-          <div className="rounded-2xl bg-white/15 px-3 py-2">
+          <div
+            className="rounded-2xl px-3 py-2"
+            style={{ background: "rgba(255,255,255,0.18)" }}
+          >
             <p className="text-sm opacity-90">📉 {t("monthOut")}</p>
             <p className="amount text-lg font-semibold leading-tight">
               {summary ? money(summary.monthExpense, currency, locale) : "…"}
