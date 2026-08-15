@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
+import { normalizeLoginEmail, normalizeLoginPassword } from './login-text';
 
 @Injectable()
 export class AuthService {
@@ -12,11 +13,13 @@ export class AuthService {
   ) {}
 
   async login(dto: LoginDto) {
+    const email = normalizeLoginEmail(dto.email);
+    const password = normalizeLoginPassword(dto.password);
     const user = await this.prisma.user.findUnique({
-      where: { email: dto.email.toLowerCase() },
+      where: { email },
     });
     if (!user) throw new UnauthorizedException('Wrong email or password');
-    const ok = await bcrypt.compare(dto.password, user.passwordHash);
+    const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) throw new UnauthorizedException('Wrong email or password');
     const token = await this.jwt.signAsync({ sub: user.id });
     return {
