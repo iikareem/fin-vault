@@ -2,7 +2,9 @@
 
 Household and personal cash management for everyday use.
 
-Fin Vault keeps shared household finances and individual wallets in one place. Track balances, record income and spending, review day-by-day history, and understand where money goes — with an Arabic-first interface and EGP as the default currency.
+I built Fin Vault for personal use — to track my own spending, see where money goes, and keep clear analytics for household and personal cash. It is shared here so anyone can clone the repository and deploy their own instance.
+
+Fin Vault keeps shared household finances and individual wallets in one place. Track balances, record income and spending, review day-by-day history, and understand spending patterns — with an Arabic-first interface and EGP as the default currency.
 
 **Repository:** [github.com/iikareem/fin-vault](https://github.com/iikareem/fin-vault)
 
