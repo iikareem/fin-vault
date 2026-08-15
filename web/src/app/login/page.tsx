@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useI18n } from "@/components/I18nProvider";
@@ -14,42 +14,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [apiReady, setApiReady] = useState(false);
-  const [apiCheck, setApiCheck] = useState("Checking API connection…");
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/health", { cache: "no-store" })
-      .then(async (res) => {
-        const body = await res.json().catch(() => ({}));
-        if (cancelled) return;
-        if (!res.ok) {
-          setApiReady(false);
-          setApiCheck(
-            typeof body.message === "string"
-              ? body.message
-              : `API connection failed (${res.status})`,
-          );
-          return;
-        }
-        setApiReady(true);
-        setApiCheck("");
-      })
-      .catch((e) => {
-        if (cancelled) return;
-        setApiReady(false);
-        setApiCheck(
-          e instanceof Error ? e.message : "API connection failed",
-        );
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!apiReady) return;
     setBusy(true);
     setError("");
     try {
@@ -75,11 +42,6 @@ export default function LoginPage() {
         </p>
         <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{t("appTitle")}</h1>
         <p className="mt-2 text-lg text-stone-600">{t("appSubtitle")}</p>
-        {apiCheck ? (
-          <p className="mt-4 rounded-2xl bg-amber-50 px-4 py-3 text-sm leading-relaxed text-amber-950">
-            {apiCheck}
-          </p>
-        ) : null}
         <form onSubmit={onSubmit} className="mt-8 space-y-4">
           <label className="block">
             <span className="mb-1 block text-sm font-medium">{t("email")}</span>
@@ -90,7 +52,6 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               autoComplete="username"
               required
-              disabled={!apiReady}
             />
             <Hint>{t("emailHint")}</Hint>
           </label>
@@ -103,13 +64,12 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
               required
-              disabled={!apiReady}
             />
             <Hint>{t("passwordHint")}</Hint>
           </label>
           {error ? <p className="text-red-700">{error}</p> : null}
           <button
-            disabled={busy || !apiReady}
+            disabled={busy}
             className="w-full rounded-2xl bg-emerald-800 px-4 py-4 text-lg font-semibold text-white disabled:opacity-60"
           >
             {busy ? t("loggingIn") : `🔑 ${t("login")}`}
