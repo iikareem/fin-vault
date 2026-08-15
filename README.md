@@ -1,12 +1,26 @@
-# Fin Vault Web App
+# Fin Vault
 
 Household and personal cash management for everyday use.
 
 I built Fin Vault for personal use — to track my own spending, see where money goes, and keep clear analytics for household and personal cash. It is shared here so anyone can clone the repository and deploy their own instance.
 
+This project is a **monorepo**: the NestJS API (`api/`) and the Next.js web app (`web/`) live in one repository and share a single Postgres database.
+
 Fin Vault keeps shared household finances and individual wallets in one place. Track balances, record income and spending, review day-by-day history, and understand spending patterns — with an Arabic-first interface and EGP as the default currency.
 
 **Repository:** [github.com/iikareem/fin-vault](https://github.com/iikareem/fin-vault)
+
+---
+
+## Repository structure
+
+```text
+fin-vault/
+├── api/                 # NestJS API + Prisma
+├── web/                 # Next.js frontend
+├── docker-compose.yml   # Local PostgreSQL
+└── package.json         # Root scripts for api / web / db
+```
 
 ---
 
@@ -26,8 +40,9 @@ Fin Vault keeps shared household finances and individual wallets in one place. T
 
 | Layer | Technology |
 | --- | --- |
-| Frontend | Next.js |
-| Backend | NestJS |
+| Monorepo | `api/` + `web/` in one repository |
+| Frontend | Next.js (`web/`) |
+| Backend | NestJS + Prisma (`api/`) |
 | Database | PostgreSQL 16 |
 | Local ports | Web `3000` · API `3001` · Postgres `5433` |
 
