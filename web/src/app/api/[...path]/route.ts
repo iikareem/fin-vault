@@ -6,9 +6,6 @@ setDefaultResultOrder("verbatim");
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
-
 const HOP = new Set([
   "connection",
   "keep-alive",
@@ -36,12 +33,26 @@ function apiOrigin() {
   }
 }
 
+function fail(target: string, reason: string) {
+  const origin = apiOrigin();
+  return Response.json(
+    {
+      message: `Cannot connect to API at ${origin}. ${reason}`,
+      origin,
+      target,
+      reason,
+    },
+    { status: 502 },
+  );
+}
+
 async function proxy(
   req: NextRequest,
   ctx: { params: Promise<{ path: string[] }> },
 ) {
   const { path } = await ctx.params;
-  const target = `${apiOrigin()}/${path.join("/")}${req.nextUrl.search}`;
+  const origin = apiOrigin();
+  const target = `${origin}/${path.join("/")}${req.nextUrl.search}`;
   const headers = new Headers();
   req.headers.forEach((value, key) => {
     if (!HOP.has(key.toLowerCase())) headers.set(key, value);
@@ -57,8 +68,9 @@ async function proxy(
   let upstream: Response;
   try {
     upstream = await fetch(target, init);
-  } catch {
-    return Response.json({ message: "API is unreachable" }, { status: 502 });
+  } catch (e) {
+    const reason = e instanceof Error ? e.message : String(e);
+    return fail(target, reason);
   }
   const out = new Headers();
   upstream.headers.forEach((value, key) => {

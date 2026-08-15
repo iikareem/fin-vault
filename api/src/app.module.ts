@@ -12,6 +12,7 @@ import { LoansModule } from './loans/loans.module';
 import { ClaimsModule } from './claims/claims.module';
 import { CharityModule } from './charity/charity.module';
 import { PayoutsModule } from './payouts/payouts.module';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -29,5 +30,6 @@ import { PayoutsModule } from './payouts/payouts.module';
     CharityModule,
     PayoutsModule,
   ],
+  controllers: [HealthController],
 })
 export class AppModule {}
