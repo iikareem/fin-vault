@@ -6,6 +6,7 @@ import { api, money, todayISO } from "@/lib/api";
 import { fill, labelFor } from "@/lib/i18n";
 import { useCalendarClock } from "@/hooks/useCalendarClock";
 import { BottomNav } from "@/components/BottomNav";
+import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
 import { householdPath } from "@/lib/space";
@@ -174,7 +175,7 @@ export default function HomePage() {
   }
 
   return (
-    <main className="mx-auto max-w-lg px-4 pb-32 pt-4">
+    <PageShell>
       <p className="text-lg text-stone-600">
         👋 {name ? t("helloName", { name }) : t("hello")}
       </p>
@@ -193,13 +194,13 @@ export default function HomePage() {
         <p className={`text-base ${isHouse ? "text-emerald-100" : "text-sky-100"}`}>
           💵 {isHouse ? t("houseMoneyNow") : t("yourMoneyNow")}
         </p>
-        <p className="mt-1 text-4xl font-bold tabular-nums">
+        <p className="mt-1 amount text-[clamp(1.4rem,7.2vw,2.25rem)] font-bold leading-tight">
           {accounts.length ? money(cashTotal, currency, locale) : "…"}
         </p>
-        <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="mt-4 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
           <div className="rounded-2xl bg-white/15 px-3 py-2">
             <p className="text-sm opacity-90">💵 {t("currentWallet")}</p>
-            <p className="text-xl font-semibold tabular-nums">
+            <p className="amount text-xl font-semibold leading-tight">
               {accounts.length
                 ? money(currentWallet?.balance ?? 0, currency, locale)
                 : "…"}
@@ -208,7 +209,7 @@ export default function HomePage() {
           </div>
           <div className="rounded-2xl bg-white/15 px-3 py-2">
             <p className="text-sm opacity-90">💰 {t("savingsWallet")}</p>
-            <p className="text-xl font-semibold tabular-nums">
+            <p className="amount text-xl font-semibold leading-tight">
               {accounts.length
                 ? money(savingsWallet?.balance ?? 0, currency, locale)
                 : "…"}
@@ -216,17 +217,17 @@ export default function HomePage() {
             <p className="mt-1 text-xs opacity-80">{t("savingsHint")}</p>
           </div>
         </div>
-        <div className="mt-3 grid grid-cols-2 gap-3">
+        <div className="mt-3 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
           <div className="rounded-2xl bg-white/15 px-3 py-2">
             <p className="text-sm opacity-90">📈 {t("monthIn")}</p>
-            <p className="text-lg font-semibold tabular-nums">
+            <p className="amount text-lg font-semibold leading-tight">
               {summary ? money(summary.monthIncome, currency, locale) : "…"}
             </p>
             <p className="mt-1 text-xs opacity-80">{t("monthInHint")}</p>
           </div>
           <div className="rounded-2xl bg-white/15 px-3 py-2">
             <p className="text-sm opacity-90">📉 {t("monthOut")}</p>
-            <p className="text-lg font-semibold tabular-nums">
+            <p className="amount text-lg font-semibold leading-tight">
               {summary ? money(summary.monthExpense, currency, locale) : "…"}
             </p>
             <p className="mt-1 text-xs opacity-80">{t("monthOutHint")}</p>
@@ -279,7 +280,7 @@ export default function HomePage() {
                       {c.note ? ` · ${c.note}` : ""}
                     </p>
                   </div>
-                  <span className="text-lg font-bold tabular-nums">
+                  <span className="amount shrink-0 text-lg font-bold">
                     {money(c.remaining, currency, locale)}
                   </span>
                 </div>
@@ -394,10 +395,10 @@ export default function HomePage() {
           <ul className="mt-3 space-y-2">
             {txs.map((tx) => (
               <li key={tx.id} className="surface rounded-2xl px-4 py-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{labelFor(tx.category.name, t)}</span>
+                <div className="flex min-w-0 items-center justify-between gap-3">
+                  <span className="min-w-0 font-medium">{labelFor(tx.category.name, t)}</span>
                   <span
-                    className={`font-semibold tabular-nums ${
+                    className={`amount shrink-0 font-semibold ${
                       tx.type === "INCOME" ? "text-emerald-800" : "text-red-800"
                     }`}
                   >
@@ -418,6 +419,6 @@ export default function HomePage() {
         </>
       ) : null}
       <BottomNav />
-    </main>
+    </PageShell>
   );
 }

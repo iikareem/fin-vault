@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
+import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
 import { householdPath } from "@/lib/space";
@@ -37,8 +38,8 @@ export default function FamilyPage() {
   }
 
   return (
-    <main className="mx-auto max-w-lg px-4 pb-32 pt-6">
-      <h1 className="text-3xl font-bold">👨‍👩‍👧‍👦 {t("family")}</h1>
+    <PageShell>
+      <h1 className="text-2xl font-bold leading-tight sm:text-3xl">👨‍👩‍👧‍👦 {t("family")}</h1>
       <p className="mt-2 text-stone-600">{t("familyBlurb")}</p>
       <Hint>{t("familyRoleHint")}</Hint>
       <ul className="mt-5 space-y-2">
@@ -64,6 +65,6 @@ export default function FamilyPage() {
       </button>
       <Hint>{t("logOutHint")}</Hint>
       <BottomNav />
-    </main>
+    </PageShell>
   );
 }

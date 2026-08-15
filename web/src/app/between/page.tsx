@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api, money, todayISO } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
+import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
 import { labelFor, fill } from "@/lib/i18n";
@@ -169,8 +170,8 @@ export default function BetweenPage() {
   }
 
   return (
-    <main className="mx-auto max-w-lg px-4 pb-32 pt-6">
-      <h1 className="text-3xl font-bold">🤝 {t("betweenTitle")}</h1>
+    <PageShell>
+      <h1 className="text-2xl font-bold leading-tight sm:text-3xl">🤝 {t("betweenTitle")}</h1>
       <p className="mt-2 text-stone-600">{t("betweenHint")}</p>
       {error ? <p className="mt-3 text-red-700">{error}</p> : null}
 
@@ -315,6 +316,6 @@ export default function BetweenPage() {
         )}
       </ul>
       <BottomNav />
-    </main>
+    </PageShell>
   );
 }

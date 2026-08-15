@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, money } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
+import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
 import { labelFor, type MessageKey } from "@/lib/i18n";
@@ -188,8 +189,8 @@ export default function HistoryPage() {
     (log.txs.length === 0 && log.claims.length === 0 && log.gifts.length === 0);
 
   return (
-    <main className="mx-auto max-w-lg px-4 pb-32 pt-4">
-      <h1 className="text-3xl font-bold">📅 {t("eachDay")}</h1>
+    <PageShell>
+      <h1 className="text-2xl font-bold leading-tight sm:text-3xl">📅 {t("eachDay")}</h1>
       <Hint>{t("daysHint")}</Hint>
       <div className="mt-4 flex items-center gap-2">
         <button
@@ -405,7 +406,7 @@ export default function HistoryPage() {
         </>
       )}
       <BottomNav />
-    </main>
+    </PageShell>
   );
 }
 

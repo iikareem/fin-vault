@@ -31,9 +31,9 @@ export function BottomNav() {
   const activeChip = personal ? "bg-sky-100 text-sky-900" : "bg-emerald-100 text-emerald-900";
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 px-4 pb-[max(0.85rem,env(safe-area-inset-bottom))]">
+    <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-20 px-3 pb-[max(0.6rem,env(safe-area-inset-bottom))] sm:px-4">
       <ul
-        className={`surface mx-auto grid max-w-lg ${cols} rounded-[1.75rem] p-1.5`}
+        className={`surface pointer-events-auto mx-auto grid max-w-lg ${cols} rounded-[1.5rem] p-1`}
       >
         {items.map((item) => {
           const current =
@@ -45,17 +45,19 @@ export function BottomNav() {
                     path.startsWith(p),
                   ));
           return (
-            <li key={item.href}>
+            <li key={item.href} className="min-w-0">
               <Link
                 href={item.href}
-                className={`flex min-h-[4.1rem] flex-col items-center justify-center gap-0.5 rounded-[1.35rem] px-0.5 text-center ${
+                className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-[1.15rem] px-0.5 text-center sm:min-h-[3.6rem] ${
                   current ? activeChip : "text-stone-500"
                 }`}
               >
-                <span className="text-xl leading-none" aria-hidden>
+                <span className="text-lg leading-none sm:text-xl" aria-hidden>
                   {item.emoji}
                 </span>
-                <span className="text-sm font-bold leading-tight">{t(item.key)}</span>
+                <span className="w-full truncate text-[0.7rem] font-bold leading-tight sm:text-sm">
+                  {t(item.key)}
+                </span>
               </Link>
             </li>
           );

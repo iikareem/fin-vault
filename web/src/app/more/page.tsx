@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { BottomNav } from "@/components/BottomNav";
+import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
 import { Hint } from "@/components/Hint";
@@ -22,8 +23,8 @@ export default function MorePage() {
   ];
 
   return (
-    <main className="mx-auto max-w-lg px-4 pb-32 pt-4">
-      <h1 className="text-3xl font-bold">☰ {t("moreTitle")}</h1>
+    <PageShell>
+      <h1 className="text-2xl font-bold leading-tight sm:text-3xl">☰ {t("moreTitle")}</h1>
       <Hint>{t("moreHint")}</Hint>
       <ul className="mt-6 space-y-3">
         {links.map((link) => (
@@ -44,6 +45,6 @@ export default function MorePage() {
         ))}
       </ul>
       <BottomNav />
-    </main>
+    </PageShell>
   );
 }

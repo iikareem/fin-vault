@@ -34,13 +34,13 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-5">
+    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]">
       <LanguageSwitch />
       <div className="surface mt-6 rounded-[2rem] p-6">
         <p className="text-5xl" aria-hidden>
           🏠
         </p>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight">{t("appTitle")}</h1>
+        <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{t("appTitle")}</h1>
         <p className="mt-2 text-lg text-stone-600">{t("appSubtitle")}</p>
         <form onSubmit={onSubmit} className="mt-8 space-y-4">
           <label className="block">

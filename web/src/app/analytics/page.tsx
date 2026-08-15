@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, money } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
+import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
 import { labelFor } from "@/lib/i18n";
@@ -147,8 +148,8 @@ export default function AnalyticsPage() {
   );
 
   return (
-    <main className="mx-auto max-w-lg px-4 pb-32 pt-4">
-      <h1 className="text-3xl font-bold">📊 {t("navCharts")}</h1>
+    <PageShell>
+      <h1 className="text-2xl font-bold leading-tight sm:text-3xl">📊 {t("navCharts")}</h1>
       <Hint>{t("chartsHint")}</Hint>
       <div className="mt-4 grid grid-cols-3 gap-2 rounded-3xl bg-stone-200 p-1.5">
         {(["day", "month", "year"] as Period[]).map((p) => (
@@ -395,6 +396,6 @@ export default function AnalyticsPage() {
         </>
       ) : null}
       <BottomNav />
-    </main>
+    </PageShell>
   );
 }

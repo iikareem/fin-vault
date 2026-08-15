@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { api, money, todayISO } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
+import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
 import { labelFor } from "@/lib/i18n";
@@ -148,16 +149,16 @@ export default function CharityPage() {
 
   if (active?.kind === "PERSONAL") {
     return (
-      <main className="mx-auto max-w-lg px-4 pb-32 pt-4">
+      <PageShell>
         <p className="text-stone-600">{t("charityHint")}</p>
         <BottomNav />
-      </main>
+      </PageShell>
     );
   }
 
   return (
-    <main className="mx-auto max-w-lg px-4 pb-32 pt-4">
-      <h1 className="text-3xl font-bold">🕌 {t("charityTitle")}</h1>
+    <PageShell>
+      <h1 className="text-2xl font-bold leading-tight sm:text-3xl">🕌 {t("charityTitle")}</h1>
       <p className="mt-2 text-stone-600">{t("charityHint")}</p>
 
       <div className="mt-4 flex items-center justify-between gap-3">
@@ -394,6 +395,6 @@ export default function CharityPage() {
         </div>
       ) : null}
       <BottomNav />
-    </main>
+    </PageShell>
   );
 }

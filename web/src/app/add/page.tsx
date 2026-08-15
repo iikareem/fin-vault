@@ -4,6 +4,7 @@ import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, todayISO } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
+import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
 import { labelFor } from "@/lib/i18n";
@@ -198,8 +199,8 @@ function AddForm() {
   const claimMode = mode === "claim";
 
   return (
-    <main className="mx-auto max-w-lg px-4 pb-32 pt-6">
-      <h1 className="text-3xl font-bold">➕ {t("navAdd")}</h1>
+    <PageShell>
+      <h1 className="text-2xl font-bold leading-tight sm:text-3xl">➕ {t("navAdd")}</h1>
       <Hint>{t("addPageHint")}</Hint>
       {houseAdmin ? (
         <div className="mt-4 grid grid-cols-2 gap-2">
@@ -421,7 +422,7 @@ function AddForm() {
         <Hint>{t("addSaveHint")}</Hint>
       </form>
       <BottomNav />
-    </main>
+    </PageShell>
   );
 }
 
