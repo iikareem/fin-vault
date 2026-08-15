@@ -11,6 +11,16 @@ const arabic = Noto_Sans_Arabic({
 export const metadata: Metadata = {
   title: "Fin Vault · مال البيت",
   description: "Fin Vault — house and personal cash, spending, and day-by-day history",
+  applicationName: "Fin Vault",
+  icons: {
+    icon: [
+      { url: "/icon.png", type: "image/png" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
+    shortcut: "/icon.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

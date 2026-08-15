@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { useI18n } from "@/components/I18nProvider";
@@ -50,9 +51,14 @@ export default function LoginPage() {
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]">
       <LanguageSwitch />
       <div className="surface mt-6 rounded-[2rem] p-6">
-        <p className="text-5xl" aria-hidden>
-          🏠
-        </p>
+        <Image
+          src="/icon.png"
+          alt="Fin Vault"
+          width={72}
+          height={72}
+          priority
+          className="rounded-2xl shadow-sm"
+        />
         <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{t("appTitle")}</h1>
         <p className="mt-2 text-lg text-stone-600">{t("appSubtitle")}</p>
         <form noValidate onSubmit={onSubmit} className="mt-8 space-y-4">
