@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsDateString,
   IsNumber,
   IsOptional,
@@ -20,4 +21,12 @@ export class CreateCharityGiftDto {
   @IsOptional()
   @IsString()
   note?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  fromHouse?: boolean;
+
+  @IsOptional()
+  @IsString()
+  accountId?: string;
 }

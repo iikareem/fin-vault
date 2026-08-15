@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, money } from "@/lib/api";
+import { api, parseAmount } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
+import { Money } from "@/components/Money";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
 import { labelFor, type MessageKey } from "@/lib/i18n";
@@ -113,7 +114,7 @@ export default function HistoryPage() {
       await api(householdPath(active.householdId, `/transactions/${id}`), {
         method: "PATCH",
         body: JSON.stringify({
-          amount: Number(amount),
+          amount: parseAmount(amount),
           note,
           ...(categoryId ? { categoryId } : {}),
         }),
@@ -135,7 +136,7 @@ export default function HistoryPage() {
       await api(householdPath(active.householdId, `/claims/${id}`), {
         method: "PATCH",
         body: JSON.stringify({
-          amount: Number(amount),
+          amount: parseAmount(amount),
           note,
           ...(categoryId ? { categoryId } : {}),
         }),
@@ -156,7 +157,7 @@ export default function HistoryPage() {
     try {
       await api(householdPath(active.householdId, `/charity/gifts/${id}`), {
         method: "PATCH",
-        body: JSON.stringify({ amount: Number(amount), note }),
+        body: JSON.stringify({ amount: parseAmount(amount), note }),
       });
       setOpenId("");
       await load(active.householdId, day);
@@ -219,14 +220,14 @@ export default function HistoryPage() {
         <div className="rounded-3xl bg-white p-4 shadow-sm">
           <p className="text-lg text-stone-500">{t("in")}</p>
           <p className="text-2xl font-bold text-emerald-800">
-            {money(log?.income ?? 0, currency, locale)}
+            <Money amount={log?.income ?? 0} currency={currency} locale={locale} />
           </p>
           <Hint>{t("dayInHint")}</Hint>
         </div>
         <div className="rounded-3xl bg-white p-4 shadow-sm">
           <p className="text-lg text-stone-500">{t("out")}</p>
           <p className="text-2xl font-bold text-red-800">
-            {money(log?.expense ?? 0, currency, locale)}
+            <Money amount={log?.expense ?? 0} currency={currency} locale={locale} />
           </p>
           <Hint>{t("dayOutHint")}</Hint>
         </div>
@@ -257,8 +258,8 @@ export default function HistoryPage() {
                       : undefined
                   }
                 >
-                  <div className="flex justify-between gap-3 text-xl">
-                    <span className="font-bold">
+                  <div className="money-row text-xl">
+                    <span className="font-bold" dir="auto">
                       {labelFor(tx.category.name, t)}
                     </span>
                     <span
@@ -268,8 +269,12 @@ export default function HistoryPage() {
                           : "font-bold text-red-800"
                       }
                     >
-                      {tx.type === "INCOME" ? "+" : "−"}
-                      {money(tx.amount, currency, locale)}
+                      <Money
+                        amount={tx.amount}
+                        currency={currency}
+                        locale={locale}
+                        extraSign={tx.type === "INCOME" ? "+" : "−"}
+                      />
                     </span>
                   </div>
                   {tx.user.name === "House" && !tx.note ? null : (
@@ -324,12 +329,16 @@ export default function HistoryPage() {
                   }
                 >
                   <p className="text-lg font-bold">{t("pocketThatDay")}</p>
-                  <div className="flex justify-between gap-3 text-xl">
-                    <span>
+                  <div className="money-row text-xl">
+                    <span dir="auto">
                       {c.member.name} · {labelFor(c.category.name, t)}
                     </span>
                     <span className="font-bold">
-                      {money(c.amount, currency, locale)}
+                      <Money
+                        amount={c.amount}
+                        currency={currency}
+                        locale={locale}
+                      />
                     </span>
                   </div>
                   {c.note ? <p className="text-stone-600">{c.note}</p> : null}
@@ -370,12 +379,16 @@ export default function HistoryPage() {
                   }
                 >
                   <p className="text-lg font-bold">{t("charityThatDay")}</p>
-                  <div className="flex justify-between gap-3 text-xl">
-                    <span>
-                      {g.member.name} · {labelFor(g.type.name, t)}
+                  <div className="money-row text-xl">
+                    <span dir="auto">
+                      {labelFor(g.member.name, t)} · {labelFor(g.type.name, t)}
                     </span>
                     <span className="font-bold">
-                      {money(g.amount, currency, locale)}
+                      <Money
+                        amount={g.amount}
+                        currency={currency}
+                        locale={locale}
+                      />
                     </span>
                   </div>
                 </button>
@@ -441,7 +454,8 @@ function EditFields({
     <div className="mt-4 space-y-3 border-t border-stone-200 pt-4">
       <input
         inputMode="decimal"
-        className="w-full rounded-2xl border border-stone-300 px-4 py-4 text-3xl"
+        dir="ltr"
+        className="amount-input w-full rounded-2xl border border-stone-300 px-4 py-4 text-3xl"
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
         aria-label={t("amount")}

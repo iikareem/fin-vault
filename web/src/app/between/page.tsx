@@ -1,13 +1,14 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { api, money, todayISO } from "@/lib/api";
+import { api, money, parseAmount, todayISO } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
 import { labelFor, fill } from "@/lib/i18n";
 import { householdPath } from "@/lib/space";
+import { Money } from "@/components/Money";
 
 type Person = { id: string; name: string };
 type Category = { id: string; name: string; kind: string };
@@ -85,7 +86,7 @@ export default function BetweenPage() {
           toUserId,
           direction,
           categoryId,
-          amount: Number(amount),
+          amount: parseAmount(amount),
           occurredOn,
           note,
         }),
@@ -101,7 +102,7 @@ export default function BetweenPage() {
   }
 
   async function repay(loanId: string) {
-    const value = Number(payAmount[loanId]);
+    const value = parseAmount(payAmount[loanId] ?? "");
     if (!houseId || !value) return;
     setBusy(true);
     setError("");
@@ -126,10 +127,16 @@ export default function BetweenPage() {
     const other = asDebtor ? loan.fromUser : loan.toUser;
     return (
       <li key={loan.id} className="rounded-2xl bg-white px-4 py-3 shadow-sm">
-        <div className="flex justify-between gap-2">
-          <span className="font-semibold">{other.name}</span>
+        <div className="money-row">
+          <span className="font-semibold" dir="auto">
+            {other.name}
+          </span>
           <span className="font-semibold">
-            {money(loan.remaining, currency, locale)}
+            <Money
+              amount={loan.remaining}
+              currency={currency}
+              locale={locale}
+            />
           </span>
         </div>
         <p className="text-sm text-stone-500">
@@ -145,7 +152,8 @@ export default function BetweenPage() {
             <div className="flex gap-2">
               <input
                 inputMode="decimal"
-                className="min-w-0 flex-1 rounded-xl border border-stone-300 px-3 py-2"
+                dir="ltr"
+                className="amount-input min-w-0 flex-1 rounded-xl border border-stone-300 px-3 py-2"
                 placeholder={t("payBackAmount")}
                 value={payAmount[loan.id] ?? ""}
                 onChange={(e) =>
@@ -259,7 +267,8 @@ export default function BetweenPage() {
           <span className="mb-1 block font-medium">{t("amount")}</span>
           <input
             inputMode="decimal"
-            className="w-full rounded-2xl border border-stone-300 px-4 py-3 text-2xl"
+            dir="ltr"
+            className="amount-input w-full rounded-2xl border border-stone-300 px-4 py-3 text-2xl"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             placeholder="0"

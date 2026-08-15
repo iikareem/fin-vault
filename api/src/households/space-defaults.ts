@@ -10,6 +10,7 @@ const HOUSE_EXPENSE = [
   { name: 'Health', color: '#db2777' },
   { name: 'Family gift', color: '#db2777' },
   { name: 'Courtesy', color: '#c026d3' },
+  { name: 'Charity', color: '#0f766e' },
   { name: 'Other', color: '#64748b' },
   { name: 'Member payback', color: '#44403c' },
 ];

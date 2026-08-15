@@ -89,6 +89,23 @@ button {
 }
 
 @utility amount {
-  overflow-wrap: anywhere;
+  unicode-bidi: isolate;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+
+@utility amount-input {
+  direction: ltr;
+  unicode-bidi: isolate;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+@utility money-row {
+  display: flex;
+  flex-direction: row;
+  direction: ltr;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
 }

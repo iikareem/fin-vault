@@ -404,7 +404,10 @@ export class AnalyticsService {
         .filter((t) => t.type !== 'INCOME')
         .reduce((s, t) => s + Number(t.amount), 0) +
       claims.reduce((s, c) => s + Number(c.amount), 0) +
-      gifts.reduce((s, g) => s + Number(g.amount), 0);
+      gifts.reduce(
+        (s, g) => s + (g.houseTxId ? 0 : Number(g.amount)),
+        0,
+      );
 
     return {
       date,
@@ -435,8 +438,8 @@ export class AnalyticsService {
         id: g.id,
         amount: Number(g.amount),
         note: g.note,
-        member: g.member,
-        memberId: g.memberId,
+        member: g.houseTxId ? { id: 'house', name: 'House' } : g.member,
+        memberId: g.houseTxId ? 'house' : g.memberId,
         type: g.type,
       })),
     };

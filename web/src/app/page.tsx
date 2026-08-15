@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { api, money, todayISO } from "@/lib/api";
+import { api, money, parseAmount, todayISO } from "@/lib/api";
 import { fill, labelFor } from "@/lib/i18n";
 import { useCalendarClock } from "@/hooks/useCalendarClock";
 import { BottomNav } from "@/components/BottomNav";
@@ -11,6 +11,7 @@ import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
+import { Money } from "@/components/Money";
 import {
   isCashWallet,
   isCurrentWallet,
@@ -128,7 +129,7 @@ export default function HomePage() {
 
   async function payClaim(claim: Claim) {
     if (!active || !cashId) return;
-    const typed = Number(payAmounts[claim.id]);
+    const typed = parseAmount(payAmounts[claim.id] ?? "");
     const amount = Number.isFinite(typed) ? typed : 0;
     if (amount <= 0) {
       setError(t("payBackAmount"));
@@ -196,8 +197,12 @@ export default function HomePage() {
         <p className="text-base" style={{ color: "#fff" }}>
           💵 {isHouse ? t("houseMoneyNow") : t("yourMoneyNow")}
         </p>
-        <p className="mt-1 amount text-[clamp(1.4rem,7.2vw,2.25rem)] font-bold leading-tight">
-          {accounts.length ? money(cashTotal, currency, locale) : "…"}
+        <p className="mt-1 text-[clamp(1.4rem,7.2vw,2.25rem)] font-bold leading-tight">
+          {accounts.length ? (
+            <Money amount={cashTotal} currency={currency} locale={locale} />
+          ) : (
+            "…"
+          )}
         </p>
         <div className="mt-4 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
           <div
@@ -205,10 +210,16 @@ export default function HomePage() {
             style={{ background: "rgba(255,255,255,0.18)" }}
           >
             <p className="text-sm opacity-90">💵 {t("currentWallet")}</p>
-            <p className="amount text-xl font-semibold leading-tight">
-              {accounts.length
-                ? money(currentWallet?.balance ?? 0, currency, locale)
-                : "…"}
+            <p className="text-xl font-semibold leading-tight">
+              {accounts.length ? (
+                <Money
+                  amount={currentWallet?.balance ?? 0}
+                  currency={currency}
+                  locale={locale}
+                />
+              ) : (
+                "…"
+              )}
             </p>
             <p className="mt-1 text-xs opacity-80">{t("currentHint")}</p>
           </div>
@@ -217,10 +228,16 @@ export default function HomePage() {
             style={{ background: "rgba(255,255,255,0.18)" }}
           >
             <p className="text-sm opacity-90">💰 {t("savingsWallet")}</p>
-            <p className="amount text-xl font-semibold leading-tight">
-              {accounts.length
-                ? money(savingsWallet?.balance ?? 0, currency, locale)
-                : "…"}
+            <p className="text-xl font-semibold leading-tight">
+              {accounts.length ? (
+                <Money
+                  amount={savingsWallet?.balance ?? 0}
+                  currency={currency}
+                  locale={locale}
+                />
+              ) : (
+                "…"
+              )}
             </p>
             <p className="mt-1 text-xs opacity-80">{t("savingsHint")}</p>
           </div>
@@ -231,8 +248,16 @@ export default function HomePage() {
             style={{ background: "rgba(255,255,255,0.18)" }}
           >
             <p className="text-sm opacity-90">📈 {t("monthIn")}</p>
-            <p className="amount text-lg font-semibold leading-tight">
-              {summary ? money(summary.monthIncome, currency, locale) : "…"}
+            <p className="text-lg font-semibold leading-tight">
+              {summary ? (
+                <Money
+                  amount={summary.monthIncome}
+                  currency={currency}
+                  locale={locale}
+                />
+              ) : (
+                "…"
+              )}
             </p>
             <p className="mt-1 text-xs opacity-80">{t("monthInHint")}</p>
           </div>
@@ -241,8 +266,16 @@ export default function HomePage() {
             style={{ background: "rgba(255,255,255,0.18)" }}
           >
             <p className="text-sm opacity-90">📉 {t("monthOut")}</p>
-            <p className="amount text-lg font-semibold leading-tight">
-              {summary ? money(summary.monthExpense, currency, locale) : "…"}
+            <p className="text-lg font-semibold leading-tight">
+              {summary ? (
+                <Money
+                  amount={summary.monthExpense}
+                  currency={currency}
+                  locale={locale}
+                />
+              ) : (
+                "…"
+              )}
             </p>
             <p className="mt-1 text-xs opacity-80">{t("monthOutHint")}</p>
           </div>
@@ -286,16 +319,20 @@ export default function HomePage() {
           <ul className="mt-3 space-y-3">
             {waitingClaims.map((c) => (
               <li key={c.id} className="rounded-2xl bg-amber-50 px-3 py-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
+                <div className="money-row">
+                  <div className="min-w-0 text-right" dir="auto">
                     <p className="font-semibold">{c.member.name}</p>
                     <p className="text-stone-600">
                       {labelFor(c.category.name, t)}
                       {c.note ? ` · ${c.note}` : ""}
                     </p>
                   </div>
-                  <span className="amount shrink-0 text-lg font-bold">
-                    {money(c.remaining, currency, locale)}
+                  <span className="shrink-0 text-lg font-bold">
+                    <Money
+                      amount={c.remaining}
+                      currency={currency}
+                      locale={locale}
+                    />
                   </span>
                 </div>
                 {isAdmin ? (
@@ -321,7 +358,8 @@ export default function HomePage() {
                     </div>
                     <input
                       inputMode="decimal"
-                      className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-2xl"
+                      dir="ltr"
+                      className="amount-input w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-2xl"
                       value={payAmounts[c.id] ?? ""}
                       onChange={(e) =>
                         setPayAmounts((prev) => ({
@@ -355,8 +393,16 @@ export default function HomePage() {
         >
           <div className="flex items-center justify-between">
             <span className="text-xl font-semibold">🕌 {t("navCharity")}</span>
-            <span className="font-semibold tabular-nums">
-              {charity ? money(charity.familyTotal, currency, locale) : ""}
+            <span className="font-semibold">
+              {charity ? (
+                <Money
+                  amount={charity.familyTotal}
+                  currency={currency}
+                  locale={locale}
+                />
+              ) : (
+                ""
+              )}
             </span>
           </div>
           <Hint>{t("charityHomeHint")}</Hint>
@@ -409,15 +455,21 @@ export default function HomePage() {
           <ul className="mt-3 space-y-2">
             {txs.map((tx) => (
               <li key={tx.id} className="surface rounded-2xl px-4 py-3">
-                <div className="flex min-w-0 items-center justify-between gap-3">
-                  <span className="min-w-0 font-medium">{labelFor(tx.category.name, t)}</span>
+                <div className="money-row min-w-0">
+                  <span className="min-w-0 font-medium" dir="auto">
+                    {labelFor(tx.category.name, t)}
+                  </span>
                   <span
-                    className={`amount shrink-0 font-semibold ${
+                    className={`shrink-0 font-semibold ${
                       tx.type === "INCOME" ? "text-emerald-800" : "text-red-800"
                     }`}
                   >
-                    {tx.type === "INCOME" ? "+" : "−"}
-                    {money(Number(tx.amount), currency, locale)}
+                    <Money
+                      amount={Number(tx.amount)}
+                      currency={currency}
+                      locale={locale}
+                      extraSign={tx.type === "INCOME" ? "+" : "−"}
+                    />
                   </span>
                 </div>
                 {tx.user.name !== "House" || tx.note ? (

@@ -63,7 +63,12 @@ export class CharityController {
     @CurrentUser() user: AuthUser,
     @Body() dto: CreateCharityGiftDto,
   ) {
-    return this.charity.contribute(membership.householdId, user.id, dto);
+    return this.charity.contribute(
+      membership.householdId,
+      user.id,
+      membership.role,
+      dto,
+    );
   }
 
   @Patch('gifts/:giftId')

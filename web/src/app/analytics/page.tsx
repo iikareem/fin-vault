@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { api, money } from "@/lib/api";
+import { api } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
+import { Money } from "@/components/Money";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
 import { labelFor } from "@/lib/i18n";
@@ -223,14 +224,20 @@ export default function AnalyticsPage() {
           <h2 className="text-xl font-semibold">{t("savingsTitle")}</h2>
           <Hint>{t("chartsSavingsHint")}</Hint>
           <div className="mt-3 grid grid-cols-1 gap-2 text-base">
-            <p className="flex justify-between">
-              <span className="text-stone-500">{t("broughtFromBefore")}</span>
+            <p className="money-row">
+              <span className="text-stone-500" dir="auto">
+                {t("broughtFromBefore")}
+              </span>
               <span className="font-semibold">
-                {money(monthSavings.broughtForward, currency, locale)}
+                <Money
+                  amount={monthSavings.broughtForward}
+                  currency={currency}
+                  locale={locale}
+                />
               </span>
             </p>
-            <p className="flex justify-between">
-              <span className="text-stone-500">
+            <p className="money-row">
+              <span className="text-stone-500" dir="auto">
                 {monthSavings.saved < 0
                   ? t("usedFromSavings")
                   : t("savedInMonth")}
@@ -240,13 +247,23 @@ export default function AnalyticsPage() {
                   monthSavings.saved < 0 ? "text-red-800" : "text-emerald-800"
                 }`}
               >
-                {money(monthSavings.saved, currency, locale)}
+                <Money
+                  amount={monthSavings.saved}
+                  currency={currency}
+                  locale={locale}
+                />
               </span>
             </p>
-            <p className="flex justify-between">
-              <span className="text-stone-500">{t("goesToNextMonth")}</span>
+            <p className="money-row">
+              <span className="text-stone-500" dir="auto">
+                {t("goesToNextMonth")}
+              </span>
               <span className="font-semibold">
-                {money(monthSavings.remaining, currency, locale)}
+                <Money
+                  amount={monthSavings.remaining}
+                  currency={currency}
+                  locale={locale}
+                />
               </span>
             </p>
           </div>
@@ -278,7 +295,11 @@ export default function AnalyticsPage() {
                         row.saved < 0 ? "text-red-800" : "text-emerald-800"
                       }
                     >
-                      {money(row.saved, currency, locale)}
+                      <Money
+                        amount={row.saved}
+                        currency={currency}
+                        locale={locale}
+                      />
                     </span>
                   </div>
                   <div className="mt-1 h-3 overflow-hidden rounded-full bg-stone-200">
@@ -293,7 +314,11 @@ export default function AnalyticsPage() {
                   </div>
                   <p className="mt-1 text-sm text-stone-500">
                     {t("goesToNextMonth")}:{" "}
-                    {money(row.remaining, currency, locale)}
+                    <Money
+                      amount={row.remaining}
+                      currency={currency}
+                      locale={locale}
+                    />
                   </p>
                 </button>
               ))
@@ -306,13 +331,13 @@ export default function AnalyticsPage() {
         <div className="rounded-2xl bg-white p-4 shadow-sm">
           <p className="text-stone-500">{t("periodTotalIn")}</p>
           <p className="text-xl font-semibold text-emerald-800">
-            {money(totalIn, currency, locale)}
+            <Money amount={totalIn} currency={currency} locale={locale} />
           </p>
         </div>
         <div className="rounded-2xl bg-white p-4 shadow-sm">
           <p className="text-stone-500">{t("periodTotalOut")}</p>
           <p className="text-xl font-semibold text-red-800">
-            {money(totalOut, currency, locale)}
+            <Money amount={totalOut} currency={currency} locale={locale} />
           </p>
         </div>
       </div>
@@ -331,7 +356,13 @@ export default function AnalyticsPage() {
                 <div key={b.key}>
                   <div className="flex justify-between text-sm">
                     <span>{b.label}</span>
-                    <span>{money(b.expense, currency, locale)}</span>
+                    <span>
+                      <Money
+                        amount={b.expense}
+                        currency={currency}
+                        locale={locale}
+                      />
+                    </span>
                   </div>
                   <div className="mt-1 h-3 overflow-hidden rounded-full bg-stone-200">
                     <div
@@ -357,7 +388,7 @@ export default function AnalyticsPage() {
               <div className="flex justify-between">
                 <span>{labelFor(c.name, t)}</span>
                 <span className="font-semibold">
-                  {money(c.total, currency, locale)}
+                  <Money amount={c.total} currency={currency} locale={locale} />
                 </span>
               </div>
               <div className="mt-1 h-3 overflow-hidden rounded-full bg-stone-200">
@@ -388,7 +419,7 @@ export default function AnalyticsPage() {
                   {labelFor(m.name, t)} · {m.type === "EXPENSE" ? t("paidVerb") : t("receivedVerb")}
                 </span>
                 <span className="font-semibold">
-                  {money(m.total, currency, locale)}
+                  <Money amount={m.total} currency={currency} locale={locale} />
                 </span>
               </li>
             ))}

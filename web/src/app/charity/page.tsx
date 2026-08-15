@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { api, money, todayISO } from "@/lib/api";
+import { api, money, parseAmount, todayISO } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/components/I18nProvider";
@@ -11,6 +11,14 @@ import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 import { useCalendarClock } from "@/hooks/useCalendarClock";
 import { shiftMonthKey } from "@/lib/calendar";
+import {
+  isCashWallet,
+  isCurrentWallet,
+  isSavingsWallet,
+  sortCashWallets,
+} from "@/lib/wallets";
+
+type Account = { id: string; name: string };
 
 type MemberTotal = { userId: string; name: string; total: number };
 type Gift = {
@@ -52,6 +60,8 @@ export default function CharityPage() {
   const [goals, setGoals] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accountId, setAccountId] = useState("");
 
   useEffect(() => {
     setMonth(cal.monthKey);
@@ -79,7 +89,17 @@ export default function CharityPage() {
     if (!house) return;
     setKind("HOUSE");
     load(house.householdId, month).catch((e) => setError(e.message));
-  }, [house?.householdId, month]);
+    if (house.role === "ADMIN") {
+      api<Account[]>(householdPath(house.householdId, "/accounts"))
+        .then((list) => {
+          const cash = sortCashWallets(list.filter(isCashWallet));
+          setAccounts(cash);
+          const current = cash.find(isCurrentWallet) ?? cash[0];
+          if (current) setAccountId(current.id);
+        })
+        .catch((e) => setError(e.message));
+    }
+  }, [house?.householdId, house?.role, month]);
 
   async function contribute(e: FormEvent) {
     e.preventDefault();
@@ -91,9 +111,12 @@ export default function CharityPage() {
         method: "POST",
         body: JSON.stringify({
           typeId,
-          amount: Number(amount),
+          amount: parseAmount(amount),
           occurredOn,
           note,
+          ...(isAdmin
+            ? { fromHouse: true, accountId }
+            : {}),
         }),
       });
       setAmount("");
@@ -199,8 +222,10 @@ export default function CharityPage() {
         onSubmit={contribute}
         className="mt-5 space-y-3 rounded-3xl bg-white p-4 shadow-sm"
       >
-        <h2 className="text-xl font-semibold">🤲 {t("charityIPaid")}</h2>
-        <Hint>{t("charityPayHint")}</Hint>
+        <h2 className="text-xl font-semibold">
+          🤲 {isAdmin ? t("charityFromHouse") : t("charityIPaid")}
+        </h2>
+        <Hint>{isAdmin ? t("charityFromHouseHint") : t("charityPayHint")}</Hint>
         <label className="block">
           <span className="text-stone-500">{t("forWhat")}</span>
           <select
@@ -217,16 +242,39 @@ export default function CharityPage() {
           </select>
           <Hint>{t("charityTypeHint")}</Hint>
         </label>
+        {isAdmin ? (
+          <div>
+            <p className="mb-1 font-medium">{t("pickWalletSpend")}</p>
+            <div className="grid grid-cols-2 gap-2">
+              {accounts.map((a) => (
+                <button
+                  key={a.id}
+                  type="button"
+                  onClick={() => setAccountId(a.id)}
+                  className={`rounded-2xl px-3 py-3 text-lg font-bold ${
+                    accountId === a.id
+                      ? "bg-teal-800 text-white shadow"
+                      : "bg-stone-100 text-stone-700"
+                  }`}
+                >
+                  {isSavingsWallet(a)
+                    ? `💰 ${t("savingsWallet")}`
+                    : `💵 ${t("currentWallet")}`}
+                </button>
+              ))}
+            </div>
+            <Hint>{t("charityWalletHint")}</Hint>
+          </div>
+        ) : null}
         <label className="block">
           <span className="text-stone-500">{t("amount")}</span>
           <input
-            type="number"
-            min="0.01"
-            step="0.01"
+            inputMode="decimal"
+            dir="ltr"
             required
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="mt-1 w-full rounded-2xl border border-stone-200 px-3 py-3 text-lg"
+            className="amount-input mt-1 w-full rounded-2xl border border-stone-200 px-3 py-3 text-lg"
           />
           <Hint>{t("amountHint")}</Hint>
         </label>
@@ -338,7 +386,7 @@ export default function CharityPage() {
                 <ul className="mt-2 space-y-1">
                   {row.byMember.map((m) => (
                     <li key={m.userId} className="flex justify-between">
-                      <span>{m.name}</span>
+                      <span>{labelFor(m.name, t)}</span>
                       <span className="font-semibold">
                         {money(m.total, currency, locale)}
                       </span>

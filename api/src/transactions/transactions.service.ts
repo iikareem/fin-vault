@@ -84,6 +84,7 @@ export class TransactionsService {
         payoutHouse: true,
         payoutPersonal: true,
         charityGift: true,
+        charityHouseGift: true,
         claimPersonal: true,
       },
     });
@@ -130,6 +131,12 @@ export class TransactionsService {
             data: { amount: new Prisma.Decimal(dto.amount) },
           });
         }
+        if (tx.charityHouseGift) {
+          await db.charityGift.update({
+            where: { id: tx.charityHouseGift.id },
+            data: { amount: new Prisma.Decimal(dto.amount) },
+          });
+        }
         if (tx.claimPersonal && tx.claimPersonal.status === 'OPEN') {
           await db.houseClaim.update({
             where: { id: tx.claimPersonal.id },
@@ -152,6 +159,12 @@ export class TransactionsService {
         if (tx.charityGift) {
           await db.charityGift.update({
             where: { id: tx.charityGift.id },
+            data: { occurredOn: on },
+          });
+        }
+        if (tx.charityHouseGift) {
+          await db.charityGift.update({
+            where: { id: tx.charityHouseGift.id },
             data: { occurredOn: on },
           });
         }
@@ -182,6 +195,7 @@ export class TransactionsService {
         payoutHouse: true,
         payoutPersonal: true,
         charityGift: true,
+        charityHouseGift: true,
         claimPersonal: true,
         reimbursement: true,
       },
@@ -204,6 +218,9 @@ export class TransactionsService {
       }
       if (tx.charityGift) {
         await db.charityGift.delete({ where: { id: tx.charityGift.id } });
+      }
+      if (tx.charityHouseGift) {
+        await db.charityGift.delete({ where: { id: tx.charityHouseGift.id } });
       }
       if (tx.claimPersonal) {
         if (tx.claimPersonal.status !== 'OPEN') {

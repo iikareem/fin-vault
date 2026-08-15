@@ -136,7 +136,8 @@ model Transaction {
   note          String         @default("")
   createdAt     DateTime       @default(now())
   reimbursement Reimbursement?
-  charityGift   CharityGift?
+  charityGift      CharityGift? @relation("CharityPersonalTx")
+  charityHouseGift CharityGift? @relation("CharityHouseTx")
   payoutHouse    HousePayout? @relation("PayoutHouseTx")
   payoutPersonal HousePayout? @relation("PayoutPersonalTx")
   claimPersonal  HouseClaim? @relation("ClaimPersonalTx")
@@ -236,9 +237,11 @@ model CharityGift {
   amount       Decimal     @db.Decimal(14, 2)
   occurredOn   DateTime    @db.Date
   note         String      @default("")
-  personalTxId String?     @unique
-  personalTx   Transaction? @relation(fields: [personalTxId], references: [id])
-  createdAt    DateTime    @default(now())
+  personalTxId String?      @unique
+  personalTx   Transaction? @relation("CharityPersonalTx", fields: [personalTxId], references: [id])
+  houseTxId    String?      @unique
+  houseTx      Transaction? @relation("CharityHouseTx", fields: [houseTxId], references: [id])
+  createdAt    DateTime     @default(now())
 
   @@index([householdId, occurredOn])
   @@index([typeId])

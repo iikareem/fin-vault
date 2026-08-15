@@ -29,17 +29,18 @@ function loadFamily(): Person[] {
   return JSON.parse(readFileSync(file, 'utf8')) as Person[];
 }
 
-async function syncNames(family: Person[]) {
+async function syncFamily(family: Person[]) {
   await prisma.household.updateMany({
     where: { kind: 'HOUSE' },
     data: { name: 'House' },
   });
   for (const person of family) {
+    const passwordHash = await bcrypt.hash(person.password, 10);
     const user = await prisma.user.findUnique({ where: { email: person.email } });
     if (!user) continue;
     await prisma.user.update({
       where: { id: user.id },
-      data: { name: person.name, relation: person.relation },
+      data: { name: person.name, relation: person.relation, passwordHash },
     });
     await prisma.household.updateMany({
       where: {
@@ -55,37 +56,40 @@ async function main() {
   const family = loadFamily();
   const already = await prisma.user.count();
   if (already > 0) {
-    await syncNames(family);
-    console.log(`Family is fixed (${family.length} people). Names synced.`);
+    await syncFamily(family);
+    console.log(`Family is fixed (${family.length} people). Names and passwords synced.`);
     return;
   }
 
-  await prisma.$transaction(async (tx) => {
-    const house = await tx.household.create({
-      data: { name: 'House', kind: 'HOUSE', currency: 'EGP' },
-    });
-    await seedHouseBooks(tx, house.id);
+  await prisma.$transaction(
+    async (tx) => {
+      const house = await tx.household.create({
+        data: { name: 'House', kind: 'HOUSE', currency: 'EGP' },
+      });
+      await seedHouseBooks(tx, house.id);
 
-    for (const person of family) {
-      const passwordHash = await bcrypt.hash(person.password, 10);
-      const user = await tx.user.create({
-        data: {
-          name: person.name,
-          email: person.email,
-          passwordHash,
-          relation: person.relation,
-        },
-      });
-      await seedPersonalSpace(tx, user.id, person.name);
-      await tx.membership.create({
-        data: {
-          userId: user.id,
-          householdId: house.id,
-          role: person.role,
-        },
-      });
-    }
-  });
+      for (const person of family) {
+        const passwordHash = await bcrypt.hash(person.password, 10);
+        const user = await tx.user.create({
+          data: {
+            name: person.name,
+            email: person.email,
+            passwordHash,
+            relation: person.relation,
+          },
+        });
+        await seedPersonalSpace(tx, user.id, person.name);
+        await tx.membership.create({
+          data: {
+            userId: user.id,
+            householdId: house.id,
+            role: person.role,
+          },
+        });
+      }
+    },
+    { maxWait: 20000, timeout: 120000 },
+  );
 
   console.log(`Seeded ${family.length} people.`);
 }

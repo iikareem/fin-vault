@@ -2,7 +2,7 @@
 
 import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api, todayISO } from "@/lib/api";
+import { api, parseAmount, todayISO } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/components/I18nProvider";
@@ -116,7 +116,7 @@ function AddForm() {
           method: "POST",
           body: JSON.stringify({
             categoryId,
-            amount: Number(amount),
+            amount: parseAmount(amount),
             occurredOn,
             note,
           }),
@@ -127,7 +127,7 @@ function AddForm() {
           body: JSON.stringify({
             toUserId,
             accountId,
-            amount: Number(amount),
+            amount: parseAmount(amount),
             occurredOn,
             note,
             kind: "Allowance",
@@ -136,8 +136,8 @@ function AddForm() {
       } else if (type === "INCOME") {
         const current = accounts.find(isCurrentWallet);
         const savings = accounts.find(isSavingsWallet);
-        const intoCurrent = Number(currentAmt);
-        const intoSavings = Number(savingsAmt);
+        const intoCurrent = parseAmount(currentAmt);
+        const intoSavings = parseAmount(savingsAmt);
         const jobs: Promise<unknown>[] = [];
         if (current && intoCurrent > 0) {
           jobs.push(
@@ -180,7 +180,7 @@ function AddForm() {
           method: "POST",
           body: JSON.stringify({
             type,
-            amount: Number(amount),
+            amount: parseAmount(amount),
             accountId,
             categoryId,
             occurredOn,
@@ -311,7 +311,8 @@ function AddForm() {
             <span className="mb-1 block font-medium">{t("amount")}</span>
             <input
               inputMode="decimal"
-              className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-4 text-2xl"
+              dir="ltr"
+              className="amount-input w-full rounded-2xl border border-stone-300 bg-white px-4 py-4 text-2xl"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0"
@@ -328,7 +329,8 @@ function AddForm() {
               </span>
               <input
                 inputMode="decimal"
-                className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-4 text-2xl"
+                dir="ltr"
+                className="amount-input w-full rounded-2xl border border-stone-300 bg-white px-4 py-4 text-2xl"
                 value={currentAmt}
                 onChange={(e) => setCurrentAmt(e.target.value)}
                 placeholder="0"
@@ -341,7 +343,8 @@ function AddForm() {
               </span>
               <input
                 inputMode="decimal"
-                className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-4 text-2xl"
+                dir="ltr"
+                className="amount-input w-full rounded-2xl border border-stone-300 bg-white px-4 py-4 text-2xl"
                 value={savingsAmt}
                 onChange={(e) => setSavingsAmt(e.target.value)}
                 placeholder="0"

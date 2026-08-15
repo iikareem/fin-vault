@@ -102,13 +102,16 @@ export class CharityService {
         { userId: string; name: string; total: number }
       >();
       for (const g of typeGifts) {
-        const cur = byMemberMap.get(g.memberId) ?? {
-          userId: g.member.id,
-          name: g.member.name,
+        const fromHouse = Boolean(g.houseTxId);
+        const userId = fromHouse ? 'house' : g.member.id;
+        const name = fromHouse ? 'House' : g.member.name;
+        const cur = byMemberMap.get(userId) ?? {
+          userId,
+          name,
           total: 0,
         };
         cur.total += Number(g.amount);
-        byMemberMap.set(g.memberId, cur);
+        byMemberMap.set(userId, cur);
       }
       const paid = goal > 0 ? total + 0.001 >= goal : total > 0;
       return {
@@ -124,7 +127,10 @@ export class CharityService {
           amount: Number(g.amount),
           occurredOn: g.occurredOn,
           note: g.note,
-          member: g.member,
+          fromHouse: Boolean(g.houseTxId),
+          member: g.houseTxId
+            ? { id: 'house', name: 'House' }
+            : g.member,
         })),
       };
     });
@@ -191,22 +197,42 @@ export class CharityService {
   async contribute(
     householdId: string,
     memberId: string,
+    role: string,
     dto: CreateCharityGiftDto,
   ) {
     const type = await this.prisma.charityType.findFirst({
       where: { id: dto.typeId, householdId, archived: false },
     });
     if (!type) throw new NotFoundException('Charity type not found');
+    const fromHouse = dto.fromHouse === true;
+    if (fromHouse && role !== 'ADMIN') {
+      throw new ForbiddenException('Only an admin can pay charity from house cash');
+    }
 
     return this.prisma.$transaction(async (tx) => {
-      const personalTxId = await this.recordOnPersonal(
-        tx,
-        memberId,
-        dto.amount,
-        dto.occurredOn,
-        type.name,
-        dto.note ?? '',
-      );
+      let personalTxId: string | null = null;
+      let houseTxId: string | null = null;
+      if (fromHouse) {
+        houseTxId = await this.recordOnHouse(
+          tx,
+          householdId,
+          memberId,
+          dto.amount,
+          dto.occurredOn,
+          type.name,
+          dto.note ?? '',
+          dto.accountId,
+        );
+      } else {
+        personalTxId = await this.recordOnPersonal(
+          tx,
+          memberId,
+          dto.amount,
+          dto.occurredOn,
+          type.name,
+          dto.note ?? '',
+        );
+      }
       return tx.charityGift.create({
         data: {
           householdId,
@@ -216,6 +242,7 @@ export class CharityService {
           occurredOn: new Date(dto.occurredOn),
           note: dto.note ?? '',
           personalTxId,
+          houseTxId,
         },
         include: { member: { select: { id: true, name: true } } },
       });
@@ -259,6 +286,18 @@ export class CharityService {
           },
         });
       }
+      if (gift.houseTxId) {
+        await tx.transaction.update({
+          where: { id: gift.houseTxId },
+          data: {
+            ...(dto.amount !== undefined
+              ? { amount: new Prisma.Decimal(dto.amount) }
+              : {}),
+            ...(dto.note !== undefined ? { note: dto.note } : {}),
+            ...(dto.occurredOn ? { occurredOn: new Date(dto.occurredOn) } : {}),
+          },
+        });
+      }
     });
     return this.prisma.charityGift.findFirstOrThrow({
       where: { id: giftId },
@@ -283,6 +322,9 @@ export class CharityService {
       await tx.charityGift.delete({ where: { id: giftId } });
       if (gift.personalTxId) {
         await tx.transaction.delete({ where: { id: gift.personalTxId } });
+      }
+      if (gift.houseTxId) {
+        await tx.transaction.delete({ where: { id: gift.houseTxId } });
       }
     });
     return { ok: true };
@@ -310,19 +352,7 @@ export class CharityService {
       },
     });
     if (!cash) return null;
-    let category = await tx.category.findFirst({
-      where: { householdId, name: 'Charity', kind: 'EXPENSE' },
-    });
-    if (!category) {
-      category = await tx.category.create({
-        data: {
-          householdId,
-          name: 'Charity',
-          kind: 'EXPENSE',
-          color: '#0f766e',
-        },
-      });
-    }
+    const category = await this.ensureCharityCategory(tx, householdId);
     const created = await tx.transaction.create({
       data: {
         householdId,
@@ -336,5 +366,67 @@ export class CharityService {
       },
     });
     return created.id;
+  }
+
+  private async recordOnHouse(
+    tx: Prisma.TransactionClient,
+    householdId: string,
+    userId: string,
+    amount: number,
+    occurredOn: string,
+    typeName: string,
+    note: string,
+    accountId?: string,
+  ) {
+    const cash = accountId
+      ? await tx.account.findFirst({
+          where: {
+            id: accountId,
+            householdId,
+            type: 'CASH',
+            archived: false,
+          },
+        })
+      : await tx.account.findFirst({
+          where: {
+            householdId,
+            type: 'CASH',
+            archived: false,
+            name: { in: ['Current', 'Cash'] },
+          },
+        });
+    if (!cash) throw new BadRequestException('Unknown house cash wallet');
+    const category = await this.ensureCharityCategory(tx, householdId);
+    const created = await tx.transaction.create({
+      data: {
+        householdId,
+        accountId: cash.id,
+        categoryId: category.id,
+        userId,
+        type: 'EXPENSE',
+        amount: new Prisma.Decimal(amount),
+        occurredOn: new Date(occurredOn),
+        note: note || typeName,
+      },
+    });
+    return created.id;
+  }
+
+  private async ensureCharityCategory(
+    tx: Prisma.TransactionClient,
+    householdId: string,
+  ) {
+    const existing = await tx.category.findFirst({
+      where: { householdId, name: 'Charity', kind: 'EXPENSE' },
+    });
+    if (existing) return existing;
+    return tx.category.create({
+      data: {
+        householdId,
+        name: 'Charity',
+        kind: 'EXPENSE',
+        color: '#0f766e',
+      },
+    });
   }
 }
