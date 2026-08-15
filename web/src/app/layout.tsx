@@ -28,10 +28,17 @@ export const viewport: Viewport = {
   themeColor: "#edf4f0",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="ar" dir="rtl" className={`${arabic.variable} h-full`}>
       <body className="min-h-full text-stone-900 antialiased">
+        <noscript>
+          هذا الموقع يحتاج جافاسكريبت. لو الآيفون قديم، حدّثي النظام أو جرّبي كروم.
+        </noscript>
         <AppShell>{children}</AppShell>
       </body>
     </html>
