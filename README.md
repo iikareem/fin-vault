@@ -2,7 +2,7 @@
 
 [![GitHub](https://img.shields.io/badge/GitHub-iikareem%2Ffin--vault-181717?logo=github)](https://github.com/iikareem/fin-vault)
 
-**Fin Vault** (مال البيت) is a private household cash app — house money and personal money in one place.
+**Fin Vault** is a private household cash app — house money and personal money in one place.
 
 Built for daily family use: what’s on hand, what was spent, and a clear day-by-day story. Arabic-first (RTL). Currency defaults to EGP.
 
@@ -13,10 +13,9 @@ Built for daily family use: what’s on hand, what was spent, and a clear day-by
 - **Two money spaces:** house books and each person’s own cash
 - **Wallets:** current + savings
 - **Moves:** income, spending, allowances, and paybacks
-- **Spending types:** purchases (مشتريات), food, clothes, transport, bills, and more
+- **Spending types:** purchases, food, clothes, transport, bills, and more
 - **History:** day-by-day list you can edit
 - **Reports:** totals by day, category, and person
-- **Between us:** loans between family members
 - **Charity:** monthly mosque / zakat tracking from house or personal cash
 
 ## Stack
