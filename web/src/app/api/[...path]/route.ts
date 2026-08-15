@@ -6,18 +6,7 @@ setDefaultResultOrder("verbatim");
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const HOP = new Set([
-  "connection",
-  "keep-alive",
-  "proxy-authenticate",
-  "proxy-authorization",
-  "te",
-  "trailers",
-  "transfer-encoding",
-  "upgrade",
-  "host",
-  "content-length",
-]);
+const FORWARD = new Set(["accept", "authorization", "content-type", "cookie"]);
 
 function apiOrigin() {
   const raw = (process.env.API_ORIGIN ?? "http://localhost:3001").replace(
@@ -55,8 +44,9 @@ async function proxy(
   const target = `${origin}/${path.join("/")}${req.nextUrl.search}`;
   const headers = new Headers();
   req.headers.forEach((value, key) => {
-    if (!HOP.has(key.toLowerCase())) headers.set(key, value);
+    if (FORWARD.has(key.toLowerCase())) headers.set(key, value);
   });
+  headers.set("accept", "application/json");
   const init: RequestInit = {
     method: req.method,
     headers,
@@ -73,17 +63,15 @@ async function proxy(
     return fail(target, reason);
   }
   const out = new Headers();
-  upstream.headers.forEach((value, key) => {
-    if (HOP.has(key.toLowerCase())) return;
-    if (key.toLowerCase() === "set-cookie") return;
-    out.set(key, value);
-  });
+  const contentType = upstream.headers.get("content-type");
+  if (contentType) out.set("content-type", contentType);
   const cookies =
     typeof upstream.headers.getSetCookie === "function"
       ? upstream.headers.getSetCookie()
       : [];
   for (const cookie of cookies) out.append("set-cookie", cookie);
-  return new Response(upstream.body, {
+  const buffer = await upstream.arrayBuffer();
+  return new Response(buffer, {
     status: upstream.status,
     headers: out,
   });

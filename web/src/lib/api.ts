@@ -20,6 +20,8 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     res = await fetch(`${BASE}${path}`, {
       ...init,
+      method: init?.method ?? "GET",
+      cache: "no-store",
       credentials: "include",
       headers,
       signal: timed.signal,
