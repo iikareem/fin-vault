@@ -1,4 +1,10 @@
+import { setDefaultResultOrder } from "node:dns";
 import { NextRequest } from "next/server";
+
+setDefaultResultOrder("verbatim");
+
+export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -17,7 +23,17 @@ const HOP = new Set([
 ]);
 
 function apiOrigin() {
-  return (process.env.API_ORIGIN ?? "http://localhost:3001").replace(/\/$/, "");
+  const raw = (process.env.API_ORIGIN ?? "http://localhost:3001").replace(
+    /\/$/,
+    "",
+  );
+  try {
+    const url = new URL(raw);
+    if (!url.port) url.port = process.env.API_PORT ?? "3001";
+    return url.origin;
+  } catch {
+    return raw;
+  }
 }
 
 async function proxy(
