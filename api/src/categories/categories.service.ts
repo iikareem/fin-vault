@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { HouseholdKind } from '@prisma/client';
+import { PERSONAL_EXPENSE } from '../households/space-defaults';
 
 const HOUSE_PAID = [
   { name: 'Family gift', kind: 'EXPENSE' as const, color: '#db2777' },
@@ -26,6 +27,26 @@ export class CategoriesService {
           },
           update: {},
           create: { householdId, ...cat },
+        });
+      }
+    }
+    if (kind === 'PERSONAL') {
+      for (const cat of PERSONAL_EXPENSE) {
+        await this.prisma.category.upsert({
+          where: {
+            householdId_name_kind: {
+              householdId,
+              name: cat.name,
+              kind: 'EXPENSE',
+            },
+          },
+          update: {},
+          create: {
+            householdId,
+            name: cat.name,
+            kind: 'EXPENSE',
+            color: cat.color,
+          },
         });
       }
     }

@@ -15,6 +15,37 @@ const HOUSE_EXPENSE = [
   { name: 'Member payback', color: '#44403c' },
 ];
 
+/** Personal spending types. Groceries shows as مشتريات and is the UI default. */
+export const PERSONAL_EXPENSE = [
+  { name: 'Groceries', color: '#16a34a' },
+  { name: 'Food', color: '#e11d48' },
+  { name: 'Restaurants', color: '#f97316' },
+  { name: 'Coffee', color: '#92400e' },
+  { name: 'Clothes', color: '#7c3aed' },
+  { name: 'Shoes', color: '#6d28d9' },
+  { name: 'Transport', color: '#0284c7' },
+  { name: 'Fuel', color: '#0369a1' },
+  { name: 'Bills', color: '#ea580c' },
+  { name: 'Phone', color: '#0ea5e9' },
+  { name: 'Internet', color: '#0891b2' },
+  { name: 'Subscriptions', color: '#4f46e5' },
+  { name: 'Rent', color: '#7c3aed' },
+  { name: 'Health', color: '#db2777' },
+  { name: 'Pharmacy', color: '#be185d' },
+  { name: 'Personal care', color: '#ec4899' },
+  { name: 'Beauty', color: '#d946ef' },
+  { name: 'Education', color: '#2563eb' },
+  { name: 'Entertainment', color: '#c026d3' },
+  { name: 'Sports', color: '#059669' },
+  { name: 'Travel', color: '#0d9488' },
+  { name: 'Gifts', color: '#e11d48' },
+  { name: 'Electronics', color: '#475569' },
+  { name: 'Home', color: '#a16207' },
+  { name: 'Pets', color: '#ca8a04' },
+  { name: 'Charity', color: '#0f766e' },
+  { name: 'Other', color: '#64748b' },
+];
+
 export async function seedPersonalSpace(
   client: Db,
   userId: string,
@@ -36,11 +67,15 @@ export async function seedPersonalSpace(
     data: [
       { householdId: personal.id, name: 'Salary', kind: 'INCOME', color: '#15803d' },
       { householdId: personal.id, name: 'Other income', kind: 'INCOME', color: '#0f766e' },
-      { householdId: personal.id, name: 'Other', kind: 'EXPENSE', color: '#64748b' },
-      { householdId: personal.id, name: 'Charity', kind: 'EXPENSE', color: '#0f766e' },
       { householdId: personal.id, name: 'From the house', kind: 'INCOME', color: '#0f766e' },
       { householdId: personal.id, name: 'Allowance', kind: 'INCOME', color: '#0284c7' },
       { householdId: personal.id, name: 'Family gift', kind: 'INCOME', color: '#db2777' },
+      ...PERSONAL_EXPENSE.map((c) => ({
+        householdId: personal.id,
+        name: c.name,
+        kind: 'EXPENSE' as const,
+        color: c.color,
+      })),
     ],
   });
   return personal;
