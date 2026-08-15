@@ -10,13 +10,22 @@ import { Hint } from "@/components/Hint";
 export default function LoginPage() {
   const router = useRouter();
   const { t } = useI18n();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  async function onSubmit(e: FormEvent) {
+  async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const form = e.currentTarget;
+    const email = (
+      form.elements.namedItem("email") as HTMLInputElement | null
+    )?.value.trim();
+    const password = (
+      form.elements.namedItem("password") as HTMLInputElement | null
+    )?.value;
+    if (!email || !password) {
+      setError(t("loginFailed"));
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -27,7 +36,11 @@ export default function LoginPage() {
       localStorage.removeItem("fb_space");
       router.replace("/");
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("loginFailed"));
+      const code = err instanceof Error ? err.message : "";
+      if (code === "LOGIN_TIMEOUT") setError(t("loginTimeout"));
+      else if (code === "LOGIN_NETWORK") setError(t("loginNetwork"));
+      else if (code === "Please log in") setError(t("loginFailed"));
+      else setError(code || t("loginFailed"));
     } finally {
       setBusy(false);
     }
@@ -42,20 +55,19 @@ export default function LoginPage() {
         </p>
         <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{t("appTitle")}</h1>
         <p className="mt-2 text-lg text-stone-600">{t("appSubtitle")}</p>
-        <form onSubmit={onSubmit} className="mt-8 space-y-4">
+        <form noValidate onSubmit={onSubmit} className="mt-8 space-y-4">
           <label className="block">
             <span className="mb-1 block text-sm font-medium">{t("email")}</span>
             <input
               className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-lg"
               type="text"
+              name="email"
               inputMode="email"
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
               dir="ltr"
               lang="en"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
               autoComplete="username"
               required
             />
@@ -66,13 +78,12 @@ export default function LoginPage() {
             <input
               className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-lg"
               type="password"
+              name="password"
               autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
               dir="ltr"
               lang="en"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
               required
             />
@@ -80,6 +91,7 @@ export default function LoginPage() {
           </label>
           {error ? <p className="text-red-700">{error}</p> : null}
           <button
+            type="submit"
             disabled={busy}
             className="w-full rounded-2xl bg-emerald-800 px-4 py-4 text-lg font-semibold text-white disabled:opacity-60"
           >
