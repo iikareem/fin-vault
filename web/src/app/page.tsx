@@ -182,6 +182,12 @@ export default function HomePage() {
     waitingCovers.reduce((s, c) => s + c.remaining, 0);
   const coverPendingCount =
     summary?.coversPendingCount ?? waitingCovers.length;
+  const peerIouCount =
+    (summary && summary.youOwe > 0.001 ? 1 : 0) +
+    (summary && summary.youAreOwed > 0.001 ? 1 : 0);
+  const attentionCount =
+    waitingClaims.length + waitingCovers.length + peerIouCount;
+  const quietAdminHome = Boolean(isHouse && isAdmin);
 
   async function refreshHouseLists() {
     if (!active) return;
@@ -518,7 +524,7 @@ export default function HomePage() {
         </div>
       ) : null}
 
-      {isHouse && summary ? (
+      {isHouse && summary && !quietAdminHome ? (
         <div className="mt-4 space-y-2">
           {summary.claimsWaiting > 0.001 ? (
             <div className="rounded-2xl bg-amber-50 px-4 py-3">
@@ -544,38 +550,6 @@ export default function HomePage() {
               </p>
             </div>
           ) : null}
-          {isAdmin && pendingCount > 0 ? (
-            <div className="rounded-2xl bg-amber-100 px-4 py-3">
-              <p className="font-semibold text-amber-950">
-                ⏳{" "}
-                {pendingCount === 1
-                  ? t("claimsAdminBannerOne", {
-                      amount: money(pendingTotal, currency, locale),
-                    })
-                  : t("claimsAdminBanner", {
-                      amount: money(pendingTotal, currency, locale),
-                      n: String(pendingCount),
-                    })}
-              </p>
-              <Hint>{t("claimsHomeHint")}</Hint>
-            </div>
-          ) : null}
-          {isAdmin && coverPendingCount > 0 ? (
-            <div className="rounded-2xl bg-indigo-100 px-4 py-3">
-              <p className="font-semibold text-indigo-950">
-                ⏳{" "}
-                {coverPendingCount === 1
-                  ? t("coversAdminBannerOne", {
-                      amount: money(coverPendingTotal, currency, locale),
-                    })
-                  : t("coversAdminBanner", {
-                      amount: money(coverPendingTotal, currency, locale),
-                      n: String(coverPendingCount),
-                    })}
-              </p>
-              <Hint>{t("housePaidForHint")}</Hint>
-            </div>
-          ) : null}
           {summary.youOwe > 0.001 || summary.youAreOwed > 0.001 ? (
             <p className="text-sm text-stone-500">{t("homeIouHint")}</p>
           ) : null}
@@ -594,7 +568,404 @@ export default function HomePage() {
         </div>
       ) : null}
 
-      {isHouse && waitingClaims.length > 0 ? (
+      {quietAdminHome && attentionCount > 0 ? (
+        <details className="group surface mt-4 overflow-hidden rounded-[1.75rem]">
+          <summary className="cursor-pointer list-none px-4 py-3 marker:content-none [&::-webkit-details-marker]:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0 text-right">
+                <p className="font-semibold text-stone-800">
+                  {t("attentionTitle")}
+                </p>
+                <p className="mt-0.5 text-sm text-stone-500">
+                  {attentionCount === 1
+                    ? t("attentionSummaryOne")
+                    : t("attentionSummary", { n: String(attentionCount) })}
+                </p>
+              </div>
+              <span
+                className="shrink-0 text-stone-400 transition-transform group-open:rotate-180"
+                aria-hidden
+              >
+                ▾
+              </span>
+            </div>
+          </summary>
+          <div className="space-y-4 border-t border-stone-200 px-4 py-4">
+            <p className="text-sm text-stone-500">{t("attentionHint")}</p>
+            {pendingCount > 0 ? (
+              <p className="text-sm text-stone-600">
+                {pendingCount === 1
+                  ? t("claimsAdminBannerOne", {
+                      amount: money(pendingTotal, currency, locale),
+                    })
+                  : t("claimsAdminBanner", {
+                      amount: money(pendingTotal, currency, locale),
+                      n: String(pendingCount),
+                    })}
+              </p>
+            ) : null}
+            {coverPendingCount > 0 ? (
+              <p className="text-sm text-stone-600">
+                {coverPendingCount === 1
+                  ? t("coversAdminBannerOne", {
+                      amount: money(coverPendingTotal, currency, locale),
+                    })
+                  : t("coversAdminBanner", {
+                      amount: money(coverPendingTotal, currency, locale),
+                      n: String(coverPendingCount),
+                    })}
+              </p>
+            ) : null}
+            {summary && summary.claimsWaiting > 0.001 ? (
+              <p className="text-sm text-stone-600">
+                {t("houseOwesYou", {
+                  amount: money(summary.claimsWaiting, currency, locale),
+                })}
+              </p>
+            ) : null}
+            {summary && (summary.coversWaiting ?? 0) > 0.001 ? (
+              <p className="text-sm text-stone-600">
+                {t("youOweHouse", {
+                  amount: money(summary.coversWaiting ?? 0, currency, locale),
+                })}
+              </p>
+            ) : null}
+            {waitingClaims.length > 0 ? (
+              <div>
+                <h2 className="text-base font-semibold text-stone-800">
+                  {t("peoplePaidTitle")}
+                </h2>
+                <ul className="mt-2 space-y-2">
+                  {waitingClaims.map((c) => {
+                    const mine = c.member.id === userId;
+                    const canManage =
+                      (mine || isAdmin) &&
+                      c.reimbursed < 0.001 &&
+                      c.remaining > 0.001;
+                    return (
+                      <li
+                        key={c.id}
+                        className="rounded-2xl bg-stone-50 px-3 py-3"
+                      >
+                        <div className="money-row">
+                          <div className="min-w-0 text-right" dir="auto">
+                            <p className="font-semibold">{c.member.name}</p>
+                            <p className="text-stone-600">
+                              {labelFor(c.category.name, t)}
+                              {c.note ? ` · ${c.note}` : ""}
+                            </p>
+                            <p className="mt-1 text-sm text-stone-500">
+                              {mine ? t("yourClaimWaiting") : t("waitingPayback")}
+                            </p>
+                          </div>
+                          <span className="shrink-0 text-lg font-bold">
+                            <Money
+                              amount={c.remaining}
+                              currency={currency}
+                              locale={locale}
+                            />
+                          </span>
+                        </div>
+                        {canManage ? (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                startEditObligation(c.id, c.amount, c.note)
+                              }
+                              className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-stone-800"
+                            >
+                              {t("edit")}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busyEdit}
+                              onClick={() =>
+                                confirmDeleteId === c.id
+                                  ? deleteObligation(`/claims/${c.id}`)
+                                  : setConfirmDeleteId(c.id)
+                              }
+                              className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-red-800"
+                            >
+                              {confirmDeleteId === c.id
+                                ? t("confirmDelete")
+                                : t("deleteItem")}
+                            </button>
+                          </div>
+                        ) : null}
+                        {editId === c.id ? (
+                          <div className="mt-3 space-y-2">
+                            <input
+                              inputMode="decimal"
+                              dir="ltr"
+                              className="amount-input w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-xl"
+                              value={editAmount}
+                              onChange={(e) => setEditAmount(e.target.value)}
+                            />
+                            <input
+                              className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3"
+                              value={editNote}
+                              onChange={(e) => setEditNote(e.target.value)}
+                              placeholder={t("noteOptional")}
+                            />
+                            <button
+                              type="button"
+                              disabled={busyEdit}
+                              onClick={() => saveClaimEdit(c.id)}
+                              className="flex min-h-11 w-full items-center justify-center rounded-2xl bg-stone-900 font-semibold text-white disabled:opacity-60"
+                            >
+                              {busyEdit ? t("saving") : t("save")}
+                            </button>
+                          </div>
+                        ) : null}
+                        <div className="mt-3 space-y-2">
+                          <p className="text-sm text-stone-500">
+                            {t("payFromWhich")}
+                          </p>
+                          <div className="grid grid-cols-2 gap-2">
+                            {cashAccounts.map((a) => (
+                              <button
+                                key={a.id}
+                                type="button"
+                                onClick={() => setPayWalletId(a.id)}
+                                className={`rounded-2xl px-3 py-2 font-semibold ${
+                                  (payWalletId || cashId) === a.id
+                                    ? "bg-emerald-800 text-white"
+                                    : "bg-white text-stone-700"
+                                }`}
+                              >
+                                {isSavingsWallet(a)
+                                  ? "💰 " + t("savingsWallet")
+                                  : "💵 " + t("currentWallet")}
+                              </button>
+                            ))}
+                          </div>
+                          <input
+                            inputMode="decimal"
+                            dir="ltr"
+                            className="amount-input w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-2xl"
+                            value={payAmounts[c.id] ?? ""}
+                            onChange={(e) =>
+                              setPayAmounts((prev) => ({
+                                ...prev,
+                                [c.id]: e.target.value,
+                              }))
+                            }
+                            placeholder={String(c.remaining)}
+                          />
+                          <button
+                            type="button"
+                            disabled={!!payingId || !cashId}
+                            onClick={() => payClaim(c, true)}
+                            className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-emerald-800 font-semibold text-white disabled:opacity-60"
+                          >
+                            {payingId === c.id
+                              ? t("saving")
+                              : "💸 " + t("payFullRemaining")}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!!payingId || !cashId}
+                            onClick={() => payClaim(c, false)}
+                            className="flex min-h-11 w-full items-center justify-center rounded-2xl bg-white font-semibold text-emerald-900 disabled:opacity-60"
+                          >
+                            {payingId === c.id
+                              ? t("saving")
+                              : "💸 " + t("payFromHouseCash")}
+                          </button>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : null}
+            {waitingCovers.length > 0 ? (
+              <div>
+                <h2 className="text-base font-semibold text-stone-800">
+                  {t("peopleCoveredTitle")}
+                </h2>
+                <ul className="mt-2 space-y-2">
+                  {waitingCovers.map((c) => {
+                    const mine = c.member.id === userId;
+                    const canRepay = isAdmin || mine;
+                    const canManage =
+                      isAdmin && c.repaid < 0.001 && c.remaining > 0.001;
+                    return (
+                      <li
+                        key={c.id}
+                        className="rounded-2xl bg-stone-50 px-3 py-3"
+                      >
+                        <div className="money-row">
+                          <div className="min-w-0 text-right" dir="auto">
+                            <p className="font-semibold">{c.member.name}</p>
+                            <p className="text-stone-600">
+                              {labelFor(c.category.name, t)}
+                              {c.note ? ` · ${c.note}` : ""}
+                            </p>
+                            <p className="mt-1 text-sm text-stone-500">
+                              {mine
+                                ? t("yourCoverWaiting")
+                                : t("waitingPayback")}
+                            </p>
+                          </div>
+                          <span className="shrink-0 text-lg font-bold">
+                            <Money
+                              amount={c.remaining}
+                              currency={currency}
+                              locale={locale}
+                            />
+                          </span>
+                        </div>
+                        {canManage ? (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                startEditObligation(c.id, c.amount, c.note)
+                              }
+                              className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-stone-800"
+                            >
+                              {t("edit")}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={busyEdit}
+                              onClick={() =>
+                                confirmDeleteId === c.id
+                                  ? deleteObligation(`/covers/${c.id}`)
+                                  : setConfirmDeleteId(c.id)
+                              }
+                              className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-red-800"
+                            >
+                              {confirmDeleteId === c.id
+                                ? t("confirmDelete")
+                                : t("deleteItem")}
+                            </button>
+                          </div>
+                        ) : null}
+                        {editId === c.id ? (
+                          <div className="mt-3 space-y-2">
+                            <input
+                              inputMode="decimal"
+                              dir="ltr"
+                              className="amount-input w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-xl"
+                              value={editAmount}
+                              onChange={(e) => setEditAmount(e.target.value)}
+                            />
+                            <input
+                              className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3"
+                              value={editNote}
+                              onChange={(e) => setEditNote(e.target.value)}
+                              placeholder={t("noteOptional")}
+                            />
+                            <button
+                              type="button"
+                              disabled={busyEdit}
+                              onClick={() => saveCoverEdit(c.id)}
+                              className="flex min-h-11 w-full items-center justify-center rounded-2xl bg-stone-900 font-semibold text-white disabled:opacity-60"
+                            >
+                              {busyEdit ? t("saving") : t("save")}
+                            </button>
+                          </div>
+                        ) : null}
+                        {canRepay ? (
+                          <div className="mt-3 space-y-2">
+                            <p className="text-sm text-stone-500">
+                              {t("payFromWhich")}
+                            </p>
+                            <div className="grid grid-cols-2 gap-2">
+                              {cashAccounts.map((a) => (
+                                <button
+                                  key={a.id}
+                                  type="button"
+                                  onClick={() => setPayWalletId(a.id)}
+                                  className={`rounded-2xl px-3 py-2 font-semibold ${
+                                    (payWalletId || cashId) === a.id
+                                      ? "bg-indigo-800 text-white"
+                                      : "bg-white text-stone-700"
+                                  }`}
+                                >
+                                  {isSavingsWallet(a)
+                                    ? "💰 " + t("savingsWallet")
+                                    : "💵 " + t("currentWallet")}
+                                </button>
+                              ))}
+                            </div>
+                            <input
+                              inputMode="decimal"
+                              dir="ltr"
+                              className="amount-input w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-2xl"
+                              value={repayAmounts[c.id] ?? ""}
+                              onChange={(e) =>
+                                setRepayAmounts((prev) => ({
+                                  ...prev,
+                                  [c.id]: e.target.value,
+                                }))
+                              }
+                              placeholder={String(c.remaining)}
+                            />
+                            <button
+                              type="button"
+                              disabled={!!repayingId || !cashId}
+                              onClick={() => repayCover(c, true)}
+                              className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-indigo-800 font-semibold text-white disabled:opacity-60"
+                            >
+                              {repayingId === c.id
+                                ? t("saving")
+                                : "💸 " + t("repayFullToHouse")}
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!!repayingId || !cashId}
+                              onClick={() => repayCover(c, false)}
+                              className="flex min-h-11 w-full items-center justify-center rounded-2xl bg-white font-semibold text-indigo-900 disabled:opacity-60"
+                            >
+                              {repayingId === c.id
+                                ? t("saving")
+                                : "💸 " + t("repayToHouse")}
+                            </button>
+                          </div>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : null}
+            {summary &&
+            (summary.youOwe > 0.001 || summary.youAreOwed > 0.001) ? (
+              <div className="space-y-2">
+                <p className="text-sm text-stone-500">{t("homeIouHint")}</p>
+                {summary.youOwe > 0.001 ? (
+                  <Link
+                    href="/between"
+                    className="block rounded-2xl bg-stone-50 px-4 py-3"
+                  >
+                    📤{" "}
+                    {t("youOwe", {
+                      amount: money(summary.youOwe, currency, locale),
+                    })}
+                  </Link>
+                ) : null}
+                {summary.youAreOwed > 0.001 ? (
+                  <Link
+                    href="/between"
+                    className="block rounded-2xl bg-stone-50 px-4 py-3"
+                  >
+                    📥{" "}
+                    {t("theyOweYou", {
+                      amount: money(summary.youAreOwed, currency, locale),
+                    })}
+                  </Link>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        </details>
+      ) : null}
+
+      {!quietAdminHome && isHouse && waitingClaims.length > 0 ? (
         <section className="surface mt-5 rounded-[1.75rem] p-4">
           <h2 className="text-xl font-semibold">⏳ {t("peoplePaidTitle")}</h2>
           <Hint>{t("claimsHomeHint")}</Hint>
@@ -743,7 +1114,7 @@ export default function HomePage() {
         </section>
       ) : null}
 
-      {isHouse && waitingCovers.length > 0 ? (
+      {!quietAdminHome && isHouse && waitingCovers.length > 0 ? (
         <section className="surface mt-5 rounded-[1.75rem] p-4">
           <h2 className="text-xl font-semibold">🏠 {t("peopleCoveredTitle")}</h2>
           <Hint>{t("housePaidForHint")}</Hint>
@@ -897,27 +1268,41 @@ export default function HomePage() {
       {isHouse ? (
         <Link
           href="/charity"
-          className="surface mt-4 flex flex-col rounded-[1.75rem] p-4"
+          className="surface mt-4 flex items-center justify-between rounded-[1.75rem] px-4 py-3"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xl font-semibold">🕌 {t("navCharity")}</span>
-            <span className="font-semibold">
-              {charity ? (
-                <Money
-                  amount={charity.familyTotal}
-                  currency={currency}
-                  locale={locale}
-                />
-              ) : (
-                ""
-              )}
-            </span>
-          </div>
-          <Hint>{t("charityHomeHint")}</Hint>
+          <span className="font-semibold text-stone-800">
+            🕌 {t("navCharity")}
+          </span>
+          <span className="font-semibold text-stone-700">
+            {charity ? (
+              <Money
+                amount={charity.familyTotal}
+                currency={currency}
+                locale={locale}
+              />
+            ) : (
+              ""
+            )}
+          </span>
         </Link>
       ) : null}
 
-      {isHouse && !isAdmin ? (
+      {isHouse && isAdmin ? (
+        <div className="mt-5 grid grid-cols-1 gap-2">
+          <Link
+            href="/add"
+            className="flex min-h-16 items-center justify-center rounded-3xl bg-stone-900 text-lg font-semibold text-white"
+          >
+            🧾 {t("addHousePayment")}
+          </Link>
+          <Link
+            href="/add?mode=cover"
+            className="flex min-h-14 items-center justify-center rounded-3xl bg-indigo-800 text-lg font-semibold text-white"
+          >
+            🏠 {t("housePaidForTitle")}
+          </Link>
+        </div>
+      ) : isHouse && !isAdmin ? (
         <>
           <Link
             href="/add"
@@ -927,23 +1312,6 @@ export default function HomePage() {
           </Link>
           <Hint>{t("addFromMyMoneyHomeHint")}</Hint>
         </>
-      ) : isHouse && isAdmin ? (
-        <div className="mt-5 grid grid-cols-1 gap-2">
-          <Link
-            href="/add"
-            className="flex min-h-16 items-center justify-center rounded-3xl bg-stone-900 text-lg font-semibold text-white"
-          >
-            🧾 {t("addHousePayment")}
-          </Link>
-          <Hint>{t("addHousePaymentHint")}</Hint>
-          <Link
-            href="/add?mode=cover"
-            className="flex min-h-14 items-center justify-center rounded-3xl bg-indigo-800 text-lg font-semibold text-white"
-          >
-            🏠 {t("housePaidForTitle")}
-          </Link>
-          <Hint>{t("housePaidForHint")}</Hint>
-        </div>
       ) : (
         <>
         <Link
