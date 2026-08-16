@@ -33,6 +33,9 @@ type Summary = {
   claimsWaiting: number;
   claimsPendingTotal?: number;
   claimsPendingCount?: number;
+  coversWaiting?: number;
+  coversPendingTotal?: number;
+  coversPendingCount?: number;
 };
 type Account = { id: string; name: string; type?: string; balance: number };
 type CharityTypeRow = {
@@ -67,6 +70,17 @@ type Claim = {
   member: { id: string; name: string };
   category: { name: string };
 };
+type Cover = {
+  id: string;
+  amount: number;
+  remaining: number;
+  repaid: number;
+  status: string;
+  note: string;
+  occurredOn: string;
+  member: { id: string; name: string };
+  category: { name: string };
+};
 
 export default function HomePage() {
   const { t, locale } = useI18n();
@@ -77,9 +91,12 @@ export default function HomePage() {
   const [txs, setTxs] = useState<Tx[]>([]);
   const [charity, setCharity] = useState<CharityMonth | null>(null);
   const [claims, setClaims] = useState<Claim[]>([]);
+  const [covers, setCovers] = useState<Cover[]>([]);
   const [payingId, setPayingId] = useState("");
+  const [repayingId, setRepayingId] = useState("");
   const [payWalletId, setPayWalletId] = useState("");
   const [payAmounts, setPayAmounts] = useState<Record<string, string>>({});
+  const [repayAmounts, setRepayAmounts] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [flash, setFlash] = useState("");
 
@@ -92,6 +109,12 @@ export default function HomePage() {
     } else if (key === "payBackDone") {
       sessionStorage.removeItem("fb_flash");
       setFlash(t("payBackDone"));
+    } else if (key === "housePaidForSaved") {
+      sessionStorage.removeItem("fb_flash");
+      setFlash(t("housePaidForSaved"));
+    } else if (key === "coverRepayDone") {
+      sessionStorage.removeItem("fb_flash");
+      setFlash(t("coverRepayDone"));
     }
   }, [t]);
 
@@ -110,10 +133,12 @@ export default function HomePage() {
           householdPath(active.householdId, `/charity?month=${month}`),
         ),
         api<Claim[]>(householdPath(active.householdId, "/claims")),
+        api<Cover[]>(householdPath(active.householdId, "/covers")),
       );
     } else {
       setCharity(null);
       setClaims([]);
+      setCovers([]);
     }
     Promise.all(jobs)
       .then((result) => {
@@ -127,6 +152,7 @@ export default function HomePage() {
         if (active.kind === "HOUSE") {
           setCharity(result[3] as CharityMonth);
           setClaims(result[4] as Claim[]);
+          setCovers(result[5] as Cover[]);
         }
       })
       .catch((e) => setError(e.message));
@@ -141,10 +167,36 @@ export default function HomePage() {
   const cashTotal = cashAccounts.reduce((s, a) => s + a.balance, 0);
   const cashId = payWalletId || currentWallet?.id || cashAccounts[0]?.id;
   const waitingClaims = claims.filter((c) => c.remaining > 0.001);
+  const waitingCovers = covers.filter((c) => c.remaining > 0.001);
   const pendingTotal =
     summary?.claimsPendingTotal ??
     waitingClaims.reduce((s, c) => s + c.remaining, 0);
   const pendingCount = summary?.claimsPendingCount ?? waitingClaims.length;
+  const coverPendingTotal =
+    summary?.coversPendingTotal ??
+    waitingCovers.reduce((s, c) => s + c.remaining, 0);
+  const coverPendingCount =
+    summary?.coversPendingCount ?? waitingCovers.length;
+
+  async function refreshHouseLists() {
+    if (!active) return;
+    const [s, a, tx, list, coverList] = await Promise.all([
+      api<Summary>(householdPath(active.householdId, "/analytics/summary")),
+      api<Account[]>(householdPath(active.householdId, "/accounts")),
+      api<Tx[]>(householdPath(active.householdId, "/transactions")),
+      api<Claim[]>(householdPath(active.householdId, "/claims")),
+      api<Cover[]>(householdPath(active.householdId, "/covers")),
+    ]);
+    setSummary(s);
+    setAccounts(a);
+    setTxs(
+      tx
+        .filter((row) => !row.account || isCashAccount(row.account))
+        .slice(0, 8),
+    );
+    setClaims(list);
+    setCovers(coverList);
+  }
 
   async function payClaim(claim: Claim, full = false) {
     if (!active || !cashId) return;
@@ -176,26 +228,53 @@ export default function HomePage() {
           }),
         },
       );
-      const [s, a, tx, list] = await Promise.all([
-        api<Summary>(householdPath(active.householdId, "/analytics/summary")),
-        api<Account[]>(householdPath(active.householdId, "/accounts")),
-        api<Tx[]>(householdPath(active.householdId, "/transactions")),
-        api<Claim[]>(householdPath(active.householdId, "/claims")),
-      ]);
-      setSummary(s);
-      setAccounts(a);
-      setTxs(
-        tx
-          .filter((row) => !row.account || isCashAccount(row.account))
-          .slice(0, 8),
-      );
-      setClaims(list);
+      await refreshHouseLists();
       setPayAmounts((prev) => ({ ...prev, [claim.id]: "" }));
       setFlash(t("payBackDone"));
     } catch (e) {
       setError(e instanceof Error ? e.message : t("couldNotSave"));
     } finally {
       setPayingId("");
+    }
+  }
+
+  async function repayCover(cover: Cover, full = false) {
+    if (!active || !cashId) return;
+    const typed = parseAmount(repayAmounts[cover.id] ?? "");
+    const amount = full
+      ? cover.remaining
+      : Number.isFinite(typed) && typed > 0
+        ? typed
+        : cover.remaining;
+    if (amount <= 0) {
+      setError(t("payBackAmount"));
+      return;
+    }
+    if (amount > cover.remaining + 0.001) {
+      setError(t("payBackTooMuch"));
+      return;
+    }
+    setRepayingId(cover.id);
+    setError("");
+    try {
+      await api(
+        householdPath(active.householdId, `/covers/${cover.id}/repayments`),
+        {
+          method: "POST",
+          body: JSON.stringify({
+            amount,
+            accountId: cashId,
+            occurredOn: todayISO(),
+          }),
+        },
+      );
+      await refreshHouseLists();
+      setRepayAmounts((prev) => ({ ...prev, [cover.id]: "" }));
+      setFlash(t("coverRepayDone"));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("couldNotSave"));
+    } finally {
+      setRepayingId("");
     }
   }
 
@@ -321,23 +400,52 @@ export default function HomePage() {
         </p>
       </section>
 
-      {summary && summary.claimsWaiting > 0.001 && !isHouse ? (
-        <button
-          type="button"
-          onClick={() => setKind("HOUSE")}
-          className="surface mt-4 block w-full rounded-2xl px-4 py-3 text-right"
-        >
-          <p className="font-semibold text-amber-900">
-            🏠{" "}
-            {t("houseOwesYou", {
-              amount: money(summary.claimsWaiting, currency, locale),
-            })}
-          </p>
-          <p className="mt-1 text-sm text-stone-600">{t("houseOwesYouAction")}</p>
-          <p className="mt-2 text-sm font-semibold text-emerald-800">
-            {t("openHouseBooks")} →
-          </p>
-        </button>
+      {summary &&
+      ((summary.claimsWaiting ?? 0) > 0.001 ||
+        (summary.coversWaiting ?? 0) > 0.001) &&
+      !isHouse ? (
+        <div className="mt-4 space-y-2">
+          {summary.claimsWaiting > 0.001 ? (
+            <button
+              type="button"
+              onClick={() => setKind("HOUSE")}
+              className="surface block w-full rounded-2xl px-4 py-3 text-right"
+            >
+              <p className="font-semibold text-amber-900">
+                🏠{" "}
+                {t("houseOwesYou", {
+                  amount: money(summary.claimsWaiting, currency, locale),
+                })}
+              </p>
+              <p className="mt-1 text-sm text-stone-600">
+                {t("houseOwesYouAction")}
+              </p>
+              <p className="mt-2 text-sm font-semibold text-emerald-800">
+                {t("openHouseBooks")} →
+              </p>
+            </button>
+          ) : null}
+          {(summary.coversWaiting ?? 0) > 0.001 ? (
+            <button
+              type="button"
+              onClick={() => setKind("HOUSE")}
+              className="surface block w-full rounded-2xl px-4 py-3 text-right"
+            >
+              <p className="font-semibold text-indigo-900">
+                🏠{" "}
+                {t("youOweHouse", {
+                  amount: money(summary.coversWaiting ?? 0, currency, locale),
+                })}
+              </p>
+              <p className="mt-1 text-sm text-stone-600">
+                {t("youOweHouseAction")}
+              </p>
+              <p className="mt-2 text-sm font-semibold text-emerald-800">
+                {t("openHouseBooks")} →
+              </p>
+            </button>
+          ) : null}
+        </div>
       ) : null}
 
       {isHouse && summary ? (
@@ -351,6 +459,19 @@ export default function HomePage() {
                 })}
               </p>
               <p className="mt-1 text-sm text-amber-900/80">{t("waitingPayback")}</p>
+            </div>
+          ) : null}
+          {(summary.coversWaiting ?? 0) > 0.001 ? (
+            <div className="rounded-2xl bg-indigo-50 px-4 py-3">
+              <p className="font-semibold text-indigo-950">
+                🏠{" "}
+                {t("youOweHouse", {
+                  amount: money(summary.coversWaiting ?? 0, currency, locale),
+                })}
+              </p>
+              <p className="mt-1 text-sm text-indigo-900/80">
+                {t("yourCoverWaiting")}
+              </p>
             </div>
           ) : null}
           {isAdmin && pendingCount > 0 ? (
@@ -367,6 +488,22 @@ export default function HomePage() {
                     })}
               </p>
               <Hint>{t("claimsHomeHint")}</Hint>
+            </div>
+          ) : null}
+          {isAdmin && coverPendingCount > 0 ? (
+            <div className="rounded-2xl bg-indigo-100 px-4 py-3">
+              <p className="font-semibold text-indigo-950">
+                ⏳{" "}
+                {coverPendingCount === 1
+                  ? t("coversAdminBannerOne", {
+                      amount: money(coverPendingTotal, currency, locale),
+                    })
+                  : t("coversAdminBanner", {
+                      amount: money(coverPendingTotal, currency, locale),
+                      n: String(coverPendingCount),
+                    })}
+              </p>
+              <Hint>{t("housePaidForHint")}</Hint>
             </div>
           ) : null}
           {summary.youOwe > 0.001 || summary.youAreOwed > 0.001 ? (
@@ -484,6 +621,104 @@ export default function HomePage() {
         </section>
       ) : null}
 
+      {isHouse && waitingCovers.length > 0 ? (
+        <section className="surface mt-5 rounded-[1.75rem] p-4">
+          <h2 className="text-xl font-semibold">🏠 {t("peopleCoveredTitle")}</h2>
+          <Hint>{t("housePaidForHint")}</Hint>
+          <ul className="mt-3 space-y-3">
+            {waitingCovers.map((c) => {
+              const mine = c.member.id === userId;
+              const canRepay = isAdmin || mine;
+              return (
+                <li
+                  key={c.id}
+                  className={`rounded-2xl px-3 py-3 ${
+                    mine ? "bg-indigo-50" : "bg-stone-100"
+                  }`}
+                >
+                  <div className="money-row">
+                    <div className="min-w-0 text-right" dir="auto">
+                      <p className="font-semibold">{c.member.name}</p>
+                      <p className="text-stone-600">
+                        {labelFor(c.category.name, t)}
+                        {c.note ? ` · ${c.note}` : ""}
+                      </p>
+                      <p className="mt-1 text-sm font-medium text-indigo-900">
+                        {mine ? t("yourCoverWaiting") : t("waitingPayback")}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-lg font-bold">
+                      <Money
+                        amount={c.remaining}
+                        currency={currency}
+                        locale={locale}
+                      />
+                    </span>
+                  </div>
+                  {canRepay ? (
+                    <div className="mt-3 space-y-2">
+                      <p className="text-sm text-stone-500">{t("payFromWhich")}</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {cashAccounts.map((a) => (
+                          <button
+                            key={a.id}
+                            type="button"
+                            onClick={() => setPayWalletId(a.id)}
+                            className={`rounded-2xl px-3 py-2 font-semibold ${
+                              (payWalletId || cashId) === a.id
+                                ? "bg-indigo-800 text-white"
+                                : "bg-white text-stone-700"
+                            }`}
+                          >
+                            {isSavingsWallet(a)
+                              ? "💰 " + t("savingsWallet")
+                              : "💵 " + t("currentWallet")}
+                          </button>
+                        ))}
+                      </div>
+                      <input
+                        inputMode="decimal"
+                        dir="ltr"
+                        className="amount-input w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-2xl"
+                        value={repayAmounts[c.id] ?? ""}
+                        onChange={(e) =>
+                          setRepayAmounts((prev) => ({
+                            ...prev,
+                            [c.id]: e.target.value,
+                          }))
+                        }
+                        placeholder={String(c.remaining)}
+                      />
+                      <button
+                        type="button"
+                        disabled={!!repayingId || !cashId}
+                        onClick={() => repayCover(c, true)}
+                        className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-indigo-800 font-semibold text-white disabled:opacity-60"
+                      >
+                        {repayingId === c.id
+                          ? t("saving")
+                          : "💸 " + t("repayFullToHouse")}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!!repayingId || !cashId}
+                        onClick={() => repayCover(c, false)}
+                        className="flex min-h-11 w-full items-center justify-center rounded-2xl bg-white font-semibold text-indigo-900 disabled:opacity-60"
+                      >
+                        {repayingId === c.id
+                          ? t("saving")
+                          : "💸 " + t("repayToHouse")}
+                      </button>
+                      <Hint>{t("repayCoverHint")}</Hint>
+                    </div>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ) : null}
+
       {isHouse ? (
         <Link
           href="/charity"
@@ -526,6 +761,13 @@ export default function HomePage() {
             🧾 {t("addHousePayment")}
           </Link>
           <Hint>{t("addHousePaymentHint")}</Hint>
+          <Link
+            href="/add?mode=cover"
+            className="flex min-h-14 items-center justify-center rounded-3xl bg-indigo-800 text-lg font-semibold text-white"
+          >
+            🏠 {t("housePaidForTitle")}
+          </Link>
+          <Hint>{t("housePaidForHint")}</Hint>
           <Link
             href="/add?mode=claim"
             className="flex min-h-14 items-center justify-center rounded-3xl bg-amber-800 text-lg font-semibold text-white"

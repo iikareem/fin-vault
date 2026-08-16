@@ -159,26 +159,46 @@ export class AnalyticsService {
     let claimsWaiting = 0;
     let claimsPendingTotal = 0;
     let claimsPendingCount = 0;
+    let coversWaiting = 0;
+    let coversPendingTotal = 0;
+    let coversPendingCount = 0;
 
     if (membership.kind === 'HOUSE') {
-      const [loans, myClaims, openClaims] = await Promise.all([
-        this.prisma.peerLoan.findMany({
-          where: {
-            householdId,
-            status: 'OPEN',
-            OR: [{ fromUserId: userId }, { toUserId: userId }],
-          },
-          include: { repayments: true },
-        }),
-        this.prisma.houseClaim.findMany({
-          where: { householdId, memberId: userId, status: { not: 'REIMBURSED' } },
-          include: { reimbursements: true },
-        }),
-        this.prisma.houseClaim.findMany({
-          where: { householdId, status: { not: 'REIMBURSED' } },
-          include: { reimbursements: true },
-        }),
-      ]);
+      const [loans, myClaims, openClaims, myCovers, openCovers] =
+        await Promise.all([
+          this.prisma.peerLoan.findMany({
+            where: {
+              householdId,
+              status: 'OPEN',
+              OR: [{ fromUserId: userId }, { toUserId: userId }],
+            },
+            include: { repayments: true },
+          }),
+          this.prisma.houseClaim.findMany({
+            where: {
+              householdId,
+              memberId: userId,
+              status: { not: 'REIMBURSED' },
+            },
+            include: { reimbursements: true },
+          }),
+          this.prisma.houseClaim.findMany({
+            where: { householdId, status: { not: 'REIMBURSED' } },
+            include: { reimbursements: true },
+          }),
+          this.prisma.houseCover.findMany({
+            where: {
+              householdId,
+              memberId: userId,
+              status: { not: 'SETTLED' },
+            },
+            include: { repayments: true },
+          }),
+          this.prisma.houseCover.findMany({
+            where: { householdId, status: { not: 'SETTLED' } },
+            include: { repayments: true },
+          }),
+        ]);
       for (const loan of loans) {
         const remaining =
           Number(loan.originalAmount) -
@@ -200,25 +220,54 @@ export class AnalyticsService {
           claimsPendingCount += 1;
         }
       }
+      for (const cover of myCovers) {
+        coversWaiting +=
+          Number(cover.amount) -
+          cover.repayments.reduce((s, r) => s + Number(r.amount), 0);
+      }
+      for (const cover of openCovers) {
+        const remaining =
+          Number(cover.amount) -
+          cover.repayments.reduce((s, r) => s + Number(r.amount), 0);
+        if (remaining > 0.001) {
+          coversPendingTotal += remaining;
+          coversPendingCount += 1;
+        }
+      }
     } else {
-      // Personal books: still show what the house owes this person.
+      // Personal books: still show house debts both ways.
       const houseMembership = await this.prisma.membership.findFirst({
         where: { userId, household: { kind: 'HOUSE' } },
         select: { householdId: true },
       });
       if (houseMembership) {
-        const myClaims = await this.prisma.houseClaim.findMany({
-          where: {
-            householdId: houseMembership.householdId,
-            memberId: userId,
-            status: { not: 'REIMBURSED' },
-          },
-          include: { reimbursements: true },
-        });
+        const [myClaims, myCovers] = await Promise.all([
+          this.prisma.houseClaim.findMany({
+            where: {
+              householdId: houseMembership.householdId,
+              memberId: userId,
+              status: { not: 'REIMBURSED' },
+            },
+            include: { reimbursements: true },
+          }),
+          this.prisma.houseCover.findMany({
+            where: {
+              householdId: houseMembership.householdId,
+              memberId: userId,
+              status: { not: 'SETTLED' },
+            },
+            include: { repayments: true },
+          }),
+        ]);
         for (const claim of myClaims) {
           claimsWaiting +=
             Number(claim.amount) -
             claim.reimbursements.reduce((s, r) => s + Number(r.amount), 0);
+        }
+        for (const cover of myCovers) {
+          coversWaiting +=
+            Number(cover.amount) -
+            cover.repayments.reduce((s, r) => s + Number(r.amount), 0);
         }
       }
     }
@@ -237,6 +286,9 @@ export class AnalyticsService {
       claimsWaiting,
       claimsPendingTotal,
       claimsPendingCount,
+      coversWaiting,
+      coversPendingTotal,
+      coversPendingCount,
     };
   }
 

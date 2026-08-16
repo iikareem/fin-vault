@@ -30,7 +30,7 @@ function AddForm() {
   const { t } = useI18n();
   const { active } = useBooks();
   const [space, setSpace] = useState<Space | null>(null);
-  const [mode, setMode] = useState<"wallet" | "claim">("wallet");
+  const [mode, setMode] = useState<"wallet" | "claim" | "cover">("wallet");
   const [type, setType] = useState<WalletKind>("EXPENSE");
   const [amount, setAmount] = useState("");
   const [currentAmt, setCurrentAmt] = useState("");
@@ -48,15 +48,25 @@ function AddForm() {
 
   const houseAdmin = space?.kind === "HOUSE" && space.role === "ADMIN";
   const giveMode = mode === "wallet" && type === "GIVE";
+  const coverMode = mode === "cover";
+  const claimMode = mode === "claim";
 
   useEffect(() => {
     if (!active) return;
     setSpace(active);
     const isHouseMember = active.kind === "HOUSE" && active.role === "MEMBER";
     const wantClaim = search.get("mode") === "claim";
-    setMode(isHouseMember || wantClaim ? "claim" : "wallet");
+    const wantCover = search.get("mode") === "cover";
+    if (isHouseMember || wantClaim) {
+      setMode("claim");
+      setType("EXPENSE");
+    } else if (wantCover && active.role === "ADMIN") {
+      setMode("cover");
+      setType("EXPENSE");
+    } else {
+      setMode("wallet");
+    }
     if (search.get("mode") === "give" && !isHouseMember) setType("GIVE");
-    if (wantClaim) setType("EXPENSE");
     const jobs: Promise<unknown>[] = [
       api<Account[]>(householdPath(active.householdId, "/accounts")),
       api<Category[]>(householdPath(active.householdId, "/categories")),
@@ -101,8 +111,10 @@ function AddForm() {
   );
 
   useEffect(() => {
-    const list = mode === "claim" ? expenseCats : walletCats;
-    const preferred = type === "INCOME" && mode !== "claim" ? "Salary" : "Groceries";
+    const list =
+      mode === "claim" || mode === "cover" ? expenseCats : walletCats;
+    const preferred =
+      type === "INCOME" && mode === "wallet" ? "Salary" : "Groceries";
     const pick = list.find((c) => c.name === preferred) ?? list[0];
     if (pick) setCategoryId(pick.id);
   }, [mode, type, expenseCats, walletCats]);
@@ -125,6 +137,21 @@ function AddForm() {
         });
         if (typeof window !== "undefined") {
           sessionStorage.setItem("fb_flash", "claimSaved");
+        }
+      } else if (mode === "cover") {
+        await api(householdPath(space.householdId, "/covers"), {
+          method: "POST",
+          body: JSON.stringify({
+            toUserId,
+            categoryId,
+            accountId,
+            amount: parseAmount(amount),
+            occurredOn,
+            note,
+          }),
+        });
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("fb_flash", "housePaidForSaved");
         }
       } else if (type === "GIVE") {
         await api(householdPath(space.householdId, "/payouts"), {
@@ -201,8 +228,6 @@ function AddForm() {
     }
   }
 
-  const claimMode = mode === "claim";
-
   return (
     <PageShell>
       <h1 className="text-2xl font-bold leading-tight sm:text-3xl">➕ {t("navAdd")}</h1>
@@ -216,7 +241,7 @@ function AddForm() {
               setType("EXPENSE");
             }}
             className={`min-h-16 rounded-3xl px-2 text-lg font-semibold ${
-              !claimMode && type === "EXPENSE"
+              !claimMode && !coverMode && type === "EXPENSE"
                 ? "bg-red-800 text-white shadow"
                 : "bg-white text-stone-700"
             }`}
@@ -230,7 +255,7 @@ function AddForm() {
               setType("INCOME");
             }}
             className={`min-h-16 rounded-3xl px-2 text-lg font-semibold ${
-              !claimMode && type === "INCOME"
+              !claimMode && !coverMode && type === "INCOME"
                 ? "bg-emerald-800 text-white shadow"
                 : "bg-white text-stone-700"
             }`}
@@ -244,12 +269,21 @@ function AddForm() {
               setType("GIVE");
             }}
             className={`min-h-16 rounded-3xl px-2 text-lg font-semibold ${
-              !claimMode && type === "GIVE"
+              !claimMode && !coverMode && type === "GIVE"
                 ? "bg-teal-800 text-white shadow"
                 : "bg-white text-stone-700"
             }`}
           >
             💵 {t("giveFromHouse")}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("cover")}
+            className={`min-h-16 rounded-3xl px-2 text-lg font-semibold ${
+              coverMode ? "bg-indigo-800 text-white shadow" : "bg-white text-stone-700"
+            }`}
+          >
+            🏠 {t("housePaidForTitle")}
           </button>
           <button
             type="button"
@@ -284,16 +318,18 @@ function AddForm() {
         </div>
       )}
       <Hint>
-        {claimMode
-          ? t("paidFromMyMoneyHint")
-          : type === "GIVE"
-            ? t("giveFromHouseHint")
-            : type === "INCOME"
-              ? t("moneyInHint")
-              : t("paidHint")}
+        {coverMode
+          ? t("housePaidForHint")
+          : claimMode
+            ? t("paidFromMyMoneyHint")
+            : type === "GIVE"
+              ? t("giveFromHouseHint")
+              : type === "INCOME"
+                ? t("moneyInHint")
+                : t("paidHint")}
       </Hint>
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
-        {giveMode ? (
+        {giveMode || coverMode ? (
           <label className="block">
             <span className="mb-1 block font-medium">{t("giveTo")}</span>
             <select
@@ -311,7 +347,7 @@ function AddForm() {
             <Hint>{t("giveToHint")}</Hint>
           </label>
         ) : null}
-        {claimMode || type !== "INCOME" ? (
+        {claimMode || coverMode || type !== "INCOME" ? (
           <label className="block">
             <span className="mb-1 block font-medium">{t("amount")}</span>
             <input
@@ -366,7 +402,7 @@ function AddForm() {
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
             >
-              {(claimMode ? expenseCats : walletCats).map((c) => (
+              {(claimMode || coverMode ? expenseCats : walletCats).map((c) => (
                 <option key={c.id} value={c.id}>
                   {labelFor(c.name, t)}
                 </option>
@@ -375,7 +411,7 @@ function AddForm() {
             <Hint>{t("forWhatHint")}</Hint>
           </label>
         )}
-        {claimMode || type === "INCOME" ? null : (
+        {claimMode || (!coverMode && type === "INCOME") ? null : (
           <div>
             <p className="mb-1 font-medium">{t("pickWalletSpend")}</p>
             <div className="grid grid-cols-2 gap-2">
@@ -391,8 +427,8 @@ function AddForm() {
                   }`}
                 >
                   {isSavingsWallet(a)
-                    ? `💰 ${t("savingsWallet")}`
-                    : `💵 ${t("currentWallet")}`}
+                    ? "💰 " + t("savingsWallet")
+                    : "💵 " + t("currentWallet")}
                 </button>
               ))}
             </div>

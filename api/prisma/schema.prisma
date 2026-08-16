@@ -46,6 +46,12 @@ enum ClaimStatus {
   REIMBURSED
 }
 
+enum CoverStatus {
+  OPEN
+  PARTIAL
+  SETTLED
+}
+
 model Household {
   id          String         @id @default(cuid())
   name        String
@@ -58,6 +64,7 @@ model Household {
   txs          Transaction[]
   loans        PeerLoan[]
   claims       HouseClaim[]
+  covers       HouseCover[]
   charityTypes CharityType[]
   charityGifts CharityGift[]
   payouts      HousePayout[]
@@ -77,6 +84,8 @@ model User {
   loanRepayments LoanRepayment[]
   claims         HouseClaim[]
   reimbursements Reimbursement[]
+  covers         HouseCover[]
+  coverRepayments CoverRepayment[]
   charityGifts   CharityGift[]
   payoutsReceived HousePayout[] @relation("PayoutsReceived")
   payoutsRecorded HousePayout[] @relation("PayoutsRecorded")
@@ -104,6 +113,7 @@ model Account {
   archived       Boolean         @default(false)
   txs            Transaction[]
   reimbursements Reimbursement[]
+  coverRepayments CoverRepayment[]
 }
 
 model Category {
@@ -116,6 +126,7 @@ model Category {
   txs         Transaction[]
   loans       PeerLoan[]
   claims      HouseClaim[]
+  covers      HouseCover[]
 
   @@unique([householdId, name, kind])
 }
@@ -142,6 +153,9 @@ model Transaction {
   payoutPersonal HousePayout? @relation("PayoutPersonalTx")
   claimPersonal  HouseClaim? @relation("ClaimPersonalTx")
   reimbursePersonal Reimbursement? @relation("ReimbursePersonalTx")
+  coverHouse     HouseCover? @relation("CoverHouseTx")
+  coverRepayHouse CoverRepayment? @relation("CoverRepayHouseTx")
+  coverRepayPersonal CoverRepayment? @relation("CoverRepayPersonalTx")
 
   @@index([householdId, occurredOn])
   @@index([householdId, categoryId])
@@ -211,6 +225,43 @@ model Reimbursement {
   recordedByUserId String
   recordedBy       User        @relation(fields: [recordedByUserId], references: [id])
   createdAt        DateTime    @default(now())
+}
+
+model HouseCover {
+  id               String           @id @default(cuid())
+  householdId      String
+  household        Household        @relation(fields: [householdId], references: [id])
+  memberId         String
+  member           User             @relation(fields: [memberId], references: [id])
+  categoryId       String
+  category         Category         @relation(fields: [categoryId], references: [id])
+  amount           Decimal          @db.Decimal(14, 2)
+  occurredOn       DateTime         @db.Date
+  note             String           @default("")
+  status           CoverStatus      @default(OPEN)
+  createdAt        DateTime         @default(now())
+  houseTxId        String           @unique
+  houseTx          Transaction      @relation("CoverHouseTx", fields: [houseTxId], references: [id])
+  repayments       CoverRepayment[]
+
+  @@index([householdId, occurredOn])
+}
+
+model CoverRepayment {
+  id               String       @id @default(cuid())
+  coverId          String
+  cover            HouseCover   @relation(fields: [coverId], references: [id], onDelete: Cascade)
+  amount           Decimal      @db.Decimal(14, 2)
+  occurredOn       DateTime     @db.Date
+  accountId        String
+  account          Account      @relation(fields: [accountId], references: [id])
+  houseTxId        String?      @unique
+  houseTx          Transaction? @relation("CoverRepayHouseTx", fields: [houseTxId], references: [id])
+  personalTxId     String?      @unique
+  personalTx       Transaction? @relation("CoverRepayPersonalTx", fields: [personalTxId], references: [id])
+  recordedByUserId String
+  recordedBy       User         @relation(fields: [recordedByUserId], references: [id])
+  createdAt        DateTime     @default(now())
 }
 
 model CharityType {
