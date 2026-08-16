@@ -72,7 +72,6 @@ export class CoversController {
     return this.covers.repay(
       membership.householdId,
       user.id,
-      membership.role,
       coverId,
       dto,
     );

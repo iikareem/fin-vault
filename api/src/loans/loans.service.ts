@@ -199,8 +199,9 @@ export class LoansService {
       include: { repayments: true },
     });
     if (!loan) throw new NotFoundException();
-    if (loan.fromUserId !== userId && loan.toUserId !== userId) {
-      throw new ForbiddenException('This loan is not yours');
+    // Only the borrower (who still owes) can record a repayment.
+    if (loan.toUserId !== userId) {
+      throw new ForbiddenException('Only the person who owes can pay this back');
     }
     const remaining = this.remaining(loan.originalAmount, loan.repayments);
     if (dto.amount > remaining + 0.001) {

@@ -253,7 +253,7 @@ export default function BetweenPage() {
             </button>
           </div>
         ) : null}
-        {loan.remaining > 0.001 ? (
+        {asDebtor && loan.remaining > 0.001 ? (
           <div className="mt-3 space-y-1">
             <p className="text-sm text-stone-500">{t("payBackHint")}</p>
             <div className="flex gap-2">
@@ -277,6 +277,8 @@ export default function BetweenPage() {
               </button>
             </div>
           </div>
+        ) : loan.remaining > 0.001 ? (
+          <p className="mt-2 text-sm text-stone-500">{t("waitingOtherToPay")}</p>
         ) : (
           <p className="mt-2 text-sm text-emerald-800">{t("settled")}</p>
         )}

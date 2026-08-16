@@ -84,10 +84,11 @@ type Cover = {
 
 export default function HomePage() {
   const { t, locale } = useI18n();
-  const { name, userId, active, setKind } = useBooks();
+  const { name, userId, active, personal, setKind } = useBooks();
   const cal = useCalendarClock();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [personalAccounts, setPersonalAccounts] = useState<Account[]>([]);
   const [txs, setTxs] = useState<Tx[]>([]);
   const [charity, setCharity] = useState<CharityMonth | null>(null);
   const [claims, setClaims] = useState<Claim[]>([]);
@@ -95,6 +96,7 @@ export default function HomePage() {
   const [payingId, setPayingId] = useState("");
   const [repayingId, setRepayingId] = useState("");
   const [payWalletId, setPayWalletId] = useState("");
+  const [repayWalletId, setRepayWalletId] = useState("");
   const [payAmounts, setPayAmounts] = useState<Record<string, string>>({});
   const [repayAmounts, setRepayAmounts] = useState<Record<string, string>>({});
   const [editId, setEditId] = useState("");
@@ -163,6 +165,16 @@ export default function HomePage() {
       .catch((e) => setError(e.message));
   }, [active?.householdId, active?.kind, cal.monthKey]);
 
+  useEffect(() => {
+    if (!personal?.householdId || active?.kind !== "HOUSE") {
+      setPersonalAccounts([]);
+      return;
+    }
+    api<Account[]>(householdPath(personal.householdId, "/accounts"))
+      .then(setPersonalAccounts)
+      .catch(() => setPersonalAccounts([]));
+  }, [personal?.householdId, active?.kind]);
+
   const currency = active?.currency ?? "EGP";
   const isHouse = active?.kind === "HOUSE";
   const isAdmin = active?.role === "ADMIN";
@@ -171,6 +183,13 @@ export default function HomePage() {
   const savingsWallet = cashAccounts.find(isSavingsWallet);
   const cashTotal = cashAccounts.reduce((s, a) => s + a.balance, 0);
   const cashId = payWalletId || currentWallet?.id || cashAccounts[0]?.id;
+  const personalCashAccounts = sortCashWallets(
+    personalAccounts.filter(isCashAccount),
+  );
+  const personalCashId =
+    repayWalletId ||
+    personalCashAccounts.find(isCurrentWallet)?.id ||
+    personalCashAccounts[0]?.id;
   const waitingClaims = claims.filter((c) => c.remaining > 0.001);
   const waitingCovers = covers.filter((c) => c.remaining > 0.001);
   const pendingTotal =
@@ -209,15 +228,10 @@ export default function HomePage() {
     setCovers(coverList);
   }
 
-  async function payClaim(claim: Claim, full = false) {
+  async function payClaim(claim: Claim) {
     if (!active || !cashId) return;
-    const typed = parseAmount(payAmounts[claim.id] ?? "");
-    const amount = full
-      ? claim.remaining
-      : Number.isFinite(typed) && typed > 0
-        ? typed
-        : claim.remaining;
-    if (amount <= 0) {
+    const amount = parseAmount(payAmounts[claim.id] ?? "");
+    if (!Number.isFinite(amount) || amount <= 0) {
       setError(t("payBackAmount"));
       return;
     }
@@ -249,15 +263,10 @@ export default function HomePage() {
     }
   }
 
-  async function repayCover(cover: Cover, full = false) {
-    if (!active || !cashId) return;
-    const typed = parseAmount(repayAmounts[cover.id] ?? "");
-    const amount = full
-      ? cover.remaining
-      : Number.isFinite(typed) && typed > 0
-        ? typed
-        : cover.remaining;
-    if (amount <= 0) {
+  async function repayCover(cover: Cover) {
+    if (!active || !personalCashId) return;
+    const amount = parseAmount(repayAmounts[cover.id] ?? "");
+    if (!Number.isFinite(amount) || amount <= 0) {
       setError(t("payBackAmount"));
       return;
     }
@@ -274,7 +283,7 @@ export default function HomePage() {
           method: "POST",
           body: JSON.stringify({
             amount,
-            accountId: cashId,
+            accountId: personalCashId,
             occurredOn: todayISO(),
           }),
         },
@@ -751,28 +760,19 @@ export default function HomePage() {
                                 [c.id]: e.target.value,
                               }))
                             }
-                            placeholder={String(c.remaining)}
+                            placeholder={t("payBackAmount")}
                           />
                           <button
                             type="button"
                             disabled={!!payingId || !cashId}
-                            onClick={() => payClaim(c, true)}
+                            onClick={() => payClaim(c)}
                             className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-emerald-800 font-semibold text-white disabled:opacity-60"
-                          >
-                            {payingId === c.id
-                              ? t("saving")
-                              : "💸 " + t("payFullRemaining")}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={!!payingId || !cashId}
-                            onClick={() => payClaim(c, false)}
-                            className="flex min-h-11 w-full items-center justify-center rounded-2xl bg-white font-semibold text-emerald-900 disabled:opacity-60"
                           >
                             {payingId === c.id
                               ? t("saving")
                               : "💸 " + t("payFromHouseCash")}
                           </button>
+                          <Hint>{t("payClaimHint")}</Hint>
                         </div>
                       </li>
                     );
@@ -788,7 +788,7 @@ export default function HomePage() {
                 <ul className="mt-2 space-y-2">
                   {waitingCovers.map((c) => {
                     const mine = c.member.id === userId;
-                    const canRepay = isAdmin || mine;
+                    const canRepay = mine;
                     const canManage =
                       isAdmin && c.repaid < 0.001 && c.remaining > 0.001;
                     return (
@@ -806,7 +806,7 @@ export default function HomePage() {
                             <p className="mt-1 text-sm text-stone-500">
                               {mine
                                 ? t("yourCoverWaiting")
-                                : t("waitingPayback")}
+                                : t("waitingOtherToPay")}
                             </p>
                           </div>
                           <span className="shrink-0 text-lg font-bold">
@@ -875,13 +875,13 @@ export default function HomePage() {
                               {t("payFromWhich")}
                             </p>
                             <div className="grid grid-cols-2 gap-2">
-                              {cashAccounts.map((a) => (
+                              {personalCashAccounts.map((a) => (
                                 <button
                                   key={a.id}
                                   type="button"
-                                  onClick={() => setPayWalletId(a.id)}
+                                  onClick={() => setRepayWalletId(a.id)}
                                   className={`rounded-2xl px-3 py-2 font-semibold ${
-                                    (payWalletId || cashId) === a.id
+                                    (repayWalletId || personalCashId) === a.id
                                       ? "bg-indigo-800 text-white"
                                       : "bg-white text-stone-700"
                                   }`}
@@ -903,28 +903,19 @@ export default function HomePage() {
                                   [c.id]: e.target.value,
                                 }))
                               }
-                              placeholder={String(c.remaining)}
+                              placeholder={t("payBackAmount")}
                             />
                             <button
                               type="button"
-                              disabled={!!repayingId || !cashId}
-                              onClick={() => repayCover(c, true)}
+                              disabled={!!repayingId || !personalCashId}
+                              onClick={() => repayCover(c)}
                               className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-indigo-800 font-semibold text-white disabled:opacity-60"
-                            >
-                              {repayingId === c.id
-                                ? t("saving")
-                                : "💸 " + t("repayFullToHouse")}
-                            </button>
-                            <button
-                              type="button"
-                              disabled={!!repayingId || !cashId}
-                              onClick={() => repayCover(c, false)}
-                              className="flex min-h-11 w-full items-center justify-center rounded-2xl bg-white font-semibold text-indigo-900 disabled:opacity-60"
                             >
                               {repayingId === c.id
                                 ? t("saving")
                                 : "💸 " + t("repayToHouse")}
                             </button>
+                            <Hint>{t("repayCoverHint")}</Hint>
                           </div>
                         ) : null}
                       </li>
@@ -1082,23 +1073,13 @@ export default function HomePage() {
                           [c.id]: e.target.value,
                         }))
                       }
-                      placeholder={String(c.remaining)}
+                      placeholder={t("payBackAmount")}
                     />
                     <button
                       type="button"
                       disabled={!!payingId || !cashId}
-                      onClick={() => payClaim(c, true)}
+                      onClick={() => payClaim(c)}
                       className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-emerald-800 font-semibold text-white disabled:opacity-60"
-                    >
-                      {payingId === c.id
-                        ? t("saving")
-                        : "💸 " + t("payFullRemaining")}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!!payingId || !cashId}
-                      onClick={() => payClaim(c, false)}
-                      className="flex min-h-11 w-full items-center justify-center rounded-2xl bg-white font-semibold text-emerald-900 disabled:opacity-60"
                     >
                       {payingId === c.id
                         ? t("saving")
@@ -1121,7 +1102,7 @@ export default function HomePage() {
           <ul className="mt-3 space-y-3">
             {waitingCovers.map((c) => {
               const mine = c.member.id === userId;
-              const canRepay = isAdmin || mine;
+              const canRepay = mine;
               const canManage = isAdmin && c.repaid < 0.001 && c.remaining > 0.001;
               return (
                 <li
@@ -1138,7 +1119,7 @@ export default function HomePage() {
                         {c.note ? ` · ${c.note}` : ""}
                       </p>
                       <p className="mt-1 text-sm font-medium text-indigo-900">
-                        {mine ? t("yourCoverWaiting") : t("waitingPayback")}
+                        {mine ? t("yourCoverWaiting") : t("waitingOtherToPay")}
                       </p>
                     </div>
                     <span className="shrink-0 text-lg font-bold">
@@ -1205,13 +1186,13 @@ export default function HomePage() {
                     <div className="mt-3 space-y-2">
                       <p className="text-sm text-stone-500">{t("payFromWhich")}</p>
                       <div className="grid grid-cols-2 gap-2">
-                        {cashAccounts.map((a) => (
+                        {personalCashAccounts.map((a) => (
                           <button
                             key={a.id}
                             type="button"
-                            onClick={() => setPayWalletId(a.id)}
+                            onClick={() => setRepayWalletId(a.id)}
                             className={`rounded-2xl px-3 py-2 font-semibold ${
-                              (payWalletId || cashId) === a.id
+                              (repayWalletId || personalCashId) === a.id
                                 ? "bg-indigo-800 text-white"
                                 : "bg-white text-stone-700"
                             }`}
@@ -1233,23 +1214,13 @@ export default function HomePage() {
                             [c.id]: e.target.value,
                           }))
                         }
-                        placeholder={String(c.remaining)}
+                        placeholder={t("payBackAmount")}
                       />
                       <button
                         type="button"
-                        disabled={!!repayingId || !cashId}
-                        onClick={() => repayCover(c, true)}
+                        disabled={!!repayingId || !personalCashId}
+                        onClick={() => repayCover(c)}
                         className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-indigo-800 font-semibold text-white disabled:opacity-60"
-                      >
-                        {repayingId === c.id
-                          ? t("saving")
-                          : "💸 " + t("repayFullToHouse")}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={!!repayingId || !cashId}
-                        onClick={() => repayCover(c, false)}
-                        className="flex min-h-11 w-full items-center justify-center rounded-2xl bg-white font-semibold text-indigo-900 disabled:opacity-60"
                       >
                         {repayingId === c.id
                           ? t("saving")
