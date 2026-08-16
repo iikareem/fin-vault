@@ -17,6 +17,8 @@ export default function MorePage() {
   }, [setKind]);
 
   const links = [
+    { href: "/with-house", label: t("withHouseTitle"), emoji: "🏠", hint: t("moreWithHouseHint") },
+    { href: "/between/history", label: t("betweenHistoryTitle"), emoji: "🤝", hint: t("moreBetweenHistoryHint") },
     { href: "/analytics", label: t("navCharts"), emoji: "📊", hint: t("moreChartsHint") },
     { href: "/charity", label: t("navCharity"), emoji: "🕌", hint: t("moreCharityHint") },
     { href: "/family", label: t("navFamily"), emoji: "👨‍👩‍👧‍👦", hint: t("moreFamilyHint") },

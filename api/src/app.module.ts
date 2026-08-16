@@ -13,6 +13,7 @@ import { ClaimsModule } from './claims/claims.module';
 import { CharityModule } from './charity/charity.module';
 import { PayoutsModule } from './payouts/payouts.module';
 import { CoversModule } from './covers/covers.module';
+import { HistoryModule } from './history/history.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -31,6 +32,7 @@ import { HealthController } from './health.controller';
     CharityModule,
     PayoutsModule,
     CoversModule,
+    HistoryModule,
   ],
   controllers: [HealthController],
 })

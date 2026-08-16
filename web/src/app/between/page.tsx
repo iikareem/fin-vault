@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import { api, money, parseAmount, todayISO } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
@@ -431,6 +432,14 @@ export default function BetweenPage() {
           youAreOwed.map((l) => loanCard(l, false))
         )}
       </ul>
+
+      <Link
+        href="/between/history"
+        className="surface mt-8 flex min-h-16 flex-col justify-center rounded-[1.75rem] px-5 py-4"
+      >
+        <span className="text-lg font-semibold">🕒 {t("betweenHistoryLink")}</span>
+        <span className="mt-1 text-sm text-stone-500">{t("betweenHistoryHint")}</span>
+      </Link>
       <BottomNav />
     </PageShell>
   );

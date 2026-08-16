@@ -41,7 +41,7 @@ export function BottomNav() {
               ? path === "/"
               : path.startsWith(item.href) ||
                 (item.href === "/more" &&
-                  ["/charity", "/family", "/analytics"].some((p) =>
+                  ["/charity", "/family", "/analytics", "/with-house"].some((p) =>
                     path.startsWith(p),
                   ));
           return (

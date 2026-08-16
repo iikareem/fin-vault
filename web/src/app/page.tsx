@@ -1287,6 +1287,15 @@ export default function HomePage() {
         </Link>
       ) : null}
 
+      {isHouse ? (
+        <Link
+          href="/with-house"
+          className="mt-3 block text-center text-sm font-semibold text-stone-500"
+        >
+          🕒 {t("withHouseTitle")} →
+        </Link>
+      ) : null}
+
       {isHouse && isAdmin ? (
         <div className="mt-5 grid grid-cols-1 gap-2">
           <Link

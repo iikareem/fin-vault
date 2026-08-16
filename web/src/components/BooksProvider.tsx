@@ -25,7 +25,7 @@ type BooksValue = {
 
 const BooksContext = createContext<BooksValue | null>(null);
 
-const HOUSE_ONLY = ["/between", "/family", "/charity", "/more"];
+const HOUSE_ONLY = ["/between", "/family", "/charity", "/more", "/with-house"];
 
 export function BooksProvider({ children }: { children: ReactNode }) {
   const path = usePathname();
