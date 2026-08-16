@@ -943,20 +943,6 @@ export default function HomePage() {
             🏠 {t("housePaidForTitle")}
           </Link>
           <Hint>{t("housePaidForHint")}</Hint>
-          <Link
-            href="/add?mode=claim"
-            className="flex min-h-14 items-center justify-center rounded-3xl bg-amber-800 text-lg font-semibold text-white"
-          >
-            ➕ {t("addFromMyMoney")}
-          </Link>
-          <Hint>{t("addFromMyMoneyHomeHint")}</Hint>
-          <Link
-            href="/add?mode=give"
-            className="flex min-h-16 items-center justify-center rounded-3xl bg-teal-800 text-lg font-semibold text-white"
-          >
-            💵 {t("giveFromHouse")}
-          </Link>
-          <Hint>{t("giveFromHouseHomeHint")}</Hint>
         </div>
       ) : (
         <>
