@@ -1423,11 +1423,10 @@ export default function HomePage() {
                       tx.type === "INCOME" ? "text-emerald-800" : "text-red-800"
                     }`}
                   >
-                    <PrivateMoney
+                    <Money
                       amount={Number(tx.amount)}
                       currency={currency}
                       locale={locale}
-                      visible={moneyVisible}
                       extraSign={tx.type === "INCOME" ? "+" : "−"}
                     />
                   </span>

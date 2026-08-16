@@ -73,7 +73,7 @@ function monthLabel(key: string, locale: string) {
 export default function AnalyticsPage() {
   const { t, locale } = useI18n();
   const cal = useCalendarClock();
-  const { active } = useBooks();
+  const { active, house } = useBooks();
   const [period, setPeriod] = useState<Period>("month");
   const [cursor, setCursor] = useState(() => new Date());
   const [days, setDays] = useState<DayRow[]>([]);
@@ -83,6 +83,7 @@ export default function AnalyticsPage() {
   const [savingsOpening, setSavingsOpening] = useState(0);
   const [error, setError] = useState("");
   const currency = active?.currency ?? "EGP";
+  const hideAggregates = active?.kind === "HOUSE" && house?.role !== "ADMIN";
   const { from, to } = rangeFor(period, cursor);
 
   useEffect(() => {
@@ -218,8 +219,13 @@ export default function AnalyticsPage() {
       </div>
       <Hint>{t("pickPeriodHint")}</Hint>
       {error ? <p className="mt-3 text-red-700">{error}</p> : null}
+      {hideAggregates ? (
+        <p className="mt-4 rounded-3xl bg-white px-4 py-3 text-sm text-stone-500 shadow-sm">
+          {t("aggregatesAdminOnly")}
+        </p>
+      ) : null}
 
-      {period === "month" ? (
+      {period === "month" && !hideAggregates ? (
         <section className="mt-5 rounded-3xl bg-white p-4 shadow-sm">
           <h2 className="text-xl font-semibold">{t("savingsTitle")}</h2>
           <Hint>{t("chartsSavingsHint")}</Hint>
@@ -270,7 +276,7 @@ export default function AnalyticsPage() {
         </section>
       ) : null}
 
-      {period === "year" ? (
+      {period === "year" && !hideAggregates ? (
         <>
           <h2 className="mt-8 text-xl font-semibold">{t("savedByMonth")}</h2>
           <div className="mt-3 space-y-2">
@@ -331,17 +337,27 @@ export default function AnalyticsPage() {
         <div className="rounded-2xl bg-white p-4 shadow-sm">
           <p className="text-stone-500">{t("periodTotalIn")}</p>
           <p className="text-xl font-semibold text-emerald-800">
-            <Money amount={totalIn} currency={currency} locale={locale} />
+            {hideAggregates ? (
+              "••••"
+            ) : (
+              <Money amount={totalIn} currency={currency} locale={locale} />
+            )}
           </p>
         </div>
         <div className="rounded-2xl bg-white p-4 shadow-sm">
           <p className="text-stone-500">{t("periodTotalOut")}</p>
           <p className="text-xl font-semibold text-red-800">
-            <Money amount={totalOut} currency={currency} locale={locale} />
+            {hideAggregates ? (
+              "••••"
+            ) : (
+              <Money amount={totalOut} currency={currency} locale={locale} />
+            )}
           </p>
         </div>
       </div>
-      <Hint>{t("periodTotalsHint")}</Hint>
+      <Hint>
+        {hideAggregates ? t("aggregatesAdminOnly") : t("periodTotalsHint")}
+      </Hint>
 
       {period !== "day" ? (
         <>
@@ -357,17 +373,25 @@ export default function AnalyticsPage() {
                   <div className="flex justify-between text-sm">
                     <span>{b.label}</span>
                     <span>
-                      <Money
-                        amount={b.expense}
-                        currency={currency}
-                        locale={locale}
-                      />
+                      {hideAggregates ? (
+                        "••••"
+                      ) : (
+                        <Money
+                          amount={b.expense}
+                          currency={currency}
+                          locale={locale}
+                        />
+                      )}
                     </span>
                   </div>
                   <div className="mt-1 h-3 overflow-hidden rounded-full bg-stone-200">
                     <div
                       className="h-full rounded-full bg-red-700"
-                      style={{ width: `${(b.expense / maxBar) * 100}%` }}
+                      style={{
+                        width: hideAggregates
+                          ? "0%"
+                          : `${(b.expense / maxBar) * 100}%`,
+                      }}
                     />
                   </div>
                 </div>
@@ -388,14 +412,24 @@ export default function AnalyticsPage() {
               <div className="flex justify-between">
                 <span>{labelFor(c.name, t)}</span>
                 <span className="font-semibold">
-                  <Money amount={c.total} currency={currency} locale={locale} />
+                  {hideAggregates ? (
+                    "••••"
+                  ) : (
+                    <Money
+                      amount={c.total}
+                      currency={currency}
+                      locale={locale}
+                    />
+                  )}
                 </span>
               </div>
               <div className="mt-1 h-3 overflow-hidden rounded-full bg-stone-200">
                 <div
                   className="h-full rounded-full"
                   style={{
-                    width: `${(c.total / maxCat) * 100}%`,
+                    width: hideAggregates
+                      ? "0%"
+                      : `${(c.total / maxCat) * 100}%`,
                     background: c.color,
                   }}
                 />
@@ -416,10 +450,19 @@ export default function AnalyticsPage() {
                 className="flex justify-between rounded-2xl bg-white px-4 py-3 shadow-sm"
               >
                 <span>
-                  {labelFor(m.name, t)} · {m.type === "EXPENSE" ? t("paidVerb") : t("receivedVerb")}
+                  {labelFor(m.name, t)} ·{" "}
+                  {m.type === "EXPENSE" ? t("paidVerb") : t("receivedVerb")}
                 </span>
                 <span className="font-semibold">
-                  <Money amount={m.total} currency={currency} locale={locale} />
+                  {hideAggregates ? (
+                    "••••"
+                  ) : (
+                    <Money
+                      amount={m.total}
+                      currency={currency}
+                      locale={locale}
+                    />
+                  )}
                 </span>
               </li>
             ))}

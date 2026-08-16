@@ -60,7 +60,7 @@ function shiftDay(day: string, dir: number) {
 export default function HistoryPage() {
   const { t, locale } = useI18n();
   const cal = useCalendarClock();
-  const { active, userId } = useBooks();
+  const { active, userId, house } = useBooks();
   const [day, setDay] = useState(cal.today);
   const [log, setLog] = useState<DayLog | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -73,6 +73,7 @@ export default function HistoryPage() {
   const [busy, setBusy] = useState(false);
   const currency = active?.currency ?? "EGP";
   const canEditHouse = active?.kind === "PERSONAL" || active?.role === "ADMIN";
+  const hideAggregates = active?.kind === "HOUSE" && house?.role !== "ADMIN";
 
   function load(hid: string, on: string) {
     return Promise.all([
@@ -216,22 +217,36 @@ export default function HistoryPage() {
         </button>
       </div>
       <Hint>{t("pickDayHint")}</Hint>
-      <div className="mt-4 grid grid-cols-2 gap-3">
-        <div className="rounded-3xl bg-white p-4 shadow-sm">
-          <p className="text-lg text-stone-500">{t("in")}</p>
-          <p className="text-2xl font-bold text-emerald-800">
-            <Money amount={log?.income ?? 0} currency={currency} locale={locale} />
-          </p>
-          <Hint>{t("dayInHint")}</Hint>
+      {hideAggregates ? (
+        <p className="mt-4 rounded-3xl bg-white px-4 py-3 text-sm text-stone-500 shadow-sm">
+          {t("aggregatesAdminOnly")}
+        </p>
+      ) : (
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="rounded-3xl bg-white p-4 shadow-sm">
+            <p className="text-lg text-stone-500">{t("in")}</p>
+            <p className="text-2xl font-bold text-emerald-800">
+              <Money
+                amount={log?.income ?? 0}
+                currency={currency}
+                locale={locale}
+              />
+            </p>
+            <Hint>{t("dayInHint")}</Hint>
+          </div>
+          <div className="rounded-3xl bg-white p-4 shadow-sm">
+            <p className="text-lg text-stone-500">{t("out")}</p>
+            <p className="text-2xl font-bold text-red-800">
+              <Money
+                amount={log?.expense ?? 0}
+                currency={currency}
+                locale={locale}
+              />
+            </p>
+            <Hint>{t("dayOutHint")}</Hint>
+          </div>
         </div>
-        <div className="rounded-3xl bg-white p-4 shadow-sm">
-          <p className="text-lg text-stone-500">{t("out")}</p>
-          <p className="text-2xl font-bold text-red-800">
-            <Money amount={log?.expense ?? 0} currency={currency} locale={locale} />
-          </p>
-          <Hint>{t("dayOutHint")}</Hint>
-        </div>
-      </div>
+      )}
       {error ? <p className="mt-3 text-lg text-red-700">{error}</p> : null}
 
       {empty ? (
