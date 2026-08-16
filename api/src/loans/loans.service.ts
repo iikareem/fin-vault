@@ -2,7 +2,9 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
+  OnModuleInit,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
@@ -10,8 +12,162 @@ import { CreateLoanDto } from './dto/create-loan.dto';
 import { CreateRepaymentDto } from './dto/create-repayment.dto';
 
 @Injectable()
-export class LoansService {
+export class LoansService implements OnModuleInit {
+  private readonly logger = new Logger(LoansService.name);
+
   constructor(private prisma: PrismaService) {}
+
+  async onModuleInit() {
+    try {
+      const result = await this.backfillMissingPersonalTxs();
+      if (result.loans > 0 || result.repayments > 0) {
+        this.logger.log(
+          `Backfilled personal cash for ${result.loans} loans and ${result.repayments} repayments`,
+        );
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Peer loan personal-cash backfill skipped: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
+
+  private isoDate(d: Date) {
+    return d.toISOString().slice(0, 10);
+  }
+
+  /**
+   * Existing peer loans (before cash ledger) had no personal txs.
+   * Idempotent: only fills null fromPersonalTxId / toPersonalTxId.
+   */
+  async backfillMissingPersonalTxs() {
+    const loans = await this.prisma.peerLoan.findMany({
+      where: {
+        OR: [{ fromPersonalTxId: null }, { toPersonalTxId: null }],
+      },
+      include: {
+        fromUser: { select: { id: true, name: true } },
+        toUser: { select: { id: true, name: true } },
+        category: { select: { id: true, name: true, color: true } },
+      },
+      orderBy: { occurredOn: 'asc' },
+    });
+    const repayments = await this.prisma.loanRepayment.findMany({
+      where: {
+        OR: [{ fromPersonalTxId: null }, { toPersonalTxId: null }],
+      },
+      include: {
+        loan: {
+          include: {
+            fromUser: { select: { id: true, name: true } },
+            toUser: { select: { id: true, name: true } },
+            category: { select: { id: true, name: true, color: true } },
+          },
+        },
+      },
+      orderBy: { occurredOn: 'asc' },
+    });
+
+    let loanCount = 0;
+    let repayCount = 0;
+
+    for (const loan of loans) {
+      await this.prisma.$transaction(async (tx) => {
+        const note = loan.note.trim();
+        const occurredOn = this.isoDate(loan.occurredOn);
+        const amount = Number(loan.originalAmount);
+        let fromPersonalTxId = loan.fromPersonalTxId;
+        let toPersonalTxId = loan.toPersonalTxId;
+        if (!fromPersonalTxId) {
+          fromPersonalTxId = await this.recordPersonalExpense(
+            tx,
+            loan.fromUserId,
+            amount,
+            occurredOn,
+            loan.category.name,
+            loan.category.color,
+            note
+              ? `${loan.toUser.name} · ${note}`
+              : `Lent to ${loan.toUser.name}`,
+          );
+        }
+        if (!toPersonalTxId) {
+          toPersonalTxId = await this.recordPersonalIncome(
+            tx,
+            loan.toUserId,
+            amount,
+            occurredOn,
+            loan.category.name,
+            loan.category.color,
+            note
+              ? `${loan.fromUser.name} · ${note}`
+              : `Borrowed from ${loan.fromUser.name}`,
+          );
+        }
+        if (
+          fromPersonalTxId !== loan.fromPersonalTxId ||
+          toPersonalTxId !== loan.toPersonalTxId
+        ) {
+          await tx.peerLoan.update({
+            where: { id: loan.id },
+            data: { fromPersonalTxId, toPersonalTxId },
+          });
+          loanCount += 1;
+        }
+      });
+    }
+
+    for (const row of repayments) {
+      await this.prisma.$transaction(async (tx) => {
+        const loan = row.loan;
+        const note = row.note.trim();
+        const occurredOn = this.isoDate(row.occurredOn);
+        const amount = Number(row.amount);
+        let fromPersonalTxId = row.fromPersonalTxId;
+        let toPersonalTxId = row.toPersonalTxId;
+        if (!fromPersonalTxId) {
+          fromPersonalTxId = await this.recordPersonalExpense(
+            tx,
+            loan.toUserId,
+            amount,
+            occurredOn,
+            loan.category.name,
+            loan.category.color,
+            note
+              ? `${loan.fromUser.name} · ${note}`
+              : `Repaid ${loan.fromUser.name}`,
+          );
+        }
+        if (!toPersonalTxId) {
+          toPersonalTxId = await this.recordPersonalIncome(
+            tx,
+            loan.fromUserId,
+            amount,
+            occurredOn,
+            loan.category.name,
+            loan.category.color,
+            note
+              ? `${loan.toUser.name} · ${note}`
+              : `Repayment from ${loan.toUser.name}`,
+          );
+        }
+        if (
+          fromPersonalTxId !== row.fromPersonalTxId ||
+          toPersonalTxId !== row.toPersonalTxId
+        ) {
+          await tx.loanRepayment.update({
+            where: { id: row.id },
+            data: { fromPersonalTxId, toPersonalTxId },
+          });
+          repayCount += 1;
+        }
+      });
+    }
+
+    return { loans: loanCount, repayments: repayCount };
+  }
 
   private remaining(
     original: Prisma.Decimal,
