@@ -12,6 +12,7 @@ import { useBooks } from "@/components/BooksProvider";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 import { Money } from "@/components/Money";
+import { PrivateMoney } from "@/components/PrivateMoney";
 import {
   isCashWallet,
   isCurrentWallet,
@@ -84,7 +85,7 @@ type Cover = {
 
 export default function HomePage() {
   const { t, locale } = useI18n();
-  const { name, userId, active, personal, setKind } = useBooks();
+  const { name, userId, active, personal, house, setKind } = useBooks();
   const cal = useCalendarClock();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -106,6 +107,7 @@ export default function HomePage() {
   const [error, setError] = useState("");
   const [flash, setFlash] = useState("");
   const [busyEdit, setBusyEdit] = useState(false);
+  const [personalMoneyVisible, setPersonalMoneyVisible] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -169,6 +171,10 @@ export default function HomePage() {
   }, [active?.householdId, active?.kind, cal.monthKey]);
 
   useEffect(() => {
+    setPersonalMoneyVisible(false);
+  }, [active?.householdId, active?.kind]);
+
+  useEffect(() => {
     if (!personal?.householdId || active?.kind !== "HOUSE") {
       setPersonalAccounts([]);
       return;
@@ -180,7 +186,13 @@ export default function HomePage() {
 
   const currency = active?.currency ?? "EGP";
   const isHouse = active?.kind === "HOUSE";
-  const isAdmin = active?.role === "ADMIN";
+  const isAdmin = (isHouse ? active?.role : house?.role) === "ADMIN";
+  const houseAdmin = house?.role === "ADMIN";
+  /** Non-admins never see house cash totals on home. */
+  const houseCashHidden = isHouse && !houseAdmin;
+  /** Personal cash is masked until tapped. */
+  const moneyVisible = isHouse ? !houseCashHidden : personalMoneyVisible;
+  const canToggleMoney = !isHouse;
   const cashAccounts = sortCashWallets(accounts.filter(isCashAccount));
   const currentWallet = cashAccounts.find(isCurrentWallet);
   const savingsWallet = cashAccounts.find(isSavingsWallet);
@@ -382,100 +394,140 @@ export default function HomePage() {
       {error ? <p className="mt-2 text-red-700">{error}</p> : null}
 
       <section
-        className="mt-3 rounded-[1.75rem] p-5 shadow-lg"
+        className={`mt-3 rounded-[1.75rem] p-5 shadow-lg ${
+          canToggleMoney ? "cursor-pointer select-none" : ""
+        }`}
         style={{
           color: "#fff",
           background: isHouse
             ? "linear-gradient(to bottom right, #047857, #022c22)"
             : "linear-gradient(to bottom right, #0369a1, #082f49)",
         }}
+        onClick={
+          canToggleMoney
+            ? () => setPersonalMoneyVisible((v) => !v)
+            : undefined
+        }
+        onKeyDown={
+          canToggleMoney
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setPersonalMoneyVisible((v) => !v);
+                }
+              }
+            : undefined
+        }
+        role={canToggleMoney ? "button" : undefined}
+        tabIndex={canToggleMoney ? 0 : undefined}
+        aria-pressed={canToggleMoney ? personalMoneyVisible : undefined}
       >
         <p className="text-base" style={{ color: "#fff" }}>
           💵 {isHouse ? t("houseMoneyNow") : t("yourMoneyNow")}
         </p>
-        <p className="mt-1 text-[clamp(1.4rem,7.2vw,2.25rem)] font-bold leading-tight">
-          {accounts.length ? (
-            <Money amount={cashTotal} currency={currency} locale={locale} />
-          ) : (
-            "…"
-          )}
-        </p>
-        <div className="mt-4 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
-          <div
-            className="rounded-2xl px-3 py-2"
-            style={{ background: "rgba(255,255,255,0.18)" }}
-          >
-            <p className="text-sm opacity-90">💵 {t("currentWallet")}</p>
-            <p className="text-xl font-semibold leading-tight">
+        {houseCashHidden ? (
+          <p className="mt-3 text-base opacity-90">{t("houseCashAdminOnly")}</p>
+        ) : (
+          <>
+            <p className="mt-1 text-[clamp(1.4rem,7.2vw,2.25rem)] font-bold leading-tight">
               {accounts.length ? (
-                <Money
-                  amount={currentWallet?.balance ?? 0}
+                <PrivateMoney
+                  amount={cashTotal}
                   currency={currency}
                   locale={locale}
+                  visible={moneyVisible}
                 />
               ) : (
                 "…"
               )}
             </p>
-            <p className="mt-1 text-xs opacity-80">{t("currentHint")}</p>
-          </div>
-          <div
-            className="rounded-2xl px-3 py-2"
-            style={{ background: "rgba(255,255,255,0.18)" }}
-          >
-            <p className="text-sm opacity-90">💰 {t("savingsWallet")}</p>
-            <p className="text-xl font-semibold leading-tight">
-              {accounts.length ? (
-                <Money
-                  amount={savingsWallet?.balance ?? 0}
-                  currency={currency}
-                  locale={locale}
-                />
-              ) : (
-                "…"
-              )}
-            </p>
-            <p className="mt-1 text-xs opacity-80">{t("savingsHint")}</p>
-          </div>
-        </div>
-        <div className="mt-3 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
-          <div
-            className="rounded-2xl px-3 py-2"
-            style={{ background: "rgba(255,255,255,0.18)" }}
-          >
-            <p className="text-sm opacity-90">📈 {t("monthIn")}</p>
-            <p className="text-lg font-semibold leading-tight">
-              {summary ? (
-                <Money
-                  amount={summary.monthIncome}
-                  currency={currency}
-                  locale={locale}
-                />
-              ) : (
-                "…"
-              )}
-            </p>
-            <p className="mt-1 text-xs opacity-80">{t("monthInHint")}</p>
-          </div>
-          <div
-            className="rounded-2xl px-3 py-2"
-            style={{ background: "rgba(255,255,255,0.18)" }}
-          >
-            <p className="text-sm opacity-90">📉 {t("monthOut")}</p>
-            <p className="text-lg font-semibold leading-tight">
-              {summary ? (
-                <Money
-                  amount={summary.monthExpense}
-                  currency={currency}
-                  locale={locale}
-                />
-              ) : (
-                "…"
-              )}
-            </p>
-            <p className="mt-1 text-xs opacity-80">{t("monthOutHint")}</p>
-          </div>
-        </div>
+            <div className="mt-4 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
+              <div
+                className="rounded-2xl px-3 py-2"
+                style={{ background: "rgba(255,255,255,0.18)" }}
+              >
+                <p className="text-sm opacity-90">💵 {t("currentWallet")}</p>
+                <p className="text-xl font-semibold leading-tight">
+                  {accounts.length ? (
+                    <PrivateMoney
+                      amount={currentWallet?.balance ?? 0}
+                      currency={currency}
+                      locale={locale}
+                      visible={moneyVisible}
+                    />
+                  ) : (
+                    "…"
+                  )}
+                </p>
+                <p className="mt-1 text-xs opacity-80">{t("currentHint")}</p>
+              </div>
+              <div
+                className="rounded-2xl px-3 py-2"
+                style={{ background: "rgba(255,255,255,0.18)" }}
+              >
+                <p className="text-sm opacity-90">💰 {t("savingsWallet")}</p>
+                <p className="text-xl font-semibold leading-tight">
+                  {accounts.length ? (
+                    <PrivateMoney
+                      amount={savingsWallet?.balance ?? 0}
+                      currency={currency}
+                      locale={locale}
+                      visible={moneyVisible}
+                    />
+                  ) : (
+                    "…"
+                  )}
+                </p>
+                <p className="mt-1 text-xs opacity-80">{t("savingsHint")}</p>
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
+              <div
+                className="rounded-2xl px-3 py-2"
+                style={{ background: "rgba(255,255,255,0.18)" }}
+              >
+                <p className="text-sm opacity-90">📈 {t("monthIn")}</p>
+                <p className="text-lg font-semibold leading-tight">
+                  {summary ? (
+                    <PrivateMoney
+                      amount={summary.monthIncome}
+                      currency={currency}
+                      locale={locale}
+                      visible={moneyVisible}
+                    />
+                  ) : (
+                    "…"
+                  )}
+                </p>
+                <p className="mt-1 text-xs opacity-80">{t("monthInHint")}</p>
+              </div>
+              <div
+                className="rounded-2xl px-3 py-2"
+                style={{ background: "rgba(255,255,255,0.18)" }}
+              >
+                <p className="text-sm opacity-90">📉 {t("monthOut")}</p>
+                <p className="text-lg font-semibold leading-tight">
+                  {summary ? (
+                    <PrivateMoney
+                      amount={summary.monthExpense}
+                      currency={currency}
+                      locale={locale}
+                      visible={moneyVisible}
+                    />
+                  ) : (
+                    "…"
+                  )}
+                </p>
+                <p className="mt-1 text-xs opacity-80">{t("monthOutHint")}</p>
+              </div>
+            </div>
+            {canToggleMoney ? (
+              <p className="mt-3 text-sm opacity-90">
+                {moneyVisible ? t("tapToHideMoney") : t("tapToShowMoney")}
+              </p>
+            ) : null}
+          </>
+        )}
         <p className="mt-3 text-sm opacity-90">
           📅{" "}
           {cal.remainingDays === 0
@@ -1248,12 +1300,14 @@ export default function HomePage() {
             🕌 {t("navCharity")}
           </span>
           <span className="font-semibold text-stone-700">
-            {charity ? (
+            {charity && !houseCashHidden ? (
               <Money
                 amount={charity.familyTotal}
                 currency={currency}
                 locale={locale}
               />
+            ) : charity && houseCashHidden ? (
+              "••••"
             ) : (
               ""
             )}
@@ -1329,10 +1383,11 @@ export default function HomePage() {
                       tx.type === "INCOME" ? "text-emerald-800" : "text-red-800"
                     }`}
                   >
-                    <Money
+                    <PrivateMoney
                       amount={Number(tx.amount)}
                       currency={currency}
                       locale={locale}
+                      visible={moneyVisible}
                       extraSign={tx.type === "INCOME" ? "+" : "−"}
                     />
                   </span>
