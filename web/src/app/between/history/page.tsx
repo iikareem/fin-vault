@@ -11,6 +11,7 @@ import { labelFor } from "@/lib/i18n";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 import { Money } from "@/components/Money";
+import { ItemDate } from "@/components/ItemDate";
 import { useCalendarClock } from "@/hooks/useCalendarClock";
 import {
   HistoryPeriod,
@@ -240,7 +241,7 @@ export default function BetweenHistoryPage() {
                   <div className="min-w-0 text-right" dir="auto">
                     <p className="font-semibold">{title}</p>
                     <p className="text-sm text-stone-500">
-                      {ev.occurredOn}
+                      <ItemDate value={ev.occurredOn} locale={locale} />
                       {ev.categoryName
                         ? ` · ${labelFor(ev.categoryName, t)}`
                         : ""}

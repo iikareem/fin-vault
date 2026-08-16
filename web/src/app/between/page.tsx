@@ -10,6 +10,8 @@ import { useBooks } from "@/components/BooksProvider";
 import { labelFor, fill } from "@/lib/i18n";
 import { householdPath } from "@/lib/space";
 import { Money } from "@/components/Money";
+import { ItemDate } from "@/components/ItemDate";
+import { sortByOccurredOnDesc } from "@/lib/calendar";
 
 type Person = { id: string; name: string };
 type Category = { id: string; name: string; kind: string };
@@ -23,6 +25,7 @@ type Loan = {
   repaid: number;
   status: string;
   note: string;
+  occurredOn?: string;
   fromUser: { id: string; name: string };
   toUser: { id: string; name: string };
   category: { id: string; name: string; color: string };
@@ -57,8 +60,8 @@ export default function BetweenPage() {
       api<Person[]>(householdPath(hid, "/users")),
       api<Category[]>(householdPath(hid, "/categories")),
     ]).then(([loans, users, cats]) => {
-      setYouOwe(loans.youOwe);
-      setYouAreOwed(loans.youAreOwed);
+      setYouOwe(sortByOccurredOnDesc(loans.youOwe));
+      setYouAreOwed(sortByOccurredOnDesc(loans.youAreOwed));
       setPeople(users);
       const peer = cats.filter((c) => c.kind === "PEER");
       setCategories(peer);
@@ -199,6 +202,7 @@ export default function BetweenPage() {
           })}
           {loan.note ? ` · ${loan.note}` : ""}
         </p>
+        <ItemDate value={loan.occurredOn} locale={locale} className="mt-1" />
         {manage ? (
           <div className="mt-2 flex flex-wrap gap-2">
             <button

@@ -11,6 +11,7 @@ import { labelFor, type MessageKey } from "@/lib/i18n";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 import { Money } from "@/components/Money";
+import { ItemDate } from "@/components/ItemDate";
 import { useCalendarClock } from "@/hooks/useCalendarClock";
 import {
   HistoryPeriod,
@@ -199,7 +200,7 @@ export default function WithHouseHistoryPage() {
                     {t(DIRECTION_KEY[ev.direction] ?? "stillOpen")}
                   </p>
                   <p className="text-sm text-stone-500">
-                    {ev.occurredOn}
+                    <ItemDate value={ev.occurredOn} locale={locale} />
                     {ev.categoryName
                       ? ` · ${labelFor(ev.categoryName, t)}`
                       : ""}

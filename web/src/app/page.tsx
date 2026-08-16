@@ -13,6 +13,8 @@ import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 import { Money } from "@/components/Money";
 import { PrivateMoney } from "@/components/PrivateMoney";
+import { ItemDate } from "@/components/ItemDate";
+import { sortByOccurredOnDesc } from "@/lib/calendar";
 import {
   isCashWallet,
   isCurrentWallet,
@@ -52,6 +54,7 @@ type Tx = {
   type: "INCOME" | "EXPENSE" | "REIMBURSEMENT";
   amount: string | number;
   note: string;
+  occurredOn?: string;
   category: { name: string };
   user: { name: string };
   account?: { name: string; type?: string };
@@ -157,9 +160,11 @@ export default function HomePage() {
         setSummary(result[0] as Summary);
         setAccounts(result[1] as Account[]);
         setTxs(
-          (result[2] as Tx[])
-            .filter((tx) => !tx.account || isCashAccount(tx.account))
-            .slice(0, 8),
+          sortByOccurredOnDesc(
+            (result[2] as Tx[]).filter(
+              (tx) => !tx.account || isCashAccount(tx.account),
+            ),
+          ).slice(0, 8),
         );
         if (active.kind === "HOUSE") {
           setCharity(result[3] as CharityMonth);
@@ -205,8 +210,12 @@ export default function HomePage() {
     repayWalletId ||
     personalCashAccounts.find(isCurrentWallet)?.id ||
     personalCashAccounts[0]?.id;
-  const waitingClaims = claims.filter((c) => c.remaining > 0.001);
-  const waitingCovers = covers.filter((c) => c.remaining > 0.001);
+  const waitingClaims = sortByOccurredOnDesc(
+    claims.filter((c) => c.remaining > 0.001),
+  );
+  const waitingCovers = sortByOccurredOnDesc(
+    covers.filter((c) => c.remaining > 0.001),
+  );
   const pendingTotal =
     summary?.claimsPendingTotal ??
     waitingClaims.reduce((s, c) => s + c.remaining, 0);
@@ -235,9 +244,9 @@ export default function HomePage() {
     setSummary(s);
     setAccounts(a);
     setTxs(
-      tx
-        .filter((row) => !row.account || isCashAccount(row.account))
-        .slice(0, 8),
+      sortByOccurredOnDesc(
+        tx.filter((row) => !row.account || isCashAccount(row.account)),
+      ).slice(0, 8),
     );
     setClaims(list);
     setCovers(coverList);
@@ -761,6 +770,11 @@ export default function HomePage() {
                             <p className="mt-1 text-sm text-stone-500">
                               {mine ? t("yourClaimWaiting") : t("waitingPayback")}
                             </p>
+                            <ItemDate
+                              value={c.occurredOn}
+                              locale={locale}
+                              className="mt-1"
+                            />
                           </div>
                           <span className="shrink-0 text-lg font-bold">
                             <Money
@@ -903,6 +917,11 @@ export default function HomePage() {
                                 ? t("yourCoverWaiting")
                                 : t("waitingOtherToPay")}
                             </p>
+                            <ItemDate
+                              value={c.occurredOn}
+                              locale={locale}
+                              className="mt-1"
+                            />
                           </div>
                           <span className="shrink-0 text-lg font-bold">
                             <Money
@@ -1077,6 +1096,11 @@ export default function HomePage() {
                     <p className="mt-1 text-sm font-medium text-amber-900">
                       {mine ? t("yourClaimWaiting") : t("waitingPayback")}
                     </p>
+                    <ItemDate
+                      value={c.occurredOn}
+                      locale={locale}
+                      className="mt-1"
+                    />
                   </div>
                   <span className="shrink-0 text-lg font-bold">
                     <Money
@@ -1216,6 +1240,11 @@ export default function HomePage() {
                       <p className="mt-1 text-sm font-medium text-indigo-900">
                         {mine ? t("yourCoverWaiting") : t("waitingOtherToPay")}
                       </p>
+                      <ItemDate
+                        value={c.occurredOn}
+                        locale={locale}
+                        className="mt-1"
+                      />
                     </div>
                     <span className="shrink-0 text-lg font-bold">
                       <Money
@@ -1415,9 +1444,16 @@ export default function HomePage() {
             {txs.map((tx) => (
               <li key={tx.id} className="surface rounded-2xl px-4 py-3">
                 <div className="money-row min-w-0">
-                  <span className="min-w-0 font-medium" dir="auto">
-                    {labelFor(tx.category.name, t)}
-                  </span>
+                  <div className="min-w-0 text-right" dir="auto">
+                    <span className="font-medium">
+                      {labelFor(tx.category.name, t)}
+                    </span>
+                    <ItemDate
+                      value={tx.occurredOn}
+                      locale={locale}
+                      className="mt-1 block"
+                    />
+                  </div>
                   <span
                     className={`shrink-0 font-semibold ${
                       tx.type === "INCOME" ? "text-emerald-800" : "text-red-800"
