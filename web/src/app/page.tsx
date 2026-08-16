@@ -422,9 +422,48 @@ export default function HomePage() {
         tabIndex={canToggleMoney ? 0 : undefined}
         aria-pressed={canToggleMoney ? personalMoneyVisible : undefined}
       >
-        <p className="text-base" style={{ color: "#fff" }}>
-          💵 {isHouse ? t("houseMoneyNow") : t("yourMoneyNow")}
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-base" style={{ color: "#fff" }}>
+            💵 {isHouse ? t("houseMoneyNow") : t("yourMoneyNow")}
+          </p>
+          {canToggleMoney ? (
+            <span
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+              style={{ background: "rgba(255,255,255,0.22)" }}
+              aria-hidden
+            >
+              {moneyVisible ? (
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+              ) : (
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-5 w-5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M3 3l18 18" />
+                  <path d="M10.6 10.6a3 3 0 0 0 4.2 4.2" />
+                  <path d="M9.9 5.1A10.5 10.5 0 0 1 12 5c6.5 0 10 7 10 7a17.9 17.9 0 0 1-2.2 3.3" />
+                  <path d="M6.1 6.1C3.9 7.7 2 12 2 12s3.5 7 10 7a10.4 10.4 0 0 0 4.3-.9" />
+                </svg>
+              )}
+            </span>
+          ) : null}
+        </div>
         {houseCashHidden ? (
           <p className="mt-3 text-base opacity-90">{t("houseCashAdminOnly")}</p>
         ) : (
@@ -522,7 +561,8 @@ export default function HomePage() {
               </div>
             </div>
             {canToggleMoney ? (
-              <p className="mt-3 text-sm opacity-90">
+              <p className="mt-3 flex items-center gap-2 text-sm opacity-90">
+                <span aria-hidden>{moneyVisible ? "👁" : "🙈"}</span>
                 {moneyVisible ? t("tapToHideMoney") : t("tapToShowMoney")}
               </p>
             ) : null}
