@@ -186,7 +186,8 @@ const ar = {
   ofOriginal: "من أصل {amount}",
   payBack: "أرجّع",
   payBackAmount: "كام هترجّع",
-  payBackHint: "اكتبوا الجزء اللي هترجّعوه. بس اللي عليه الدين يقدر يسدّد.",
+  payBackHint:
+    "اكتبوا الجزء اللي هترجّعوه. بس اللي عليه الدين يقدر يسدّد. هيتخصم من كاشكم ويزيد عند الطرف التاني.",
   youOweTitle: "عليك",
   youOweHint: "فلوس أنت مدين بيها لحد في العيلة. لما ترجّع، اكتب المبلغ تحت الاسم.",
   theyOweTitle: "لك",
@@ -551,7 +552,8 @@ const en = {
   ofOriginal: "of {amount}",
   payBack: "Pay back",
   payBackAmount: "How much to pay back",
-  payBackHint: "Type how much you are paying back. Only the person who owes can settle it.",
+  payBackHint:
+    "Type how much you are paying back. Only the person who owes can settle it. It leaves your personal cash and returns to theirs.",
   youOweTitle: "You owe",
   youOweHint: "Money you still owe someone in the family. When you pay some back, type the amount under their name.",
   theyOweTitle: "Owed to you",
