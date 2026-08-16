@@ -53,8 +53,10 @@ function AddForm() {
     if (!active) return;
     setSpace(active);
     const isHouseMember = active.kind === "HOUSE" && active.role === "MEMBER";
-    setMode(isHouseMember ? "claim" : "wallet");
+    const wantClaim = search.get("mode") === "claim";
+    setMode(isHouseMember || wantClaim ? "claim" : "wallet");
     if (search.get("mode") === "give" && !isHouseMember) setType("GIVE");
+    if (wantClaim) setType("EXPENSE");
     const jobs: Promise<unknown>[] = [
       api<Account[]>(householdPath(active.householdId, "/accounts")),
       api<Category[]>(householdPath(active.householdId, "/categories")),
@@ -121,6 +123,9 @@ function AddForm() {
             note,
           }),
         });
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("fb_flash", "claimSaved");
+        }
       } else if (type === "GIVE") {
         await api(householdPath(space.householdId, "/payouts"), {
           method: "POST",

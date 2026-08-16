@@ -157,9 +157,11 @@ export class AnalyticsService {
     let youOwe = 0;
     let youAreOwed = 0;
     let claimsWaiting = 0;
+    let claimsPendingTotal = 0;
+    let claimsPendingCount = 0;
 
     if (membership.kind === 'HOUSE') {
-      const [loans, myClaims] = await Promise.all([
+      const [loans, myClaims, openClaims] = await Promise.all([
         this.prisma.peerLoan.findMany({
           where: {
             householdId,
@@ -170,6 +172,10 @@ export class AnalyticsService {
         }),
         this.prisma.houseClaim.findMany({
           where: { householdId, memberId: userId, status: { not: 'REIMBURSED' } },
+          include: { reimbursements: true },
+        }),
+        this.prisma.houseClaim.findMany({
+          where: { householdId, status: { not: 'REIMBURSED' } },
           include: { reimbursements: true },
         }),
       ]);
@@ -185,6 +191,36 @@ export class AnalyticsService {
           Number(claim.amount) -
           claim.reimbursements.reduce((s, r) => s + Number(r.amount), 0);
       }
+      for (const claim of openClaims) {
+        const remaining =
+          Number(claim.amount) -
+          claim.reimbursements.reduce((s, r) => s + Number(r.amount), 0);
+        if (remaining > 0.001) {
+          claimsPendingTotal += remaining;
+          claimsPendingCount += 1;
+        }
+      }
+    } else {
+      // Personal books: still show what the house owes this person.
+      const houseMembership = await this.prisma.membership.findFirst({
+        where: { userId, household: { kind: 'HOUSE' } },
+        select: { householdId: true },
+      });
+      if (houseMembership) {
+        const myClaims = await this.prisma.houseClaim.findMany({
+          where: {
+            householdId: houseMembership.householdId,
+            memberId: userId,
+            status: { not: 'REIMBURSED' },
+          },
+          include: { reimbursements: true },
+        });
+        for (const claim of myClaims) {
+          claimsWaiting +=
+            Number(claim.amount) -
+            claim.reimbursements.reduce((s, r) => s + Number(r.amount), 0);
+        }
+      }
     }
 
     return {
@@ -199,6 +235,8 @@ export class AnalyticsService {
       youOwe,
       youAreOwed,
       claimsWaiting,
+      claimsPendingTotal,
+      claimsPendingCount,
     };
   }
 

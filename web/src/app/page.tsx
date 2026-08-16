@@ -31,6 +31,8 @@ type Summary = {
   youOwe: number;
   youAreOwed: number;
   claimsWaiting: number;
+  claimsPendingTotal?: number;
+  claimsPendingCount?: number;
 };
 type Account = { id: string; name: string; type?: string; balance: number };
 type CharityTypeRow = {
@@ -68,7 +70,7 @@ type Claim = {
 
 export default function HomePage() {
   const { t, locale } = useI18n();
-  const { name, active } = useBooks();
+  const { name, userId, active, setKind } = useBooks();
   const cal = useCalendarClock();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -79,6 +81,19 @@ export default function HomePage() {
   const [payWalletId, setPayWalletId] = useState("");
   const [payAmounts, setPayAmounts] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
+  const [flash, setFlash] = useState("");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const key = sessionStorage.getItem("fb_flash");
+    if (key === "claimSaved") {
+      sessionStorage.removeItem("fb_flash");
+      setFlash(t("claimSaved"));
+    } else if (key === "payBackDone") {
+      sessionStorage.removeItem("fb_flash");
+      setFlash(t("payBackDone"));
+    }
+  }, [t]);
 
   useEffect(() => {
     if (!active) return;
@@ -126,11 +141,19 @@ export default function HomePage() {
   const cashTotal = cashAccounts.reduce((s, a) => s + a.balance, 0);
   const cashId = payWalletId || currentWallet?.id || cashAccounts[0]?.id;
   const waitingClaims = claims.filter((c) => c.remaining > 0.001);
+  const pendingTotal =
+    summary?.claimsPendingTotal ??
+    waitingClaims.reduce((s, c) => s + c.remaining, 0);
+  const pendingCount = summary?.claimsPendingCount ?? waitingClaims.length;
 
-  async function payClaim(claim: Claim) {
+  async function payClaim(claim: Claim, full = false) {
     if (!active || !cashId) return;
     const typed = parseAmount(payAmounts[claim.id] ?? "");
-    const amount = Number.isFinite(typed) ? typed : 0;
+    const amount = full
+      ? claim.remaining
+      : Number.isFinite(typed) && typed > 0
+        ? typed
+        : claim.remaining;
     if (amount <= 0) {
       setError(t("payBackAmount"));
       return;
@@ -168,6 +191,7 @@ export default function HomePage() {
       );
       setClaims(list);
       setPayAmounts((prev) => ({ ...prev, [claim.id]: "" }));
+      setFlash(t("payBackDone"));
     } catch (e) {
       setError(e instanceof Error ? e.message : t("couldNotSave"));
     } finally {
@@ -183,6 +207,11 @@ export default function HomePage() {
       <p className="mt-1 text-sm leading-relaxed text-stone-500">
         {isHouse ? t("homeHintHouse") : t("homeHintMine")}
       </p>
+      {flash ? (
+        <p className="mt-3 rounded-2xl bg-emerald-50 px-4 py-3 text-emerald-900">
+          {flash}
+        </p>
+      ) : null}
       {error ? <p className="mt-2 text-red-700">{error}</p> : null}
 
       <section
@@ -292,8 +321,54 @@ export default function HomePage() {
         </p>
       </section>
 
+      {summary && summary.claimsWaiting > 0.001 && !isHouse ? (
+        <button
+          type="button"
+          onClick={() => setKind("HOUSE")}
+          className="surface mt-4 block w-full rounded-2xl px-4 py-3 text-right"
+        >
+          <p className="font-semibold text-amber-900">
+            🏠{" "}
+            {t("houseOwesYou", {
+              amount: money(summary.claimsWaiting, currency, locale),
+            })}
+          </p>
+          <p className="mt-1 text-sm text-stone-600">{t("houseOwesYouAction")}</p>
+          <p className="mt-2 text-sm font-semibold text-emerald-800">
+            {t("openHouseBooks")} →
+          </p>
+        </button>
+      ) : null}
+
       {isHouse && summary ? (
         <div className="mt-4 space-y-2">
+          {summary.claimsWaiting > 0.001 ? (
+            <div className="rounded-2xl bg-amber-50 px-4 py-3">
+              <p className="font-semibold text-amber-950">
+                🏠{" "}
+                {t("houseOwesYou", {
+                  amount: money(summary.claimsWaiting, currency, locale),
+                })}
+              </p>
+              <p className="mt-1 text-sm text-amber-900/80">{t("waitingPayback")}</p>
+            </div>
+          ) : null}
+          {isAdmin && pendingCount > 0 ? (
+            <div className="rounded-2xl bg-amber-100 px-4 py-3">
+              <p className="font-semibold text-amber-950">
+                ⏳{" "}
+                {pendingCount === 1
+                  ? t("claimsAdminBannerOne", {
+                      amount: money(pendingTotal, currency, locale),
+                    })
+                  : t("claimsAdminBanner", {
+                      amount: money(pendingTotal, currency, locale),
+                      n: String(pendingCount),
+                    })}
+              </p>
+              <Hint>{t("claimsHomeHint")}</Hint>
+            </div>
+          ) : null}
           {summary.youOwe > 0.001 || summary.youAreOwed > 0.001 ? (
             <p className="text-sm text-stone-500">{t("homeIouHint")}</p>
           ) : null}
@@ -317,14 +392,24 @@ export default function HomePage() {
           <h2 className="text-xl font-semibold">⏳ {t("peoplePaidTitle")}</h2>
           <Hint>{t("claimsHomeHint")}</Hint>
           <ul className="mt-3 space-y-3">
-            {waitingClaims.map((c) => (
-              <li key={c.id} className="rounded-2xl bg-amber-50 px-3 py-3">
+            {waitingClaims.map((c) => {
+              const mine = c.member.id === userId;
+              return (
+              <li
+                key={c.id}
+                className={`rounded-2xl px-3 py-3 ${
+                  mine ? "bg-sky-50" : "bg-amber-50"
+                }`}
+              >
                 <div className="money-row">
                   <div className="min-w-0 text-right" dir="auto">
                     <p className="font-semibold">{c.member.name}</p>
                     <p className="text-stone-600">
                       {labelFor(c.category.name, t)}
                       {c.note ? ` · ${c.note}` : ""}
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-amber-900">
+                      {mine ? t("yourClaimWaiting") : t("waitingPayback")}
                     </p>
                   </div>
                   <span className="shrink-0 text-lg font-bold">
@@ -351,8 +436,8 @@ export default function HomePage() {
                           }`}
                         >
                           {isSavingsWallet(a)
-                            ? `💰 ${t("savingsWallet")}`
-                            : `💵 ${t("currentWallet")}`}
+                            ? "💰 " + t("savingsWallet")
+                            : "💵 " + t("currentWallet")}
                         </button>
                       ))}
                     </div>
@@ -372,16 +457,29 @@ export default function HomePage() {
                     <button
                       type="button"
                       disabled={!!payingId || !cashId}
-                      onClick={() => payClaim(c)}
+                      onClick={() => payClaim(c, true)}
                       className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-emerald-800 font-semibold text-white disabled:opacity-60"
                     >
-                      {payingId === c.id ? t("saving") : `💸 ${t("payFromHouseCash")}`}
+                      {payingId === c.id
+                        ? t("saving")
+                        : "💸 " + t("payFullRemaining")}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!!payingId || !cashId}
+                      onClick={() => payClaim(c, false)}
+                      className="flex min-h-11 w-full items-center justify-center rounded-2xl bg-white font-semibold text-emerald-900 disabled:opacity-60"
+                    >
+                      {payingId === c.id
+                        ? t("saving")
+                        : "💸 " + t("payFromHouseCash")}
                     </button>
                     <Hint>{t("payClaimHint")}</Hint>
                   </div>
                 ) : null}
               </li>
-            ))}
+              );
+            })}
           </ul>
         </section>
       ) : null}
@@ -428,6 +526,13 @@ export default function HomePage() {
             🧾 {t("addHousePayment")}
           </Link>
           <Hint>{t("addHousePaymentHint")}</Hint>
+          <Link
+            href="/add?mode=claim"
+            className="flex min-h-14 items-center justify-center rounded-3xl bg-amber-800 text-lg font-semibold text-white"
+          >
+            ➕ {t("addFromMyMoney")}
+          </Link>
+          <Hint>{t("addFromMyMoneyHomeHint")}</Hint>
           <Link
             href="/add?mode=give"
             className="flex min-h-16 items-center justify-center rounded-3xl bg-teal-800 text-lg font-semibold text-white"
