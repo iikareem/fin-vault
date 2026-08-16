@@ -22,7 +22,13 @@ type Category = { id: string; name: string; kind: "EXPENSE" | "INCOME" | "PEER" 
 type Person = { id: string; name: string };
 type WalletKind = "EXPENSE" | "INCOME" | "GIVE";
 
-const HIDDEN_EXPENSE = new Set(["Member payback", "Given to member", "Allowance"]);
+const HIDDEN_EXPENSE = new Set([
+  "Member payback",
+  "Given to member",
+  "Allowance",
+  "Wallet transfer",
+]);
+const HIDDEN_INCOME = new Set(["Wallet transfer"]);
 
 function AddForm() {
   const router = useRouter();
@@ -30,12 +36,15 @@ function AddForm() {
   const { t } = useI18n();
   const { active } = useBooks();
   const [space, setSpace] = useState<Space | null>(null);
-  const [mode, setMode] = useState<"wallet" | "claim" | "cover">("wallet");
+  const [mode, setMode] = useState<"wallet" | "claim" | "cover" | "transfer">(
+    "wallet",
+  );
   const [type, setType] = useState<WalletKind>("EXPENSE");
   const [amount, setAmount] = useState("");
   const [currentAmt, setCurrentAmt] = useState("");
   const [savingsAmt, setSavingsAmt] = useState("");
   const [accountId, setAccountId] = useState("");
+  const [toAccountId, setToAccountId] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [toUserId, setToUserId] = useState("");
   const [occurredOn, setOccurredOn] = useState(todayISO());
@@ -47,9 +56,11 @@ function AddForm() {
   const [busy, setBusy] = useState(false);
 
   const houseAdmin = space?.kind === "HOUSE" && space.role === "ADMIN";
+  const personalBooks = space?.kind === "PERSONAL";
   const giveMode = mode === "wallet" && type === "GIVE";
   const coverMode = mode === "cover";
   const claimMode = mode === "claim";
+  const transferMode = mode === "transfer";
 
   useEffect(() => {
     if (!active) return;
@@ -57,11 +68,15 @@ function AddForm() {
     const isHouseMember = active.kind === "HOUSE" && active.role === "MEMBER";
     const wantClaim = search.get("mode") === "claim";
     const wantCover = search.get("mode") === "cover";
+    const wantTransfer = search.get("mode") === "transfer";
     if (isHouseMember || wantClaim) {
       setMode("claim");
       setType("EXPENSE");
     } else if (wantCover && active.role === "ADMIN") {
       setMode("cover");
+      setType("EXPENSE");
+    } else if (wantTransfer && active.kind === "PERSONAL") {
+      setMode("transfer");
       setType("EXPENSE");
     } else {
       setMode("wallet");
@@ -83,7 +98,10 @@ function AddForm() {
         setAccounts(a);
         setCategories(c);
         const current = a.find(isCurrentWallet) ?? a[0];
+        const savings = a.find(isSavingsWallet);
         if (current) setAccountId(current.id);
+        if (savings) setToAccountId(savings.id);
+        else if (a[1]) setToAccountId(a[1].id);
         if (active.kind === "HOUSE") {
           const users = result[2] as Person[];
           setPeople(users);
@@ -105,19 +123,21 @@ function AddForm() {
       categories.filter(
         (c) =>
           c.kind === type &&
-          !(type === "EXPENSE" && HIDDEN_EXPENSE.has(c.name)),
+          !(type === "EXPENSE" && HIDDEN_EXPENSE.has(c.name)) &&
+          !(type === "INCOME" && HIDDEN_INCOME.has(c.name)),
       ),
     [categories, type],
   );
 
   useEffect(() => {
+    if (transferMode) return;
     const list =
       mode === "claim" || mode === "cover" ? expenseCats : walletCats;
     const preferred =
       type === "INCOME" && mode === "wallet" ? "Salary" : "Groceries";
     const pick = list.find((c) => c.name === preferred) ?? list[0];
     if (pick) setCategoryId(pick.id);
-  }, [mode, type, expenseCats, walletCats]);
+  }, [mode, type, expenseCats, walletCats, transferMode]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -125,7 +145,27 @@ function AddForm() {
     setBusy(true);
     setError("");
     try {
-      if (mode === "claim") {
+      if (transferMode) {
+        const value = parseAmount(amount);
+        if (!accountId || !toAccountId || !(value > 0)) {
+          setError(t("amountHint"));
+          setBusy(false);
+          return;
+        }
+        await api(householdPath(space.householdId, "/accounts/transfer"), {
+          method: "POST",
+          body: JSON.stringify({
+            fromAccountId: accountId,
+            toAccountId: toAccountId,
+            amount: value,
+            occurredOn,
+            note,
+          }),
+        });
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("fb_flash", "transferSaved");
+        }
+      } else if (mode === "claim") {
         await api(householdPath(space.householdId, "/claims"), {
           method: "POST",
           body: JSON.stringify({
@@ -299,26 +339,51 @@ function AddForm() {
         <div className="mt-4 grid grid-cols-2 gap-2">
           <button
             type="button"
-            onClick={() => setType("EXPENSE")}
+            onClick={() => {
+              setMode("wallet");
+              setType("EXPENSE");
+            }}
             className={`min-h-16 rounded-3xl text-lg font-semibold ${
-              type === "EXPENSE" ? "bg-red-800 text-white shadow" : "bg-white text-stone-700"
+              !transferMode && type === "EXPENSE"
+                ? "bg-red-800 text-white shadow"
+                : "bg-white text-stone-700"
             }`}
           >
             🧾 {t("paid")}
           </button>
           <button
             type="button"
-            onClick={() => setType("INCOME")}
+            onClick={() => {
+              setMode("wallet");
+              setType("INCOME");
+            }}
             className={`min-h-16 rounded-3xl text-lg font-semibold ${
-              type === "INCOME" ? "bg-emerald-800 text-white shadow" : "bg-white text-stone-700"
+              !transferMode && type === "INCOME"
+                ? "bg-emerald-800 text-white shadow"
+                : "bg-white text-stone-700"
             }`}
           >
             📈 {t("moneyIn")}
           </button>
+          {personalBooks ? (
+            <button
+              type="button"
+              onClick={() => setMode("transfer")}
+              className={`col-span-2 min-h-14 rounded-3xl text-lg font-semibold ${
+                transferMode
+                  ? "bg-stone-800 text-white shadow"
+                  : "bg-white text-stone-700"
+              }`}
+            >
+              🔁 {t("transferWallets")}
+            </button>
+          ) : null}
         </div>
       )}
       <Hint>
-        {coverMode
+        {transferMode
+          ? t("transferWalletsHint")
+          : coverMode
           ? t("housePaidForHint")
           : claimMode
             ? t("paidFromMyMoneyHint")
@@ -329,7 +394,77 @@ function AddForm() {
                 : t("paidHint")}
       </Hint>
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
-        {giveMode || coverMode ? (
+        {transferMode ? (
+          <>
+            <div>
+              <p className="mb-1 font-medium">{t("transferFrom")}</p>
+              <div className="grid grid-cols-2 gap-2">
+                {accounts.map((a) => (
+                  <button
+                    key={`from-${a.id}`}
+                    type="button"
+                    onClick={() => {
+                      setAccountId(a.id);
+                      if (a.id === toAccountId) {
+                        const other = accounts.find((x) => x.id !== a.id);
+                        if (other) setToAccountId(other.id);
+                      }
+                    }}
+                    className={`rounded-2xl px-3 py-3 font-semibold ${
+                      accountId === a.id
+                        ? "bg-stone-900 text-white"
+                        : "bg-white text-stone-700"
+                    }`}
+                  >
+                    {isSavingsWallet(a)
+                      ? "💰 " + t("savingsWallet")
+                      : "💵 " + t("currentWallet")}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="mb-1 font-medium">{t("transferTo")}</p>
+              <div className="grid grid-cols-2 gap-2">
+                {accounts.map((a) => (
+                  <button
+                    key={`to-${a.id}`}
+                    type="button"
+                    onClick={() => {
+                      setToAccountId(a.id);
+                      if (a.id === accountId) {
+                        const other = accounts.find((x) => x.id !== a.id);
+                        if (other) setAccountId(other.id);
+                      }
+                    }}
+                    className={`rounded-2xl px-3 py-3 font-semibold ${
+                      toAccountId === a.id
+                        ? "bg-emerald-800 text-white"
+                        : "bg-white text-stone-700"
+                    }`}
+                  >
+                    {isSavingsWallet(a)
+                      ? "💰 " + t("savingsWallet")
+                      : "💵 " + t("currentWallet")}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <label className="block">
+              <span className="mb-1 block font-medium">{t("amount")}</span>
+              <input
+                inputMode="decimal"
+                dir="ltr"
+                className="amount-input w-full rounded-2xl border border-stone-300 bg-white px-4 py-4 text-2xl"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder={t("payBackAmount")}
+                required
+              />
+            </label>
+          </>
+        ) : null}
+        {!transferMode && (giveMode || coverMode) ? (
           <label className="block">
             <span className="mb-1 block font-medium">{t("giveTo")}</span>
             <select
@@ -347,7 +482,7 @@ function AddForm() {
             <Hint>{t("giveToHint")}</Hint>
           </label>
         ) : null}
-        {claimMode || coverMode || type !== "INCOME" ? (
+        {!transferMode && (claimMode || coverMode || type !== "INCOME") ? (
           <label className="block">
             <span className="mb-1 block font-medium">{t("amount")}</span>
             <input
@@ -361,7 +496,8 @@ function AddForm() {
             />
             <Hint>{t("amountHint")}</Hint>
           </label>
-        ) : (
+        ) : null}
+        {!transferMode && !claimMode && !coverMode && type === "INCOME" ? (
           <div className="space-y-3">
             <Hint>{t("splitIncomeHint")}</Hint>
             <label className="block">
@@ -393,8 +529,8 @@ function AddForm() {
               <Hint>{t("savingsHint")}</Hint>
             </label>
           </div>
-        )}
-        {giveMode ? null : (
+        ) : null}
+        {!transferMode && !giveMode ? (
           <label className="block">
             <span className="mb-1 block font-medium">{t("forWhat")}</span>
             <select
@@ -410,8 +546,9 @@ function AddForm() {
             </select>
             <Hint>{t("forWhatHint")}</Hint>
           </label>
-        )}
-        {claimMode || (!coverMode && type === "INCOME") ? null : (
+        ) : null}
+        {!transferMode &&
+        !(claimMode || (!coverMode && type === "INCOME")) ? (
           <div>
             <p className="mb-1 font-medium">{t("pickWalletSpend")}</p>
             <div className="grid grid-cols-2 gap-2">
@@ -434,7 +571,7 @@ function AddForm() {
             </div>
             <Hint>{t("pickWalletHint")}</Hint>
           </div>
-        )}
+        ) : null}
         <label className="block">
           <span className="mb-1 block font-medium">{t("day")}</span>
           <input

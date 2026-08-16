@@ -202,6 +202,13 @@ const ar = {
   currentWallet: "جاري",
   savingsWallet: "توفير",
   bothWallets: "الاتنين مع بعض",
+  transferWallets: "تحويل بين المحافظ",
+  transferWalletsHint:
+    "انقلي فلوس بين الجاري والتوفير. اكتبي المبلغ واختاري منين ولفين.",
+  transferFrom: "من أنهي محفظة",
+  transferTo: "لأنهي محفظة",
+  transferSaved: "اتحوّل المبلغ بين المحافظ",
+  walletTransfer: "تحويل بين المحافظ",
   currentHint: "الفلوس اليومية: أكل، فواتير، مصروف.",
   savingsHint: "فلوس متتحط على جنب. مش للصرف اليومي.",
   bothHint: "مجموع الجاري والتوفير.",
@@ -554,6 +561,13 @@ const en = {
   currentWallet: "Current",
   savingsWallet: "Savings",
   bothWallets: "Both together",
+  transferWallets: "Move between wallets",
+  transferWalletsHint:
+    "Move money between current and savings. Type the amount and pick from and to.",
+  transferFrom: "From which wallet",
+  transferTo: "To which wallet",
+  transferSaved: "Moved between your wallets",
+  walletTransfer: "Wallet transfer",
   currentHint: "Everyday money: food, bills, allowance.",
   savingsHint: "Money set aside. Not for daily spending.",
   bothHint: "Current plus savings.",
@@ -709,6 +723,7 @@ export const messages = { ar, en } as const;
 export type MessageKey = keyof typeof ar;
 
 const nameEmojis: Record<string, string> = {
+  "Wallet transfer": "🔁",
   Cash: "💵",
   Current: "💵",
   Savings: "💰",
@@ -768,6 +783,7 @@ const nameKeys: Record<string, MessageKey> = {
   Cash: "cash",
   Current: "currentWallet",
   Savings: "savingsWallet",
+  "Wallet transfer": "walletTransfer",
   Bank: "bank",
   Groceries: "groceries",
   Food: "food",

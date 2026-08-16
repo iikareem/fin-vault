@@ -1,7 +1,14 @@
-import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+} from '@nestjs/common';
+import { HouseholdKind, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAccountDto } from './dto/create-account.dto';
+import { TransferAccountsDto } from './dto/transfer-accounts.dto';
+
+export const WALLET_TRANSFER_CATEGORY = 'Wallet transfer';
 
 @Injectable()
 export class AccountsService {
@@ -76,5 +83,120 @@ export class AccountsService {
         openingBalance: new Prisma.Decimal(dto.openingBalance ?? 0),
       },
     });
+  }
+
+  private async ensureTransferCategories(householdId: string) {
+    const ensure = async (kind: 'EXPENSE' | 'INCOME') => {
+      const existing = await this.prisma.category.findFirst({
+        where: { householdId, name: WALLET_TRANSFER_CATEGORY, kind },
+      });
+      if (existing) return existing;
+      return this.prisma.category.create({
+        data: {
+          householdId,
+          name: WALLET_TRANSFER_CATEGORY,
+          kind,
+          color: '#57534e',
+        },
+      });
+    };
+    const [expense, income] = await Promise.all([
+      ensure('EXPENSE'),
+      ensure('INCOME'),
+    ]);
+    return { expense, income };
+  }
+
+  async transfer(
+    householdId: string,
+    kind: HouseholdKind,
+    userId: string,
+    dto: TransferAccountsDto,
+  ) {
+    if (kind !== 'PERSONAL') {
+      throw new ForbiddenException('Transfers are only for your own money');
+    }
+    if (dto.fromAccountId === dto.toAccountId) {
+      throw new BadRequestException('Pick two different wallets');
+    }
+    await this.ensureCashPots(householdId);
+    const [from, to] = await Promise.all([
+      this.prisma.account.findFirst({
+        where: {
+          id: dto.fromAccountId,
+          householdId,
+          archived: false,
+          type: 'CASH',
+        },
+      }),
+      this.prisma.account.findFirst({
+        where: {
+          id: dto.toAccountId,
+          householdId,
+          archived: false,
+          type: 'CASH',
+        },
+      }),
+    ]);
+    if (!from || !to) {
+      throw new BadRequestException('Pick current or savings');
+    }
+
+    const balances = await this.list(householdId);
+    const fromBal = balances.find((a) => a.id === from.id)?.balance ?? 0;
+    if (dto.amount > fromBal + 0.001) {
+      throw new BadRequestException('Not enough money in that wallet');
+    }
+
+    const cats = await this.ensureTransferCategories(householdId);
+    const note =
+      dto.note?.trim() || `Transfer · ${from.name} → ${to.name}`;
+
+    const [outTx, inTx] = await this.prisma.$transaction([
+      this.prisma.transaction.create({
+        data: {
+          householdId,
+          userId,
+          accountId: from.id,
+          categoryId: cats.expense.id,
+          type: 'EXPENSE',
+          amount: new Prisma.Decimal(dto.amount),
+          occurredOn: new Date(dto.occurredOn),
+          note,
+        },
+        include: {
+          account: { select: { id: true, name: true, type: true } },
+          category: {
+            select: { id: true, name: true, color: true, kind: true },
+          },
+        },
+      }),
+      this.prisma.transaction.create({
+        data: {
+          householdId,
+          userId,
+          accountId: to.id,
+          categoryId: cats.income.id,
+          type: 'INCOME',
+          amount: new Prisma.Decimal(dto.amount),
+          occurredOn: new Date(dto.occurredOn),
+          note,
+        },
+        include: {
+          account: { select: { id: true, name: true, type: true } },
+          category: {
+            select: { id: true, name: true, color: true, kind: true },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      amount: dto.amount,
+      from: { id: from.id, name: from.name },
+      to: { id: to.id, name: to.name },
+      out: outTx,
+      in: inTx,
+    };
   }
 }

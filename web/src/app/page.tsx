@@ -122,6 +122,9 @@ export default function HomePage() {
     } else if (key === "coverRepayDone") {
       sessionStorage.removeItem("fb_flash");
       setFlash(t("coverRepayDone"));
+    } else if (key === "transferSaved") {
+      sessionStorage.removeItem("fb_flash");
+      setFlash(t("transferSaved"));
     }
   }, [t]);
 
@@ -1301,6 +1304,12 @@ export default function HomePage() {
           ➕ {t("addPersonal")}
         </Link>
         <Hint>{t("addPersonalHint")}</Hint>
+        <Link
+          href="/add?mode=transfer"
+          className="mt-2 flex min-h-14 items-center justify-center rounded-3xl bg-stone-700 text-lg font-semibold text-white"
+        >
+          🔁 {t("transferWallets")}
+        </Link>
         </>
       )}
 

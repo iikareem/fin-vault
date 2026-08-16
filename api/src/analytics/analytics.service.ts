@@ -75,7 +75,11 @@ export class AnalyticsService {
     const ids = accounts.map((a) => a.id);
     const txs = ids.length
       ? await this.prisma.transaction.findMany({
-          where: { householdId, accountId: { in: ids } },
+          where: {
+            householdId,
+            accountId: { in: ids },
+            category: { name: { not: 'Wallet transfer' } },
+          },
           select: { occurredOn: true, type: true, amount: true },
         })
       : [];
@@ -147,6 +151,7 @@ export class AnalyticsService {
             householdId,
             accountId: { in: cashIds },
             occurredOn: today,
+            category: { name: { not: 'Wallet transfer' } },
           },
           _sum: { amount: true },
         })
