@@ -140,7 +140,6 @@ export class CoversService {
   async repay(
     householdId: string,
     actorId: string,
-    role: string,
     coverId: string,
     dto: CreateCoverRepaymentDto,
   ) {
@@ -149,17 +148,43 @@ export class CoversService {
       include: { repayments: true, member: true, category: true },
     });
     if (!cover) throw new NotFoundException();
-    if (role !== 'ADMIN' && cover.memberId !== actorId) {
-      throw new ForbiddenException('You can only repay your own balance');
+    if (cover.memberId !== actorId) {
+      throw new ForbiddenException('Only the person who owes can pay this back');
     }
     const remaining = this.remaining(cover.amount, cover.repayments);
     if (dto.amount > remaining + 0.001) {
       throw new BadRequestException('That is more than what is still owed');
     }
-    const account = await this.prisma.account.findFirst({
-      where: { id: dto.accountId, householdId, archived: false },
-    });
-    if (!account) throw new BadRequestException('Unknown house wallet');
+
+    const personalBooks = await this.personalCashByAccount(
+      this.prisma,
+      cover.memberId,
+      dto.accountId,
+    );
+    if (!personalBooks) {
+      throw new BadRequestException('Pick your current or savings wallet');
+    }
+
+    const houseWallet =
+      (dto.houseAccountId
+        ? await this.prisma.account.findFirst({
+            where: {
+              id: dto.houseAccountId,
+              householdId,
+              archived: false,
+              type: 'CASH',
+            },
+          })
+        : null) ??
+      (await this.prisma.account.findFirst({
+        where: {
+          householdId,
+          archived: false,
+          type: 'CASH',
+          name: { in: ['Current', 'Cash'] },
+        },
+      }));
+    if (!houseWallet) throw new BadRequestException('House cash wallet missing');
 
     return this.prisma.$transaction(async (tx) => {
       const incomeCat = await this.ensureCategory(
@@ -173,7 +198,7 @@ export class CoversService {
         data: {
           householdId,
           userId: actorId,
-          accountId: dto.accountId,
+          accountId: houseWallet.id,
           categoryId: incomeCat.id,
           type: 'INCOME',
           amount: new Prisma.Decimal(dto.amount),
@@ -185,9 +210,11 @@ export class CoversService {
             }`,
         },
       });
-      const personalTxId = await this.recordPersonalExpense(
+      const personalTxId = await this.recordPersonalExpenseFromAccount(
         tx,
         cover.memberId,
+        personalBooks.householdId,
+        dto.accountId,
         dto.amount,
         dto.occurredOn,
         dto.note ?? 'Paid back to the house',
@@ -197,7 +224,7 @@ export class CoversService {
           coverId,
           amount: new Prisma.Decimal(dto.amount),
           occurredOn: new Date(dto.occurredOn),
-          accountId: dto.accountId,
+          accountId: houseWallet.id,
           houseTxId: houseTx.id,
           personalTxId,
           recordedByUserId: actorId,
@@ -253,6 +280,27 @@ export class CoversService {
     return { householdId: membership.householdId, accountId: cash.id };
   }
 
+  private async personalCashByAccount(
+    db: Prisma.TransactionClient | PrismaService,
+    userId: string,
+    accountId: string,
+  ) {
+    const membership = await db.membership.findFirst({
+      where: { userId, household: { kind: 'PERSONAL' } },
+    });
+    if (!membership) return null;
+    const cash = await db.account.findFirst({
+      where: {
+        id: accountId,
+        householdId: membership.householdId,
+        type: 'CASH',
+        archived: false,
+      },
+    });
+    if (!cash) return null;
+    return { householdId: membership.householdId, accountId: cash.id };
+  }
+
   private async recordPersonalExpense(
     tx: Prisma.TransactionClient,
     userId: string,
@@ -262,17 +310,37 @@ export class CoversService {
   ) {
     const books = await this.personalCash(tx, userId);
     if (!books) return null;
+    return this.recordPersonalExpenseFromAccount(
+      tx,
+      userId,
+      books.householdId,
+      books.accountId,
+      amount,
+      occurredOn,
+      note,
+    );
+  }
+
+  private async recordPersonalExpenseFromAccount(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    personalHouseholdId: string,
+    accountId: string,
+    amount: number,
+    occurredOn: string,
+    note: string,
+  ) {
     const category = await this.ensureCategory(
       tx,
-      books.householdId,
+      personalHouseholdId,
       'To the house',
       'EXPENSE',
       '#44403c',
     );
     const created = await tx.transaction.create({
       data: {
-        householdId: books.householdId,
-        accountId: books.accountId,
+        householdId: personalHouseholdId,
+        accountId,
         categoryId: category.id,
         userId,
         type: 'EXPENSE',
