@@ -8,18 +8,19 @@ type Props = {
   className?: string;
 };
 
-/** Compact calendar date for list rows (day + month). */
+/** Compact calendar date for list rows (weekday + day + month). */
 export function ItemDate({ value, locale, className = "" }: Props) {
   if (!value) return null;
   const key = toDateKey(value);
   if (!key) return null;
+  const label = formatItemDate(value, locale);
+  if (!label) return null;
   return (
     <time
       dateTime={key}
-      className={`inline-flex items-center gap-1 text-sm text-stone-500 ${className}`}
+      className={`inline-flex items-center rounded-md bg-stone-100/90 px-2 py-0.5 text-xs font-medium tabular-nums tracking-wide text-stone-600 ${className}`}
     >
-      <span aria-hidden>📅</span>
-      <span>{formatItemDate(value, locale)}</span>
+      {label}
     </time>
   );
 }

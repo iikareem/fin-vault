@@ -199,13 +199,23 @@ export default function WithHouseHistoryPage() {
                   <p className="font-semibold">
                     {t(DIRECTION_KEY[ev.direction] ?? "stillOpen")}
                   </p>
-                  <p className="text-sm text-stone-500">
-                    <ItemDate value={ev.occurredOn} locale={locale} />
-                    {ev.categoryName
-                      ? ` · ${labelFor(ev.categoryName, t)}`
-                      : ""}
-                    {ev.note ? ` · ${ev.note}` : ""}
-                  </p>
+                  <ItemDate
+                    value={ev.occurredOn}
+                    locale={locale}
+                    className="mt-1"
+                  />
+                  {ev.categoryName || ev.note ? (
+                    <p className="mt-1 text-sm text-stone-500">
+                      {[
+                        ev.categoryName
+                          ? labelFor(ev.categoryName, t)
+                          : null,
+                        ev.note || null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  ) : null}
                   {ev.remaining != null && ev.remaining > 0.001 ? (
                     <p className="mt-1 text-sm text-amber-900">
                       {t("remainingShort", {

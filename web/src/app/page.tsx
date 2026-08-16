@@ -168,8 +168,8 @@ export default function HomePage() {
         );
         if (active.kind === "HOUSE") {
           setCharity(result[3] as CharityMonth);
-          setClaims(result[4] as Claim[]);
-          setCovers(result[5] as Cover[]);
+          setClaims(sortByOccurredOnDesc(result[4] as Claim[]));
+          setCovers(sortByOccurredOnDesc(result[5] as Cover[]));
         }
       })
       .catch((e) => setError(e.message));
