@@ -13,7 +13,10 @@ import { CreateRepaymentDto } from './dto/create-repayment.dto';
 export class LoansService {
   constructor(private prisma: PrismaService) {}
 
-  private remaining(original: Prisma.Decimal, repayments: { amount: Prisma.Decimal }[]) {
+  private remaining(
+    original: Prisma.Decimal,
+    repayments: { amount: Prisma.Decimal }[],
+  ) {
     const paid = repayments.reduce((s, r) => s + Number(r.amount), 0);
     return Number(original) - paid;
   }
@@ -57,6 +60,105 @@ export class LoansService {
     };
   }
 
+  private async personalCash(tx: Prisma.TransactionClient, userId: string) {
+    const membership = await tx.membership.findFirst({
+      where: { userId, household: { kind: 'PERSONAL' } },
+    });
+    if (!membership) return null;
+    const cash = await tx.account.findFirst({
+      where: {
+        householdId: membership.householdId,
+        type: 'CASH',
+        archived: false,
+        name: { in: ['Current', 'Cash'] },
+      },
+    });
+    if (!cash) return null;
+    return { householdId: membership.householdId, accountId: cash.id };
+  }
+
+  private async ensurePersonalCategory(
+    tx: Prisma.TransactionClient,
+    householdId: string,
+    name: string,
+    kind: 'EXPENSE' | 'INCOME',
+    color: string,
+  ) {
+    const existing = await tx.category.findFirst({
+      where: { householdId, name, kind },
+    });
+    if (existing) return existing;
+    return tx.category.create({
+      data: { householdId, name, kind, color },
+    });
+  }
+
+  private async recordPersonalExpense(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    amount: number,
+    occurredOn: string,
+    categoryName: string,
+    color: string,
+    note: string,
+  ) {
+    const books = await this.personalCash(tx, userId);
+    if (!books) return null;
+    const category = await this.ensurePersonalCategory(
+      tx,
+      books.householdId,
+      categoryName,
+      'EXPENSE',
+      color,
+    );
+    const created = await tx.transaction.create({
+      data: {
+        householdId: books.householdId,
+        accountId: books.accountId,
+        categoryId: category.id,
+        userId,
+        type: 'EXPENSE',
+        amount: new Prisma.Decimal(amount),
+        occurredOn: new Date(occurredOn),
+        note,
+      },
+    });
+    return created.id;
+  }
+
+  private async recordPersonalIncome(
+    tx: Prisma.TransactionClient,
+    userId: string,
+    amount: number,
+    occurredOn: string,
+    categoryName: string,
+    color: string,
+    note: string,
+  ) {
+    const books = await this.personalCash(tx, userId);
+    if (!books) return null;
+    const category = await this.ensurePersonalCategory(
+      tx,
+      books.householdId,
+      categoryName,
+      'INCOME',
+      color,
+    );
+    const created = await tx.transaction.create({
+      data: {
+        householdId: books.householdId,
+        accountId: books.accountId,
+        categoryId: category.id,
+        userId,
+        type: 'INCOME',
+        amount: new Prisma.Decimal(amount),
+        occurredOn: new Date(occurredOn),
+        note,
+      },
+    });
+    return created.id;
+  }
+
   async list(householdId: string, userId: string) {
     const loans = await this.prisma.peerLoan.findMany({
       where: { householdId },
@@ -95,29 +197,73 @@ export class LoansService {
     ]);
     if (!member) throw new BadRequestException('That person is not in this house');
     if (!category) throw new BadRequestException('Pick a loan category');
-    const loan = await this.prisma.peerLoan.create({
-      data: {
-        householdId,
-        fromUserId,
-        toUserId,
-        recordedByUserId: me,
-        categoryId: dto.categoryId,
-        originalAmount: new Prisma.Decimal(dto.amount),
-        occurredOn: new Date(dto.occurredOn),
-        note: dto.note ?? '',
-      },
-      include: {
-        fromUser: { select: { id: true, name: true } },
-        toUser: { select: { id: true, name: true } },
-        category: { select: { id: true, name: true, color: true } },
-        repayments: true,
-      },
+
+    const fromUser = await this.prisma.user.findUniqueOrThrow({
+      where: { id: fromUserId },
+      select: { name: true },
     });
-    return this.shape(loan);
+    const toUser = await this.prisma.user.findUniqueOrThrow({
+      where: { id: toUserId },
+      select: { name: true },
+    });
+    const note = (dto.note ?? '').trim();
+    const lenderNote = note
+      ? `${toUser.name} · ${note}`
+      : `Lent to ${toUser.name}`;
+    const borrowerNote = note
+      ? `${fromUser.name} · ${note}`
+      : `Borrowed from ${fromUser.name}`;
+    const occurredOn = dto.occurredOn;
+
+    return this.prisma.$transaction(async (tx) => {
+      const fromPersonalTxId = await this.recordPersonalExpense(
+        tx,
+        fromUserId,
+        dto.amount,
+        occurredOn,
+        category.name,
+        category.color,
+        lenderNote,
+      );
+      const toPersonalTxId = await this.recordPersonalIncome(
+        tx,
+        toUserId,
+        dto.amount,
+        occurredOn,
+        category.name,
+        category.color,
+        borrowerNote,
+      );
+      const loan = await tx.peerLoan.create({
+        data: {
+          householdId,
+          fromUserId,
+          toUserId,
+          recordedByUserId: me,
+          categoryId: dto.categoryId,
+          originalAmount: new Prisma.Decimal(dto.amount),
+          occurredOn: new Date(occurredOn),
+          note: dto.note ?? '',
+          fromPersonalTxId,
+          toPersonalTxId,
+        },
+        include: {
+          fromUser: { select: { id: true, name: true } },
+          toUser: { select: { id: true, name: true } },
+          category: { select: { id: true, name: true, color: true } },
+          repayments: true,
+        },
+      });
+      return this.shape(loan);
+    });
   }
 
   private canManage(
-    loan: { recordedByUserId: string | null; fromUserId: string; toUserId: string },
+    loan: {
+      recordedByUserId: string | null;
+      fromUserId: string;
+      toUserId: string;
+    },
     userId: string,
   ) {
     if (loan.recordedByUserId) return loan.recordedByUserId === userId;
@@ -137,7 +283,12 @@ export class LoansService {
   ) {
     const loan = await this.prisma.peerLoan.findFirst({
       where: { id: loanId, householdId },
-      include: { repayments: true },
+      include: {
+        repayments: true,
+        fromUser: { select: { id: true, name: true } },
+        toUser: { select: { id: true, name: true } },
+        category: { select: { id: true, name: true, color: true } },
+      },
     });
     if (!loan) throw new NotFoundException();
     if (!this.canManage(loan, userId)) {
@@ -146,30 +297,90 @@ export class LoansService {
     if (loan.repayments.length > 0) {
       throw new BadRequestException('This loan already has repayments');
     }
-    const data: Prisma.PeerLoanUpdateInput = {};
-    if (dto.amount !== undefined) {
-      data.originalAmount = new Prisma.Decimal(dto.amount);
-    }
-    if (dto.note !== undefined) data.note = dto.note;
-    if (dto.occurredOn) data.occurredOn = new Date(dto.occurredOn);
-    if (dto.categoryId) {
-      const category = await this.prisma.category.findFirst({
-        where: { id: dto.categoryId, householdId, kind: 'PEER' },
+
+    return this.prisma.$transaction(async (tx) => {
+      const data: Prisma.PeerLoanUpdateInput = {};
+      let category = loan.category;
+      if (dto.amount !== undefined) {
+        data.originalAmount = new Prisma.Decimal(dto.amount);
+      }
+      if (dto.note !== undefined) data.note = dto.note;
+      if (dto.occurredOn) data.occurredOn = new Date(dto.occurredOn);
+      if (dto.categoryId) {
+        const next = await tx.category.findFirst({
+          where: { id: dto.categoryId, householdId, kind: 'PEER' },
+        });
+        if (!next) throw new BadRequestException('Pick a loan category');
+        data.category = { connect: { id: dto.categoryId } };
+        category = next;
+      }
+
+      await tx.peerLoan.update({ where: { id: loanId }, data });
+
+      const amount = dto.amount ?? Number(loan.originalAmount);
+      const occurredOn = dto.occurredOn ?? loan.occurredOn.toISOString().slice(0, 10);
+      const note = (dto.note !== undefined ? dto.note : loan.note).trim();
+      const lenderNote = note
+        ? `${loan.toUser.name} · ${note}`
+        : `Lent to ${loan.toUser.name}`;
+      const borrowerNote = note
+        ? `${loan.fromUser.name} · ${note}`
+        : `Borrowed from ${loan.fromUser.name}`;
+
+      if (loan.fromPersonalTxId) {
+        const books = await this.personalCash(tx, loan.fromUserId);
+        const cat = books
+          ? await this.ensurePersonalCategory(
+              tx,
+              books.householdId,
+              category.name,
+              'EXPENSE',
+              category.color,
+            )
+          : null;
+        await tx.transaction.update({
+          where: { id: loan.fromPersonalTxId },
+          data: {
+            amount: new Prisma.Decimal(amount),
+            occurredOn: new Date(occurredOn),
+            note: lenderNote,
+            ...(cat ? { categoryId: cat.id } : {}),
+          },
+        });
+      }
+      if (loan.toPersonalTxId) {
+        const books = await this.personalCash(tx, loan.toUserId);
+        const cat = books
+          ? await this.ensurePersonalCategory(
+              tx,
+              books.householdId,
+              category.name,
+              'INCOME',
+              category.color,
+            )
+          : null;
+        await tx.transaction.update({
+          where: { id: loan.toPersonalTxId },
+          data: {
+            amount: new Prisma.Decimal(amount),
+            occurredOn: new Date(occurredOn),
+            note: borrowerNote,
+            ...(cat ? { categoryId: cat.id } : {}),
+          },
+        });
+      }
+
+      const updated = await tx.peerLoan.findUniqueOrThrow({
+        where: { id: loanId },
+        include: {
+          fromUser: { select: { id: true, name: true } },
+          toUser: { select: { id: true, name: true } },
+          category: { select: { id: true, name: true, color: true } },
+          repayments: true,
+        },
       });
-      if (!category) throw new BadRequestException('Pick a loan category');
-      data.category = { connect: { id: dto.categoryId } };
-    }
-    const updated = await this.prisma.peerLoan.update({
-      where: { id: loanId },
-      data,
-      include: {
-        fromUser: { select: { id: true, name: true } },
-        toUser: { select: { id: true, name: true } },
-        category: { select: { id: true, name: true, color: true } },
-        repayments: true,
-      },
+      return this.shape(updated);
     });
-    return this.shape(updated);
   }
 
   async remove(householdId: string, userId: string, loanId: string) {
@@ -184,7 +395,15 @@ export class LoansService {
     if (loan.repayments.length > 0) {
       throw new BadRequestException('This loan already has repayments');
     }
-    await this.prisma.peerLoan.delete({ where: { id: loanId } });
+    await this.prisma.$transaction(async (tx) => {
+      await tx.peerLoan.delete({ where: { id: loanId } });
+      if (loan.fromPersonalTxId) {
+        await tx.transaction.delete({ where: { id: loan.fromPersonalTxId } });
+      }
+      if (loan.toPersonalTxId) {
+        await tx.transaction.delete({ where: { id: loan.toPersonalTxId } });
+      }
+    });
     return { ok: true };
   }
 
@@ -196,7 +415,12 @@ export class LoansService {
   ) {
     const loan = await this.prisma.peerLoan.findFirst({
       where: { id: loanId, householdId },
-      include: { repayments: true },
+      include: {
+        repayments: true,
+        fromUser: { select: { id: true, name: true } },
+        toUser: { select: { id: true, name: true } },
+        category: { select: { id: true, name: true, color: true } },
+      },
     });
     if (!loan) throw new NotFoundException();
     // Only the borrower (who still owes) can record a repayment.
@@ -207,31 +431,62 @@ export class LoansService {
     if (dto.amount > remaining + 0.001) {
       throw new BadRequestException('That is more than what is still owed');
     }
-    await this.prisma.loanRepayment.create({
-      data: {
-        loanId,
-        amount: new Prisma.Decimal(dto.amount),
-        occurredOn: new Date(dto.occurredOn),
-        note: dto.note ?? '',
-        recordedByUserId: userId,
-      },
-    });
-    const left = remaining - dto.amount;
-    if (left <= 0.001) {
-      await this.prisma.peerLoan.update({
-        where: { id: loanId },
-        data: { status: 'SETTLED' },
+
+    const note = (dto.note ?? '').trim();
+    const payerNote = note
+      ? `${loan.fromUser.name} · ${note}`
+      : `Repaid ${loan.fromUser.name}`;
+    const receiverNote = note
+      ? `${loan.toUser.name} · ${note}`
+      : `Repayment from ${loan.toUser.name}`;
+
+    return this.prisma.$transaction(async (tx) => {
+      const fromPersonalTxId = await this.recordPersonalExpense(
+        tx,
+        loan.toUserId,
+        dto.amount,
+        dto.occurredOn,
+        loan.category.name,
+        loan.category.color,
+        payerNote,
+      );
+      const toPersonalTxId = await this.recordPersonalIncome(
+        tx,
+        loan.fromUserId,
+        dto.amount,
+        dto.occurredOn,
+        loan.category.name,
+        loan.category.color,
+        receiverNote,
+      );
+      await tx.loanRepayment.create({
+        data: {
+          loanId,
+          amount: new Prisma.Decimal(dto.amount),
+          occurredOn: new Date(dto.occurredOn),
+          note: dto.note ?? '',
+          recordedByUserId: userId,
+          fromPersonalTxId,
+          toPersonalTxId,
+        },
       });
-    }
-    const updated = await this.prisma.peerLoan.findUniqueOrThrow({
-      where: { id: loanId },
-      include: {
-        fromUser: { select: { id: true, name: true } },
-        toUser: { select: { id: true, name: true } },
-        category: { select: { id: true, name: true, color: true } },
-        repayments: true,
-      },
+      const left = remaining - dto.amount;
+      if (left <= 0.001) {
+        await tx.peerLoan.update({
+          where: { id: loanId },
+          data: { status: 'SETTLED' },
+        });
+      }
+      const updated = await tx.peerLoan.findUniqueOrThrow({
+        where: { id: loanId },
+        include: {
+          fromUser: { select: { id: true, name: true } },
+          toUser: { select: { id: true, name: true } },
+          category: { select: { id: true, name: true, color: true } },
+          repayments: true,
+        },
+      });
+      return this.shape(updated);
     });
-    return this.shape(updated);
   }
 }

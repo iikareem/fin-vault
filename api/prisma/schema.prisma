@@ -157,6 +157,10 @@ model Transaction {
   coverHouse     HouseCover? @relation("CoverHouseTx")
   coverRepayHouse CoverRepayment? @relation("CoverRepayHouseTx")
   coverRepayPersonal CoverRepayment? @relation("CoverRepayPersonalTx")
+  loanFromPersonal PeerLoan? @relation("LoanFromPersonalTx")
+  loanToPersonal   PeerLoan? @relation("LoanToPersonalTx")
+  loanRepayFromPersonal LoanRepayment? @relation("LoanRepayFromPersonalTx")
+  loanRepayToPersonal   LoanRepayment? @relation("LoanRepayToPersonalTx")
 
   @@index([householdId, occurredOn])
   @@index([householdId, categoryId])
@@ -181,6 +185,12 @@ model PeerLoan {
   status           LoanStatus      @default(OPEN)
   createdAt        DateTime        @default(now())
   repayments       LoanRepayment[]
+  /** Lender personal cash left (EXPENSE). */
+  fromPersonalTxId String?         @unique
+  fromPersonalTx   Transaction?    @relation("LoanFromPersonalTx", fields: [fromPersonalTxId], references: [id])
+  /** Borrower personal cash received (INCOME). */
+  toPersonalTxId   String?         @unique
+  toPersonalTx     Transaction?    @relation("LoanToPersonalTx", fields: [toPersonalTxId], references: [id])
 }
 
 model LoanRepayment {
@@ -193,6 +203,12 @@ model LoanRepayment {
   recordedByUserId String
   recordedBy       User     @relation(fields: [recordedByUserId], references: [id])
   createdAt        DateTime @default(now())
+  /** Borrower personal cash left (EXPENSE). */
+  fromPersonalTxId String?  @unique
+  fromPersonalTx   Transaction? @relation("LoanRepayFromPersonalTx", fields: [fromPersonalTxId], references: [id])
+  /** Lender personal cash received (INCOME). */
+  toPersonalTxId   String?  @unique
+  toPersonalTx     Transaction? @relation("LoanRepayToPersonalTx", fields: [toPersonalTxId], references: [id])
 }
 
 model HouseClaim {
