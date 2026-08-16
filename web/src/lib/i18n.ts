@@ -512,7 +512,7 @@ const en = {
   youOweTitle: "You owe",
   youOweHint: "Money you still owe someone in the family. When you pay some back, type the amount under their name.",
   theyOweTitle: "Owed to you",
-  theyOweHint: "Money someone still owes you. When they return some, type the amount under their name.",
+  theyOweHint: "Money someone still owes you. Only they can record a repayment when they pay.",
   noLoansOwe: "You do not owe anyone.",
   noLoansOwed: "Nobody owes you.",
   settled: "settled",
