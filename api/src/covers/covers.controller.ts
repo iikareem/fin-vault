@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { CoversService } from './covers.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { HouseholdGuard } from '../households/household.guard';
@@ -10,6 +10,7 @@ import { AuthUser } from '../auth/auth-user';
 import { MembershipContext } from '../households/membership-context';
 import { CreateCoverDto } from './dto/create-cover.dto';
 import { CreateCoverRepaymentDto } from './dto/create-cover-repayment.dto';
+import { UpdateCoverDto } from './dto/update-cover.dto';
 
 @Controller('households/:householdId/covers')
 @UseGuards(JwtAuthGuard, HouseholdGuard, HouseKindGuard)
@@ -29,6 +30,36 @@ export class CoversController {
     @Body() dto: CreateCoverDto,
   ) {
     return this.covers.create(membership.householdId, user.id, dto);
+  }
+
+  @Patch(':coverId')
+  update(
+    @CurrentMembership() membership: MembershipContext,
+    @CurrentUser() user: AuthUser,
+    @Param('coverId') coverId: string,
+    @Body() dto: UpdateCoverDto,
+  ) {
+    return this.covers.update(
+      membership.householdId,
+      user.id,
+      membership.role,
+      coverId,
+      dto,
+    );
+  }
+
+  @Delete(':coverId')
+  remove(
+    @CurrentMembership() membership: MembershipContext,
+    @CurrentUser() user: AuthUser,
+    @Param('coverId') coverId: string,
+  ) {
+    return this.covers.remove(
+      membership.householdId,
+      user.id,
+      membership.role,
+      coverId,
+    );
   }
 
   @Post(':coverId/repayments')

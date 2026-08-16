@@ -23,6 +23,7 @@ export class LoansService {
     householdId: string;
     fromUserId: string;
     toUserId: string;
+    recordedByUserId?: string | null;
     categoryId: string;
     originalAmount: Prisma.Decimal;
     note: string;
@@ -40,6 +41,7 @@ export class LoansService {
       householdId: loan.householdId,
       fromUserId: loan.fromUserId,
       toUserId: loan.toUserId,
+      recordedByUserId: loan.recordedByUserId ?? null,
       categoryId: loan.categoryId,
       note: loan.note,
       occurredOn: loan.occurredOn,
@@ -98,6 +100,7 @@ export class LoansService {
         householdId,
         fromUserId,
         toUserId,
+        recordedByUserId: me,
         categoryId: dto.categoryId,
         originalAmount: new Prisma.Decimal(dto.amount),
         occurredOn: new Date(dto.occurredOn),
@@ -111,6 +114,78 @@ export class LoansService {
       },
     });
     return this.shape(loan);
+  }
+
+  private canManage(
+    loan: { recordedByUserId: string | null; fromUserId: string; toUserId: string },
+    userId: string,
+  ) {
+    if (loan.recordedByUserId) return loan.recordedByUserId === userId;
+    return loan.fromUserId === userId || loan.toUserId === userId;
+  }
+
+  async update(
+    householdId: string,
+    userId: string,
+    loanId: string,
+    dto: {
+      amount?: number;
+      categoryId?: string;
+      occurredOn?: string;
+      note?: string;
+    },
+  ) {
+    const loan = await this.prisma.peerLoan.findFirst({
+      where: { id: loanId, householdId },
+      include: { repayments: true },
+    });
+    if (!loan) throw new NotFoundException();
+    if (!this.canManage(loan, userId)) {
+      throw new ForbiddenException('You can only edit loans you created');
+    }
+    if (loan.repayments.length > 0) {
+      throw new BadRequestException('This loan already has repayments');
+    }
+    const data: Prisma.PeerLoanUpdateInput = {};
+    if (dto.amount !== undefined) {
+      data.originalAmount = new Prisma.Decimal(dto.amount);
+    }
+    if (dto.note !== undefined) data.note = dto.note;
+    if (dto.occurredOn) data.occurredOn = new Date(dto.occurredOn);
+    if (dto.categoryId) {
+      const category = await this.prisma.category.findFirst({
+        where: { id: dto.categoryId, householdId, kind: 'PEER' },
+      });
+      if (!category) throw new BadRequestException('Pick a loan category');
+      data.category = { connect: { id: dto.categoryId } };
+    }
+    const updated = await this.prisma.peerLoan.update({
+      where: { id: loanId },
+      data,
+      include: {
+        fromUser: { select: { id: true, name: true } },
+        toUser: { select: { id: true, name: true } },
+        category: { select: { id: true, name: true, color: true } },
+        repayments: true,
+      },
+    });
+    return this.shape(updated);
+  }
+
+  async remove(householdId: string, userId: string, loanId: string) {
+    const loan = await this.prisma.peerLoan.findFirst({
+      where: { id: loanId, householdId },
+      include: { repayments: true },
+    });
+    if (!loan) throw new NotFoundException();
+    if (!this.canManage(loan, userId)) {
+      throw new ForbiddenException('You can only delete loans you created');
+    }
+    if (loan.repayments.length > 0) {
+      throw new BadRequestException('This loan already has repayments');
+    }
+    await this.prisma.peerLoan.delete({ where: { id: loanId } });
+    return { ok: true };
   }
 
   async repay(

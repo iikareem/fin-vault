@@ -16,8 +16,10 @@ type Loan = {
   id: string;
   fromUserId: string;
   toUserId: string;
+  recordedByUserId?: string | null;
   originalAmount: number;
   remaining: number;
+  repaid: number;
   status: string;
   note: string;
   fromUser: { id: string; name: string };
@@ -41,6 +43,10 @@ export default function BetweenPage() {
   const [occurredOn, setOccurredOn] = useState(todayISO());
   const [note, setNote] = useState("");
   const [payAmount, setPayAmount] = useState<Record<string, string>>({});
+  const [editId, setEditId] = useState("");
+  const [editAmount, setEditAmount] = useState("");
+  const [editNote, setEditNote] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -120,11 +126,57 @@ export default function BetweenPage() {
     }
   }
 
+  function canManageLoan(loan: Loan) {
+    if (loan.repaid > 0.001) return false;
+    if (loan.recordedByUserId) return loan.recordedByUserId === userId;
+    return loan.fromUserId === userId || loan.toUserId === userId;
+  }
+
+  async function saveLoanEdit(loanId: string) {
+    if (!houseId) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api(householdPath(houseId, `/loans/${loanId}`), {
+        method: "PATCH",
+        body: JSON.stringify({
+          amount: parseAmount(editAmount),
+          note: editNote,
+        }),
+      });
+      setEditId("");
+      await refresh(houseId);
+    } catch {
+      setError(t("couldNotSave"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteLoan(loanId: string) {
+    if (!houseId) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api(householdPath(houseId, `/loans/${loanId}`), {
+        method: "DELETE",
+      });
+      setConfirmDeleteId("");
+      setEditId("");
+      await refresh(houseId);
+    } catch {
+      setError(t("couldNotSave"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const others = people.filter((p) => p.id !== userId);
   const otherName = others.find((p) => p.id === toUserId)?.name ?? "";
 
   function loanCard(loan: Loan, asDebtor: boolean) {
     const other = asDebtor ? loan.fromUser : loan.toUser;
+    const manage = canManageLoan(loan);
     return (
       <li key={loan.id} className="rounded-2xl bg-white px-4 py-3 shadow-sm">
         <div className="money-row">
@@ -146,6 +198,61 @@ export default function BetweenPage() {
           })}
           {loan.note ? ` · ${loan.note}` : ""}
         </p>
+        {manage ? (
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setEditId(loan.id);
+                setConfirmDeleteId("");
+                setEditAmount(String(loan.originalAmount));
+                setEditNote(loan.note);
+              }}
+              className="rounded-xl bg-stone-100 px-3 py-2 text-sm font-semibold text-stone-800"
+            >
+              {t("edit")}
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                confirmDeleteId === loan.id
+                  ? deleteLoan(loan.id)
+                  : setConfirmDeleteId(loan.id)
+              }
+              className="rounded-xl bg-stone-100 px-3 py-2 text-sm font-semibold text-red-800"
+            >
+              {confirmDeleteId === loan.id
+                ? t("confirmDelete")
+                : t("deleteItem")}
+            </button>
+          </div>
+        ) : null}
+        {editId === loan.id ? (
+          <div className="mt-3 space-y-2">
+            <input
+              inputMode="decimal"
+              dir="ltr"
+              className="amount-input w-full rounded-xl border border-stone-300 px-3 py-2 text-xl"
+              value={editAmount}
+              onChange={(e) => setEditAmount(e.target.value)}
+            />
+            <input
+              className="w-full rounded-xl border border-stone-300 px-3 py-2"
+              value={editNote}
+              onChange={(e) => setEditNote(e.target.value)}
+              placeholder={t("noteOptional")}
+            />
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => saveLoanEdit(loan.id)}
+              className="w-full rounded-xl bg-stone-900 px-3 py-2 font-semibold text-white disabled:opacity-60"
+            >
+              {busy ? t("saving") : t("save")}
+            </button>
+          </div>
+        ) : null}
         {loan.remaining > 0.001 ? (
           <div className="mt-3 space-y-1">
             <p className="text-sm text-stone-500">{t("payBackHint")}</p>

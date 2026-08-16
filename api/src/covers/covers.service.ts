@@ -283,4 +283,116 @@ export class CoversService {
     });
     return created.id;
   }
+
+  async update(
+    householdId: string,
+    userId: string,
+    role: string,
+    coverId: string,
+    dto: {
+      amount?: number;
+      categoryId?: string;
+      toUserId?: string;
+      occurredOn?: string;
+      note?: string;
+    },
+  ) {
+    const cover = await this.prisma.houseCover.findFirst({
+      where: { id: coverId, householdId },
+      include: {
+        repayments: true,
+        houseTx: true,
+        member: true,
+        category: true,
+      },
+    });
+    if (!cover) throw new NotFoundException();
+    if (role !== 'ADMIN' && cover.houseTx.userId !== userId) {
+      throw new ForbiddenException('You can only edit covers you created');
+    }
+    if (cover.repayments.length > 0) {
+      throw new BadRequestException('This was already partly repaid');
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      let memberName = cover.member.name;
+      let categoryId = cover.categoryId;
+      const data: Prisma.HouseCoverUpdateInput = {};
+      if (dto.amount !== undefined) data.amount = new Prisma.Decimal(dto.amount);
+      if (dto.note !== undefined) data.note = dto.note;
+      if (dto.occurredOn) data.occurredOn = new Date(dto.occurredOn);
+      if (dto.toUserId) {
+        const member = await tx.membership.findFirst({
+          where: { householdId, userId: dto.toUserId },
+          include: { user: { select: { id: true, name: true } } },
+        });
+        if (!member) {
+          throw new BadRequestException('That person is not in this house');
+        }
+        data.member = { connect: { id: dto.toUserId } };
+        memberName = member.user.name;
+      }
+      if (dto.categoryId) {
+        const category = await tx.category.findFirst({
+          where: { id: dto.categoryId, householdId, kind: 'EXPENSE' },
+        });
+        if (!category) throw new BadRequestException('Pick an expense category');
+        if (
+          category.name === 'Member payback' ||
+          category.name === 'Given to member' ||
+          category.name === 'Allowance'
+        ) {
+          throw new BadRequestException('Pick what the house paid for');
+        }
+        data.category = { connect: { id: dto.categoryId } };
+        categoryId = category.id;
+      }
+      await tx.houseCover.update({ where: { id: coverId }, data });
+
+      const note = dto.note !== undefined ? dto.note : cover.note;
+      const houseNote = note.trim()
+        ? `${memberName} · ${note.trim()}`
+        : `For ${memberName}`;
+      await tx.transaction.update({
+        where: { id: cover.houseTxId },
+        data: {
+          ...(dto.amount !== undefined
+            ? { amount: new Prisma.Decimal(dto.amount) }
+            : {}),
+          ...(dto.occurredOn ? { occurredOn: new Date(dto.occurredOn) } : {}),
+          ...(dto.categoryId ? { categoryId } : {}),
+          note: houseNote,
+        },
+      });
+
+      return tx.houseCover.findFirstOrThrow({
+        where: { id: coverId },
+        include: {
+          member: { select: { id: true, name: true } },
+          category: { select: { id: true, name: true, color: true } },
+          repayments: true,
+        },
+      });
+    });
+    return this.shape(updated);
+  }
+
+  async remove(householdId: string, userId: string, role: string, coverId: string) {
+    const cover = await this.prisma.houseCover.findFirst({
+      where: { id: coverId, householdId },
+      include: { repayments: true, houseTx: true },
+    });
+    if (!cover) throw new NotFoundException();
+    if (role !== 'ADMIN' && cover.houseTx.userId !== userId) {
+      throw new ForbiddenException('You can only delete covers you created');
+    }
+    if (cover.repayments.length > 0) {
+      throw new BadRequestException('This was already partly repaid');
+    }
+    await this.prisma.$transaction(async (tx) => {
+      await tx.houseCover.delete({ where: { id: coverId } });
+      await tx.transaction.delete({ where: { id: cover.houseTxId } });
+    });
+    return { ok: true };
+  }
 }

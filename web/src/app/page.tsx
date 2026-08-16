@@ -97,8 +97,13 @@ export default function HomePage() {
   const [payWalletId, setPayWalletId] = useState("");
   const [payAmounts, setPayAmounts] = useState<Record<string, string>>({});
   const [repayAmounts, setRepayAmounts] = useState<Record<string, string>>({});
+  const [editId, setEditId] = useState("");
+  const [editAmount, setEditAmount] = useState("");
+  const [editNote, setEditNote] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState("");
   const [error, setError] = useState("");
   const [flash, setFlash] = useState("");
+  const [busyEdit, setBusyEdit] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -275,6 +280,71 @@ export default function HomePage() {
       setError(e instanceof Error ? e.message : t("couldNotSave"));
     } finally {
       setRepayingId("");
+    }
+  }
+
+  function startEditObligation(id: string, amount: number, note: string) {
+    setEditId(id);
+    setConfirmDeleteId("");
+    setEditAmount(String(amount));
+    setEditNote(note);
+  }
+
+  async function saveClaimEdit(id: string) {
+    if (!active) return;
+    setBusyEdit(true);
+    setError("");
+    try {
+      await api(householdPath(active.householdId, `/claims/${id}`), {
+        method: "PATCH",
+        body: JSON.stringify({
+          amount: parseAmount(editAmount),
+          note: editNote,
+        }),
+      });
+      setEditId("");
+      await refreshHouseLists();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("couldNotSave"));
+    } finally {
+      setBusyEdit(false);
+    }
+  }
+
+  async function saveCoverEdit(id: string) {
+    if (!active) return;
+    setBusyEdit(true);
+    setError("");
+    try {
+      await api(householdPath(active.householdId, `/covers/${id}`), {
+        method: "PATCH",
+        body: JSON.stringify({
+          amount: parseAmount(editAmount),
+          note: editNote,
+        }),
+      });
+      setEditId("");
+      await refreshHouseLists();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("couldNotSave"));
+    } finally {
+      setBusyEdit(false);
+    }
+  }
+
+  async function deleteObligation(path: string) {
+    if (!active) return;
+    setBusyEdit(true);
+    setError("");
+    try {
+      await api(householdPath(active.householdId, path), { method: "DELETE" });
+      setConfirmDeleteId("");
+      setEditId("");
+      await refreshHouseLists();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t("couldNotSave"));
+    } finally {
+      setBusyEdit(false);
     }
   }
 
@@ -531,6 +601,8 @@ export default function HomePage() {
           <ul className="mt-3 space-y-3">
             {waitingClaims.map((c) => {
               const mine = c.member.id === userId;
+              const canManage =
+                (mine || isAdmin) && c.reimbursed < 0.001 && c.remaining > 0.001;
               return (
               <li
                 key={c.id}
@@ -557,6 +629,56 @@ export default function HomePage() {
                     />
                   </span>
                 </div>
+                {canManage ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => startEditObligation(c.id, c.amount, c.note)}
+                      className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-stone-800"
+                    >
+                      {t("edit")}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busyEdit}
+                      onClick={() =>
+                        confirmDeleteId === c.id
+                          ? deleteObligation(`/claims/${c.id}`)
+                          : setConfirmDeleteId(c.id)
+                      }
+                      className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-red-800"
+                    >
+                      {confirmDeleteId === c.id
+                        ? t("confirmDelete")
+                        : t("deleteItem")}
+                    </button>
+                  </div>
+                ) : null}
+                {editId === c.id ? (
+                  <div className="mt-3 space-y-2">
+                    <input
+                      inputMode="decimal"
+                      dir="ltr"
+                      className="amount-input w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-xl"
+                      value={editAmount}
+                      onChange={(e) => setEditAmount(e.target.value)}
+                    />
+                    <input
+                      className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3"
+                      value={editNote}
+                      onChange={(e) => setEditNote(e.target.value)}
+                      placeholder={t("noteOptional")}
+                    />
+                    <button
+                      type="button"
+                      disabled={busyEdit}
+                      onClick={() => saveClaimEdit(c.id)}
+                      className="flex min-h-11 w-full items-center justify-center rounded-2xl bg-stone-900 font-semibold text-white disabled:opacity-60"
+                    >
+                      {busyEdit ? t("saving") : t("save")}
+                    </button>
+                  </div>
+                ) : null}
                 {isAdmin ? (
                   <div className="mt-3 space-y-2">
                     <p className="text-sm text-stone-500">{t("payFromWhich")}</p>
@@ -629,6 +751,7 @@ export default function HomePage() {
             {waitingCovers.map((c) => {
               const mine = c.member.id === userId;
               const canRepay = isAdmin || mine;
+              const canManage = isAdmin && c.repaid < 0.001 && c.remaining > 0.001;
               return (
                 <li
                   key={c.id}
@@ -655,6 +778,58 @@ export default function HomePage() {
                       />
                     </span>
                   </div>
+                  {canManage ? (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          startEditObligation(c.id, c.amount, c.note)
+                        }
+                        className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-stone-800"
+                      >
+                        {t("edit")}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busyEdit}
+                        onClick={() =>
+                          confirmDeleteId === c.id
+                            ? deleteObligation(`/covers/${c.id}`)
+                            : setConfirmDeleteId(c.id)
+                        }
+                        className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-red-800"
+                      >
+                        {confirmDeleteId === c.id
+                          ? t("confirmDelete")
+                          : t("deleteItem")}
+                      </button>
+                    </div>
+                  ) : null}
+                  {editId === c.id ? (
+                    <div className="mt-3 space-y-2">
+                      <input
+                        inputMode="decimal"
+                        dir="ltr"
+                        className="amount-input w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-xl"
+                        value={editAmount}
+                        onChange={(e) => setEditAmount(e.target.value)}
+                      />
+                      <input
+                        className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3"
+                        value={editNote}
+                        onChange={(e) => setEditNote(e.target.value)}
+                        placeholder={t("noteOptional")}
+                      />
+                      <button
+                        type="button"
+                        disabled={busyEdit}
+                        onClick={() => saveCoverEdit(c.id)}
+                        className="flex min-h-11 w-full items-center justify-center rounded-2xl bg-stone-900 font-semibold text-white disabled:opacity-60"
+                      >
+                        {busyEdit ? t("saving") : t("save")}
+                      </button>
+                    </div>
+                  ) : null}
                   {canRepay ? (
                     <div className="mt-3 space-y-2">
                       <p className="text-sm text-stone-500">{t("payFromWhich")}</p>

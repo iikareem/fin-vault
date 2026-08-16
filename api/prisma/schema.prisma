@@ -82,6 +82,7 @@ model User {
   loansGiven     PeerLoan[]      @relation("LoansGiven")
   loansReceived  PeerLoan[]      @relation("LoansReceived")
   loanRepayments LoanRepayment[]
+  loansRecorded  PeerLoan[]      @relation("LoansRecorded")
   claims         HouseClaim[]
   reimbursements Reimbursement[]
   covers         HouseCover[]
@@ -163,21 +164,23 @@ model Transaction {
 }
 
 model PeerLoan {
-  id             String          @id @default(cuid())
-  householdId    String
-  household      Household       @relation(fields: [householdId], references: [id])
-  fromUserId     String
-  fromUser       User            @relation("LoansGiven", fields: [fromUserId], references: [id])
-  toUserId       String
-  toUser         User            @relation("LoansReceived", fields: [toUserId], references: [id])
-  categoryId     String
-  category       Category        @relation(fields: [categoryId], references: [id])
-  originalAmount Decimal         @db.Decimal(14, 2)
-  note           String          @default("")
-  occurredOn     DateTime        @db.Date
-  status         LoanStatus      @default(OPEN)
-  createdAt      DateTime        @default(now())
-  repayments     LoanRepayment[]
+  id               String          @id @default(cuid())
+  householdId      String
+  household        Household       @relation(fields: [householdId], references: [id])
+  fromUserId       String
+  fromUser         User            @relation("LoansGiven", fields: [fromUserId], references: [id])
+  toUserId         String
+  toUser           User            @relation("LoansReceived", fields: [toUserId], references: [id])
+  recordedByUserId String?
+  recordedBy       User?           @relation("LoansRecorded", fields: [recordedByUserId], references: [id])
+  categoryId       String
+  category         Category        @relation(fields: [categoryId], references: [id])
+  originalAmount   Decimal         @db.Decimal(14, 2)
+  note             String          @default("")
+  occurredOn       DateTime        @db.Date
+  status           LoanStatus      @default(OPEN)
+  createdAt        DateTime        @default(now())
+  repayments       LoanRepayment[]
 }
 
 model LoanRepayment {

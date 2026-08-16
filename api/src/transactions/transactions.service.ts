@@ -86,6 +86,7 @@ export class TransactionsService {
         charityGift: true,
         charityHouseGift: true,
         claimPersonal: true,
+        coverHouse: true,
       },
     });
     if (!tx) throw new NotFoundException();
@@ -143,6 +144,12 @@ export class TransactionsService {
             data: { amount: new Prisma.Decimal(dto.amount) },
           });
         }
+        if (tx.coverHouse && tx.coverHouse.status === 'OPEN') {
+          await db.houseCover.update({
+            where: { id: tx.coverHouse.id },
+            data: { amount: new Prisma.Decimal(dto.amount) },
+          });
+        }
       }
       if (dto.occurredOn) {
         const on = new Date(dto.occurredOn);
@@ -174,6 +181,12 @@ export class TransactionsService {
             data: { occurredOn: on },
           });
         }
+        if (tx.coverHouse && tx.coverHouse.status === 'OPEN') {
+          await db.houseCover.update({
+            where: { id: tx.coverHouse.id },
+            data: { occurredOn: on },
+          });
+        }
       }
     });
 
@@ -197,6 +210,7 @@ export class TransactionsService {
         charityGift: true,
         charityHouseGift: true,
         claimPersonal: true,
+        coverHouse: true,
         reimbursement: true,
       },
     });
@@ -227,6 +241,12 @@ export class TransactionsService {
           throw new BadRequestException('This was already paid back');
         }
         await db.houseClaim.delete({ where: { id: tx.claimPersonal.id } });
+      }
+      if (tx.coverHouse) {
+        if (tx.coverHouse.status !== 'OPEN') {
+          throw new BadRequestException('This was already partly repaid');
+        }
+        await db.houseCover.delete({ where: { id: tx.coverHouse.id } });
       }
       await db.transaction.delete({ where: { id } });
     });
