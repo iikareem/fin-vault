@@ -9,7 +9,7 @@ import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
 import { labelFor, type MessageKey } from "@/lib/i18n";
 import { useCalendarClock } from "@/hooks/useCalendarClock";
-import { isoLocal } from "@/lib/calendar";
+import { formatItemDate, isoLocal } from "@/lib/calendar";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 
@@ -192,24 +192,40 @@ export default function HistoryPage() {
 
   return (
     <PageShell>
-      <h1 className="text-2xl font-bold leading-tight sm:text-3xl">📅 {t("eachDay")}</h1>
+      <h1 className="text-2xl font-bold leading-tight sm:text-3xl">
+        {t("eachDay")}
+      </h1>
       <Hint>{t("daysHint")}</Hint>
       <div className="mt-4 flex items-center gap-2">
         <button
           type="button"
+          aria-label={t("pickDayHint")}
           className="min-h-16 rounded-3xl bg-white px-5 text-3xl font-bold shadow-sm"
           onClick={() => setDay((d) => shiftDay(d, -1))}
         >
           ‹
         </button>
-        <input
-          type="date"
-          className="min-h-16 min-w-0 flex-1 rounded-3xl border border-stone-300 bg-white px-3 text-center text-xl font-bold"
-          value={day}
-          onChange={(e) => setDay(e.target.value)}
-        />
+        <label className="relative flex min-h-16 min-w-0 flex-1 cursor-pointer flex-col items-center justify-center rounded-3xl border border-stone-300 bg-white px-3 py-2 shadow-sm">
+          <time
+            dateTime={day}
+            className="text-center text-xl font-bold leading-tight text-stone-900 sm:text-2xl"
+          >
+            {formatItemDate(day, locale)}
+          </time>
+          <span className="mt-0.5 text-xs font-medium text-stone-500">
+            {day}
+          </span>
+          <input
+            type="date"
+            className="absolute inset-0 cursor-pointer opacity-0"
+            value={day}
+            onChange={(e) => setDay(e.target.value)}
+            aria-label={t("pickDayHint")}
+          />
+        </label>
         <button
           type="button"
+          aria-label={t("pickDayHint")}
           className="min-h-16 rounded-3xl bg-white px-5 text-3xl font-bold shadow-sm"
           onClick={() => setDay((d) => shiftDay(d, 1))}
         >
