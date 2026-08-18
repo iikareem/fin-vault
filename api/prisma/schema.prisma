@@ -40,6 +40,11 @@ enum LoanStatus {
   SETTLED
 }
 
+enum LoanKind {
+  TRACK_ONLY
+  CASH
+}
+
 enum ClaimStatus {
   OPEN
   PARTIAL
@@ -183,6 +188,7 @@ model PeerLoan {
   note             String          @default("")
   occurredOn       DateTime        @db.Date
   status           LoanStatus      @default(OPEN)
+  kind             LoanKind        @default(TRACK_ONLY)
   createdAt        DateTime        @default(now())
   repayments       LoanRepayment[]
   /** Lender personal cash left (EXPENSE). */

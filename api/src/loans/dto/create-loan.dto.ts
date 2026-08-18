@@ -15,6 +15,10 @@ export class CreateLoanDto {
   @IsIn(['I_GAVE', 'THEY_GAVE'])
   direction?: 'I_GAVE' | 'THEY_GAVE';
 
+  @IsOptional()
+  @IsIn(['TRACK_ONLY', 'CASH'])
+  kind?: 'TRACK_ONLY' | 'CASH';
+
   @IsString()
   categoryId: string;
 

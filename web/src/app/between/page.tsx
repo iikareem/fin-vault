@@ -24,6 +24,7 @@ type Loan = {
   remaining: number;
   repaid: number;
   status: string;
+  kind?: string;
   note: string;
   occurredOn?: string;
   fromUser: { id: string; name: string };
@@ -42,6 +43,7 @@ export default function BetweenPage() {
   const [youAreOwed, setYouAreOwed] = useState<Loan[]>([]);
   const [toUserId, setToUserId] = useState("");
   const [direction, setDirection] = useState<"I_GAVE" | "THEY_GAVE">("I_GAVE");
+  const [loanKind, setLoanKind] = useState<"TRACK_ONLY" | "CASH">("TRACK_ONLY");
   const [categoryId, setCategoryId] = useState("");
   const [amount, setAmount] = useState("");
   const [occurredOn, setOccurredOn] = useState(todayISO());
@@ -95,6 +97,7 @@ export default function BetweenPage() {
         body: JSON.stringify({
           toUserId,
           direction,
+          kind: loanKind,
           categoryId,
           amount: parseAmount(amount),
           occurredOn,
@@ -331,6 +334,38 @@ export default function BetweenPage() {
             {direction === "I_GAVE" ? t("iGaveHint") : t("theyGaveMeHint")}
           </p>
         </div>
+        <div>
+          <p className="mb-1 font-medium">{t("loanKind")}</p>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setLoanKind("TRACK_ONLY")}
+              className={`rounded-2xl px-3 py-3 text-lg font-bold ${
+                loanKind === "TRACK_ONLY"
+                  ? "bg-stone-900 text-white shadow"
+                  : "bg-white text-stone-700"
+              }`}
+            >
+              📋 {t("loanKindTrackOnly")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setLoanKind("CASH")}
+              className={`rounded-2xl px-3 py-3 text-lg font-bold ${
+                loanKind === "CASH"
+                  ? "bg-emerald-800 text-white shadow"
+                  : "bg-white text-stone-700"
+              }`}
+            >
+              💸 {t("loanKindCash")}
+            </button>
+          </div>
+          <p className="mt-2 text-sm leading-relaxed text-stone-500">
+            {loanKind === "TRACK_ONLY"
+              ? t("loanKindTrackOnlyHint")
+              : t("loanKindCashHint")}
+          </p>
+        </div>
         <label className="block">
           <span className="mb-1 block font-medium">{t("who")}</span>
           <select
@@ -353,14 +388,21 @@ export default function BetweenPage() {
           </p>
         </label>
         {otherName ? (
-          <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-base leading-relaxed text-emerald-950">
-            {fill(
-              direction === "I_GAVE"
-                ? t("betweenSummaryIGave")
-                : t("betweenSummaryTheyGave"),
-              { name: otherName },
-            )}
-          </p>
+          <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-base leading-relaxed text-emerald-950">
+            <p>
+              {fill(
+                direction === "I_GAVE"
+                  ? t("betweenSummaryIGave")
+                  : t("betweenSummaryTheyGave"),
+                { name: otherName },
+              )}
+            </p>
+            <p className="mt-1 text-sm">
+              {loanKind === "TRACK_ONLY"
+                ? t("loanKindTrackOnlyHint")
+                : t("loanKindCashHint")}
+            </p>
+          </div>
         ) : null}
         <label className="block">
           <span className="mb-1 block font-medium">{t("forWhat")}</span>

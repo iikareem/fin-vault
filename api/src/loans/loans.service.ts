@@ -41,10 +41,12 @@ export class LoansService implements OnModuleInit {
   /**
    * Existing peer loans (before cash ledger) had no personal txs.
    * Idempotent: only fills null fromPersonalTxId / toPersonalTxId.
+   * Only CASH loans should ever carry personal txs; TRACK_ONLY loans never do.
    */
   async backfillMissingPersonalTxs() {
     const loans = await this.prisma.peerLoan.findMany({
       where: {
+        kind: 'CASH',
         OR: [{ fromPersonalTxId: null }, { toPersonalTxId: null }],
       },
       include: {
@@ -188,6 +190,7 @@ export class LoansService implements OnModuleInit {
     note: string;
     occurredOn: Date;
     status: string;
+    kind: string;
     createdAt: Date;
     repayments: { amount: Prisma.Decimal }[];
     fromUser?: { id: string; name: string };
@@ -205,6 +208,7 @@ export class LoansService implements OnModuleInit {
       note: loan.note,
       occurredOn: loan.occurredOn,
       status: remaining <= 0.001 ? 'SETTLED' : loan.status,
+      kind: loan.kind,
       createdAt: loan.createdAt,
       fromUser: loan.fromUser,
       toUser: loan.toUser,
@@ -339,6 +343,7 @@ export class LoansService implements OnModuleInit {
       throw new BadRequestException('You cannot lend to yourself');
     }
     const theyGave = dto.direction === 'THEY_GAVE';
+    const kind = dto.kind ?? 'TRACK_ONLY';
     const fromUserId = theyGave ? otherId : me;
     const toUserId = theyGave ? me : otherId;
     const [member, category] = await Promise.all([
@@ -372,24 +377,28 @@ export class LoansService implements OnModuleInit {
     const occurredOn = dto.occurredOn;
 
     return this.prisma.$transaction(async (tx) => {
-      const fromPersonalTxId = await this.recordPersonalExpense(
-        tx,
-        fromUserId,
-        dto.amount,
-        occurredOn,
-        category.name,
-        category.color,
-        lenderNote,
-      );
-      const toPersonalTxId = await this.recordPersonalIncome(
-        tx,
-        toUserId,
-        dto.amount,
-        occurredOn,
-        category.name,
-        category.color,
-        borrowerNote,
-      );
+      let fromPersonalTxId: string | null = null;
+      let toPersonalTxId: string | null = null;
+      if (kind === 'CASH') {
+        fromPersonalTxId = await this.recordPersonalExpense(
+          tx,
+          fromUserId,
+          dto.amount,
+          occurredOn,
+          category.name,
+          category.color,
+          lenderNote,
+        );
+        toPersonalTxId = await this.recordPersonalIncome(
+          tx,
+          toUserId,
+          dto.amount,
+          occurredOn,
+          category.name,
+          category.color,
+          borrowerNote,
+        );
+      }
       const loan = await tx.peerLoan.create({
         data: {
           householdId,
@@ -400,6 +409,7 @@ export class LoansService implements OnModuleInit {
           originalAmount: new Prisma.Decimal(dto.amount),
           occurredOn: new Date(occurredOn),
           note: dto.note ?? '',
+          kind,
           fromPersonalTxId,
           toPersonalTxId,
         },
