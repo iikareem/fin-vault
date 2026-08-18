@@ -8,6 +8,7 @@ import { Money } from "@/components/Money";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
 import { labelFor, type MessageKey } from "@/lib/i18n";
+import { CategoryPicker } from "@/components/CategoryPicker";
 import { useCalendarClock } from "@/hooks/useCalendarClock";
 import { formatItemDate, isoLocal } from "@/lib/calendar";
 import { householdPath } from "@/lib/space";
@@ -49,7 +50,7 @@ type DayLog = {
   claims: Claim[];
   gifts: Gift[];
 };
-type Category = { id: string; name: string; kind: string };
+type Category = { id: string; name: string; kind: string; parentId?: string | null };
 
 function shiftDay(day: string, dir: number) {
   const d = new Date(`${day}T12:00:00`);
@@ -492,17 +493,11 @@ function EditFields({
         aria-label={t("amount")}
       />
       {categories.length > 0 ? (
-        <select
-          className="w-full rounded-2xl border border-stone-300 px-4 py-4 text-xl"
+        <CategoryPicker
+          categories={categories}
           value={categoryId}
-          onChange={(e) => setCategoryId(e.target.value)}
-        >
-          {categories.map((c) => (
-            <option key={c.id} value={c.id}>
-              {labelFor(c.name, t)}
-            </option>
-          ))}
-        </select>
+          onChange={setCategoryId}
+        />
       ) : null}
       <input
         className="w-full rounded-2xl border border-stone-300 px-4 py-4 text-xl"

@@ -359,14 +359,20 @@ export class AnalyticsService {
     >();
     for (const r of rows) {
       const cat = cats.find((c) => c.id === r.categoryId);
-      const key = `${r.categoryId}:${r.type}`;
-      totals.set(key, {
-        categoryId: r.categoryId,
-        name: cat?.name ?? 'Unknown',
-        color: cat?.color ?? '#64748b',
+      const group = cat?.parentId
+        ? cats.find((c) => c.id === cat.parentId)
+        : undefined;
+      const bucket = group ?? cat;
+      const key = `${bucket?.id ?? r.categoryId}:${r.type}`;
+      const cur = totals.get(key) ?? {
+        categoryId: bucket?.id ?? r.categoryId,
+        name: bucket?.name ?? 'Unknown',
+        color: bucket?.color ?? '#64748b',
         type: r.type,
-        total: Number(r._sum.amount ?? 0),
-      });
+        total: 0,
+      };
+      cur.total += Number(r._sum.amount ?? 0);
+      totals.set(key, cur);
     }
     if (membership.kind === 'HOUSE') {
       const claims = await this.prisma.houseClaim.groupBy({

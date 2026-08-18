@@ -9,6 +9,37 @@ const HOUSE_PAID = [
   { name: 'Courtesy', kind: 'EXPENSE' as const, color: '#c026d3' },
 ];
 
+/** Legacy names replaced by their new target names (keeps the category row). */
+const RENAME: Record<string, string> = {
+  Groceries: 'Consumables',
+  Food: 'Nutrition',
+  Gifts: 'Social occasions',
+  Charity: 'Charity & sadaqah',
+  Sports: 'Sports gear',
+  Travel: 'Travel & trips',
+  Clothes: 'Clothes & shoes',
+  Restaurants: 'Dining & cafés',
+};
+
+/** Source category is merged into the target, remapping rows then deleting. */
+const MERGE: Record<string, string> = {
+  Shoes: 'Clothes & shoes',
+  Coffee: 'Dining & cafés',
+};
+
+/** Categories moved under a group by group name. */
+const REPARENT: Record<string, string> = {
+  Electronics: 'Household errands',
+  Beauty: 'Personal care',
+  Home: 'Home expenses',
+  Consumables: 'Nutrition',
+  Fuel: 'Transport',
+  Biscuits: 'Yearly expenses',
+};
+
+/** Categories removed entirely; their rows are remapped to Other. */
+const DELETE_LIST = ['Pets'];
+
 @Injectable()
 export class CategoriesService {
   constructor(private prisma: PrismaService) {}
@@ -31,29 +62,135 @@ export class CategoriesService {
       }
     }
     if (kind === 'PERSONAL') {
-      for (const cat of PERSONAL_EXPENSE) {
-        await this.prisma.category.upsert({
-          where: {
-            householdId_name_kind: {
-              householdId,
-              name: cat.name,
-              kind: 'EXPENSE',
-            },
-          },
-          update: {},
-          create: {
-            householdId,
-            name: cat.name,
-            kind: 'EXPENSE',
-            color: cat.color,
-          },
-        });
-      }
+      await this.syncPersonal(householdId);
     }
     return this.prisma.category.findMany({
       where: { householdId },
-      orderBy: [{ kind: 'asc' }, { name: 'asc' }],
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
     });
+  }
+
+  /** Aligns a personal household's expense categories with the target tree. */
+  private async syncPersonal(householdId: string) {
+    const byName = (name: string) =>
+      this.prisma.category.findFirst({
+        where: { householdId, name, kind: 'EXPENSE' },
+      });
+
+    for (const [oldName, newName] of Object.entries(RENAME)) {
+      const row = await byName(oldName);
+      if (!row) continue;
+      const target = await byName(newName);
+      if (target) {
+        await this.mergeCategory(row.id, target.id);
+      } else {
+        await this.prisma.category.update({
+          where: { id: row.id },
+          data: { name: newName },
+        });
+      }
+    }
+
+    for (const [sourceName, targetName] of Object.entries(MERGE)) {
+      const source = await byName(sourceName);
+      const target = await byName(targetName);
+      if (source && target) {
+        await this.mergeCategory(source.id, target.id);
+      }
+    }
+
+    for (const [childName, parentName] of Object.entries(REPARENT)) {
+      const child = await byName(childName);
+      const parent = await byName(parentName);
+      if (child && parent && child.id !== parent.id) {
+        await this.prisma.category.update({
+          where: { id: child.id },
+          data: { parentId: parent.id },
+        });
+      }
+    }
+
+    const other = await byName('Other');
+    for (const name of DELETE_LIST) {
+      const row = await byName(name);
+      if (row && other) {
+        await this.mergeCategory(row.id, other.id);
+      }
+    }
+
+    const parents = PERSONAL_EXPENSE.filter((c) => !c.group);
+    const children = PERSONAL_EXPENSE.filter((c) => c.group);
+    const parentIds = new Map<string, string>();
+    for (let i = 0; i < parents.length; i++) {
+      const def = parents[i];
+      const row = await this.prisma.category.upsert({
+        where: {
+          householdId_name_kind: {
+            householdId,
+            name: def.name,
+            kind: 'EXPENSE',
+          },
+        },
+        update: { color: def.color, sortOrder: i },
+        create: {
+          householdId,
+          name: def.name,
+          kind: 'EXPENSE',
+          color: def.color,
+          sortOrder: i,
+        },
+      });
+      parentIds.set(def.name, row.id);
+    }
+    const orderInGroup = new Map<string, number>();
+    for (const def of children) {
+      const group = def.group;
+      if (!group) continue;
+      const parentId = parentIds.get(group);
+      if (!parentId) continue;
+      const order = orderInGroup.get(group) ?? 0;
+      orderInGroup.set(group, order + 1);
+      await this.prisma.category.upsert({
+        where: {
+          householdId_name_kind: {
+            householdId,
+            name: def.name,
+            kind: 'EXPENSE',
+          },
+        },
+        update: { color: def.color, parentId, sortOrder: order },
+        create: {
+          householdId,
+          name: def.name,
+          kind: 'EXPENSE',
+          color: def.color,
+          parentId,
+          sortOrder: order,
+        },
+      });
+    }
+  }
+
+  private async mergeCategory(sourceId: string, targetId: string) {
+    await this.prisma.$transaction([
+      this.prisma.transaction.updateMany({
+        where: { categoryId: sourceId },
+        data: { categoryId: targetId },
+      }),
+      this.prisma.houseClaim.updateMany({
+        where: { categoryId: sourceId },
+        data: { categoryId: targetId },
+      }),
+      this.prisma.houseCover.updateMany({
+        where: { categoryId: sourceId },
+        data: { categoryId: targetId },
+      }),
+      this.prisma.peerLoan.updateMany({
+        where: { categoryId: sourceId },
+        data: { categoryId: targetId },
+      }),
+      this.prisma.category.delete({ where: { id: sourceId } }),
+    ]);
   }
 
   private async mergeLegacyGift(householdId: string) {
@@ -102,6 +239,7 @@ export class CategoriesService {
         name: dto.name,
         kind: dto.kind,
         color: dto.color ?? '#2563eb',
+        parentId: dto.parentId ?? null,
       },
     });
   }

@@ -12,4 +12,8 @@ export class CreateCategoryDto {
   @IsOptional()
   @IsString()
   color?: string;
+
+  @IsOptional()
+  @IsString()
+  parentId?: string;
 }

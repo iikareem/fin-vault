@@ -126,15 +126,20 @@ model Category {
   id          String        @id @default(cuid())
   householdId String
   household   Household     @relation(fields: [householdId], references: [id])
+  parentId    String?
+  parent      Category?     @relation("CategoryChildren", fields: [parentId], references: [id])
+  children    Category[]    @relation("CategoryChildren")
   name        String
   kind        CategoryKind
   color       String        @default("#2563eb")
+  sortOrder   Int           @default(0)
   txs         Transaction[]
   loans       PeerLoan[]
   claims      HouseClaim[]
   covers      HouseCover[]
 
   @@unique([householdId, name, kind])
+  @@index([householdId, parentId])
 }
 
 model Transaction {

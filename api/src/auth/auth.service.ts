@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { normalizeLoginEmail, normalizeLoginPassword } from './login-text';
 
 @Injectable()
@@ -34,6 +35,26 @@ export class AuthService {
 
   issueToken(userId: string) {
     return this.jwt.signAsync({ sub: userId });
+  }
+
+  async changePassword(userId: string, dto: ChangePasswordDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+    if (!user) throw new UnauthorizedException();
+    const current = normalizeLoginPassword(dto.currentPassword);
+    const ok = await bcrypt.compare(current, user.passwordHash);
+    if (!ok) throw new UnauthorizedException('Wrong current password');
+    const next = normalizeLoginPassword(dto.newPassword);
+    if (next.length < 8) {
+      throw new UnauthorizedException('New password must be at least 8 characters');
+    }
+    const hash = await bcrypt.hash(next, 10);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: hash },
+    });
+    return { ok: true };
   }
 
   async me(userId: string) {

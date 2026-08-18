@@ -7,9 +7,9 @@ import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
-import { labelFor } from "@/lib/i18n";
 import { householdPath, type Space } from "@/lib/space";
 import { Hint } from "@/components/Hint";
+import { CategoryPicker } from "@/components/CategoryPicker";
 import {
   isCashWallet,
   isCurrentWallet,
@@ -18,7 +18,12 @@ import {
 } from "@/lib/wallets";
 
 type Account = { id: string; name: string; type?: string };
-type Category = { id: string; name: string; kind: "EXPENSE" | "INCOME" | "PEER" };
+type Category = {
+  id: string;
+  name: string;
+  kind: "EXPENSE" | "INCOME" | "PEER";
+  parentId?: string | null;
+};
 type Person = { id: string; name: string };
 type WalletKind = "EXPENSE" | "INCOME" | "GIVE";
 
@@ -134,7 +139,7 @@ function AddForm() {
     const list =
       mode === "claim" || mode === "cover" ? expenseCats : walletCats;
     const preferred =
-      type === "INCOME" && mode === "wallet" ? "Salary" : "Groceries";
+      type === "INCOME" && mode === "wallet" ? "Salary" : "Consumables";
     const pick = list.find((c) => c.name === preferred) ?? list[0];
     if (pick) setCategoryId(pick.id);
   }, [mode, type, expenseCats, walletCats, transferMode]);
@@ -531,21 +536,11 @@ function AddForm() {
           </div>
         ) : null}
         {!transferMode && !giveMode ? (
-          <label className="block">
-            <span className="mb-1 block font-medium">{t("forWhat")}</span>
-            <select
-              className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-lg"
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-            >
-              {(claimMode || coverMode ? expenseCats : walletCats).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {labelFor(c.name, t)}
-                </option>
-              ))}
-            </select>
-            <Hint>{t("forWhatHint")}</Hint>
-          </label>
+          <CategoryPicker
+            categories={claimMode || coverMode ? expenseCats : walletCats}
+            value={categoryId}
+            onChange={setCategoryId}
+          />
         ) : null}
         {!transferMode &&
         !(claimMode || (!coverMode && type === "INCOME")) ? (
