@@ -22,6 +22,7 @@ export default function MorePage() {
     { href: "/analytics", label: t("navCharts"), emoji: "📊", hint: t("moreChartsHint") },
     { href: "/charity", label: t("navCharity"), emoji: "🕌", hint: t("moreCharityHint") },
     { href: "/family", label: t("navFamily"), emoji: "👨‍👩‍👧‍👦", hint: t("moreFamilyHint") },
+    { href: "/profile", label: t("navProfile"), emoji: "👤", hint: t("profileHint") },
   ];
 
   return (

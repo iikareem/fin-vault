@@ -15,30 +15,46 @@ const RENAME: Record<string, string> = {
   Food: 'Nutrition',
   Gifts: 'Social occasions',
   Charity: 'Charity & sadaqah',
-  Sports: 'Sports gear',
   Travel: 'Travel & trips',
   Clothes: 'Clothes & shoes',
   Restaurants: 'Dining & cafés',
+  'Household errands': 'Durable purchases',
+  'Other errands': 'Other durables',
+  'Sports gear': 'Sports',
 };
 
 /** Source category is merged into the target, remapping rows then deleting. */
 const MERGE: Record<string, string> = {
   Shoes: 'Clothes & shoes',
   Coffee: 'Dining & cafés',
+  Home: 'Other home',
+  Phone: 'Phone bills',
+  'Personal grooming': 'Other care',
+  'Other yearly': 'Other',
 };
 
 /** Categories moved under a group by group name. */
 const REPARENT: Record<string, string> = {
-  Electronics: 'Household errands',
+  Electronics: 'Durable purchases',
   Beauty: 'Personal care',
-  Home: 'Home expenses',
   Consumables: 'Nutrition',
   Fuel: 'Transport',
-  Biscuits: 'Yearly expenses',
+  Cleaning: 'Hygiene',
+  Pharmacy: 'Health',
+  Snacks: 'Nutrition',
+  'Phone bills': 'Bills',
+  'Repairs & fixes': 'Home expenses',
+  Licenses: 'Government fees',
+  'Traffic fines': 'Government fees',
+  Internet: 'Bills',
 };
 
 /** Categories removed entirely; their rows are remapped to Other. */
-const DELETE_LIST = ['Pets'];
+const DELETE_LIST = [
+  'Pets',
+  'Related expenses',
+  'Yearly expenses',
+];
 
 @Injectable()
 export class CategoriesService {
@@ -91,33 +107,6 @@ export class CategoriesService {
       }
     }
 
-    for (const [sourceName, targetName] of Object.entries(MERGE)) {
-      const source = await byName(sourceName);
-      const target = await byName(targetName);
-      if (source && target) {
-        await this.mergeCategory(source.id, target.id);
-      }
-    }
-
-    for (const [childName, parentName] of Object.entries(REPARENT)) {
-      const child = await byName(childName);
-      const parent = await byName(parentName);
-      if (child && parent && child.id !== parent.id) {
-        await this.prisma.category.update({
-          where: { id: child.id },
-          data: { parentId: parent.id },
-        });
-      }
-    }
-
-    const other = await byName('Other');
-    for (const name of DELETE_LIST) {
-      const row = await byName(name);
-      if (row && other) {
-        await this.mergeCategory(row.id, other.id);
-      }
-    }
-
     const parents = PERSONAL_EXPENSE.filter((c) => !c.group);
     const children = PERSONAL_EXPENSE.filter((c) => c.group);
     const parentIds = new Map<string, string>();
@@ -131,7 +120,7 @@ export class CategoriesService {
             kind: 'EXPENSE',
           },
         },
-        update: { color: def.color, sortOrder: i },
+        update: { color: def.color, sortOrder: i, parentId: null },
         create: {
           householdId,
           name: def.name,
@@ -169,9 +158,41 @@ export class CategoriesService {
         },
       });
     }
+
+    for (const [sourceName, targetName] of Object.entries(MERGE)) {
+      const source = await byName(sourceName);
+      const target = await byName(targetName);
+      if (source && target && source.id !== target.id) {
+        await this.mergeCategory(source.id, target.id);
+      }
+    }
+
+    for (const [childName, parentName] of Object.entries(REPARENT)) {
+      const child = await byName(childName);
+      const parent = await byName(parentName);
+      if (child && parent && child.id !== parent.id) {
+        await this.prisma.category.update({
+          where: { id: child.id },
+          data: { parentId: parent.id },
+        });
+      }
+    }
+
+    const other = await byName('Other');
+    for (const name of DELETE_LIST) {
+      const row = await byName(name);
+      if (row && other && row.id !== other.id) {
+        await this.prisma.category.updateMany({
+          where: { parentId: row.id },
+          data: { parentId: other.id },
+        });
+        await this.mergeCategory(row.id, other.id);
+      }
+    }
   }
 
   private async mergeCategory(sourceId: string, targetId: string) {
+    if (sourceId === targetId) return;
     await this.prisma.$transaction([
       this.prisma.transaction.updateMany({
         where: { categoryId: sourceId },
@@ -188,6 +209,10 @@ export class CategoriesService {
       this.prisma.peerLoan.updateMany({
         where: { categoryId: sourceId },
         data: { categoryId: targetId },
+      }),
+      this.prisma.category.updateMany({
+        where: { parentId: sourceId },
+        data: { parentId: targetId },
       }),
       this.prisma.category.delete({ where: { id: sourceId } }),
     ]);

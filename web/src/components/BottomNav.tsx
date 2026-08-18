@@ -12,6 +12,7 @@ const houseItems: { href: string; key: MessageKey; emoji: string }[] = [
   { href: "/between", key: "navBetween", emoji: "🤝" },
   { href: "/history", key: "navDays", emoji: "📅" },
   { href: "/more", key: "navMore", emoji: "☰" },
+  { href: "/profile", key: "navProfile", emoji: "👤" },
 ];
 
 const mineItems: { href: string; key: MessageKey; emoji: string }[] = [
@@ -19,6 +20,7 @@ const mineItems: { href: string; key: MessageKey; emoji: string }[] = [
   { href: "/add", key: "navAdd", emoji: "➕" },
   { href: "/history", key: "navDays", emoji: "📅" },
   { href: "/analytics", key: "navCharts", emoji: "📊" },
+  { href: "/profile", key: "navProfile", emoji: "👤" },
 ];
 
 export function BottomNav() {
@@ -27,7 +29,12 @@ export function BottomNav() {
   const { active } = useBooks();
   const personal = active?.kind === "PERSONAL";
   const items = personal ? mineItems : houseItems;
-  const cols = items.length === 5 ? "grid-cols-5" : "grid-cols-4";
+  const cols =
+    items.length === 6
+      ? "grid-cols-6"
+      : items.length === 5
+        ? "grid-cols-5"
+        : "grid-cols-4";
   const activeChip = personal ? "bg-sky-100 text-sky-900" : "bg-emerald-100 text-emerald-900";
 
   return (
