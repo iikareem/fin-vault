@@ -11,8 +11,9 @@ const HOUSE_PAID = [
 
 /** Legacy names replaced by their new target names (keeps the category row). */
 const RENAME: Record<string, string> = {
-  Groceries: 'Consumables',
-  Food: 'Nutrition',
+  Groceries: 'Home food',
+  Nutrition: 'Food',
+  Consumables: 'Home food',
   Gifts: 'Social occasions',
   Charity: 'Charity & sadaqah',
   Travel: 'Travel & trips',
@@ -31,22 +32,26 @@ const MERGE: Record<string, string> = {
   Phone: 'Phone bills',
   'Personal grooming': 'Other care',
   'Other yearly': 'Other',
+  Snacks: 'Supermarket food',
 };
 
 /** Categories moved under a group by group name. */
 const REPARENT: Record<string, string> = {
   Electronics: 'Durable purchases',
   Beauty: 'Personal care',
-  Consumables: 'Nutrition',
+  'Home food': 'Food',
   Fuel: 'Transport',
   Cleaning: 'Hygiene',
   Pharmacy: 'Health',
-  Snacks: 'Nutrition',
   'Phone bills': 'Bills',
   'Repairs & fixes': 'Home expenses',
   Licenses: 'Government fees',
   'Traffic fines': 'Government fees',
   Internet: 'Bills',
+  'Supermarket food': 'Supermarket',
+  'Supermarket cleaning': 'Supermarket',
+  'Supermarket household': 'Supermarket',
+  'Other supermarket': 'Supermarket',
 };
 
 /** Categories removed entirely; their rows are remapped to Other. */

@@ -24,10 +24,14 @@ type ExpenseDef = {
 
 export const PERSONAL_EXPENSE: ExpenseDef[] = [
   // Main groups and standalone categories, in display order.
-  { name: 'Nutrition', color: '#16a34a' },
-  { name: 'Consumables', color: '#65a30d', group: 'Nutrition' },
-  { name: 'Supermarket', color: '#22c55e', group: 'Nutrition' },
-  { name: 'Snacks', color: '#d6a35c', group: 'Nutrition' },
+  { name: 'Food', color: '#16a34a' },
+  { name: 'Home food', color: '#65a30d', group: 'Food' },
+
+  { name: 'Supermarket', color: '#22c55e' },
+  { name: 'Supermarket food', color: '#4ade80', group: 'Supermarket' },
+  { name: 'Supermarket cleaning', color: '#0ea5e9', group: 'Supermarket' },
+  { name: 'Supermarket household', color: '#a16207', group: 'Supermarket' },
+  { name: 'Other supermarket', color: '#a8a29e', group: 'Supermarket' },
 
   { name: 'Hygiene', color: '#2dd4bf' },
   { name: 'Cleaning', color: '#0ea5e9', group: 'Hygiene' },
