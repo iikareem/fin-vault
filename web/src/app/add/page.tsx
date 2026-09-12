@@ -646,7 +646,7 @@ function AddForm() {
         >
           {busy ? t("saving") : `✅ ${t("save")}`}
         </button>
-        <Hint>{t("addSaveHint")}</Hint>
+        <Hint>{personalPaid && trackOnly ? t("spendTrackOnlyHint") : t("addSaveHint")}</Hint>
       </form>
       <BottomNav />
     </PageShell>
