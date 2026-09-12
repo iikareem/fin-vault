@@ -522,7 +522,7 @@ function AddForm() {
         ) : null}
         {personalPaid ? (
           <div>
-            <p className="mb-1 font-medium">{t("paid")}</p>
+            <p className="mb-1 font-medium">{t("spendHowLabel")}</p>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
