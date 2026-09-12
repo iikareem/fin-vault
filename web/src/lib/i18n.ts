@@ -852,6 +852,7 @@ const en = {
   spendTrackOnly: "No deduction",
   spendTrackOnlyHint:
     "Logged in history and categories only. Current and Savings stay the same.",
+  spendHowLabel: "Deduct from a wallet?",
   trackOnlyBadge: "No deduction",
   moneyInHint: "Money in: it will be added to cash, like a salary or money returned.",
   giveToHint: "Who receives the allowance. The money goes into their cash.",
