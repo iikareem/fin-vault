@@ -90,7 +90,10 @@ export class AnalyticsService {
       const cur = byMonth.get(key) ?? { income: 0, expense: 0 };
       const amt = Number(tx.amount);
       if (tx.type === 'INCOME') cur.income += amt;
-      else cur.expense += amt;
+      else if (tx.type === 'EXPENSE' || tx.type === 'REIMBURSEMENT') {
+        cur.expense += amt;
+      }
+      // TRACK is log-only and does not change cash.
       byMonth.set(key, cur);
     }
 
@@ -307,7 +310,7 @@ export class AnalyticsService {
       WHERE "householdId" = ${householdId}
         AND "occurredOn" >= ${dateOnlyUtc(from)}
         AND "occurredOn" <= ${dateOnlyUtc(to)}
-        AND type <> 'REIMBURSEMENT'
+        AND type IN ('INCOME', 'EXPENSE')
       GROUP BY "occurredOn", type
       ORDER BY "occurredOn" ASC
     `;
@@ -363,12 +366,13 @@ export class AnalyticsService {
         ? cats.find((c) => c.id === cat.parentId)
         : undefined;
       const bucket = group ?? cat;
-      const key = `${bucket?.id ?? r.categoryId}:${r.type}`;
+      const type = r.type === 'TRACK' ? 'EXPENSE' : r.type;
+      const key = `${bucket?.id ?? r.categoryId}:${type}`;
       const cur = totals.get(key) ?? {
         categoryId: bucket?.id ?? r.categoryId,
         name: bucket?.name ?? 'Unknown',
         color: bucket?.color ?? '#64748b',
-        type: r.type,
+        type,
         total: 0,
       };
       cur.total += Number(r._sum.amount ?? 0);
@@ -437,7 +441,7 @@ export class AnalyticsService {
             name:
               members.find((m) => m.user.id === r.userId)?.user.name ??
               'Unknown',
-            type: r.type,
+            type: r.type === 'TRACK' ? 'EXPENSE' : r.type,
             total: Number(r._sum.amount ?? 0),
           }));
     if (membership.kind !== 'HOUSE') return out;
@@ -500,9 +504,10 @@ export class AnalyticsService {
     const income = txs
       .filter((t) => t.type === 'INCOME')
       .reduce((s, t) => s + Number(t.amount), 0);
+    // TRACK is log-only: show in the day list, but do not count as cash out.
     const expense =
       txs
-        .filter((t) => t.type !== 'INCOME')
+        .filter((t) => t.type === 'EXPENSE' || t.type === 'REIMBURSEMENT')
         .reduce((s, t) => s + Number(t.amount), 0) +
       claims.reduce((s, c) => s + Number(c.amount), 0) +
       gifts.reduce(
