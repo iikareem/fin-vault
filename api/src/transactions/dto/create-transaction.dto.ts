@@ -8,15 +8,17 @@ import {
 } from 'class-validator';
 
 export class CreateTransactionDto {
-  @IsIn(['EXPENSE', 'INCOME'])
-  type: 'EXPENSE' | 'INCOME';
+  @IsIn(['EXPENSE', 'INCOME', 'TRACK'])
+  type: 'EXPENSE' | 'INCOME' | 'TRACK';
 
   @IsNumber()
   @Min(0.01)
   amount: number;
 
+  /** Required for cash EXPENSE/INCOME. Optional for TRACK (uses Current if omitted). */
+  @IsOptional()
   @IsString()
-  accountId: string;
+  accountId?: string;
 
   @IsString()
   categoryId: string;

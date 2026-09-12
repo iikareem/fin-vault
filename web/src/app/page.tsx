@@ -51,7 +51,7 @@ type CharityTypeRow = {
 type CharityMonth = { familyTotal: number; types: CharityTypeRow[] };
 type Tx = {
   id: string;
-  type: "INCOME" | "EXPENSE" | "REIMBURSEMENT";
+  type: "INCOME" | "EXPENSE" | "REIMBURSEMENT" | "TRACK";
   amount: string | number;
   note: string;
   occurredOn?: string;
@@ -1447,6 +1447,11 @@ export default function HomePage() {
                   <div className="min-w-0 text-right" dir="auto">
                     <span className="font-medium">
                       {labelFor(tx.category.name, t)}
+                      {tx.type === "TRACK" ? (
+                        <span className="ms-2 text-sm font-normal text-stone-500">
+                          ({t("trackOnlyBadge")})
+                        </span>
+                      ) : null}
                     </span>
                     <ItemDate
                       value={tx.occurredOn}
@@ -1456,20 +1461,38 @@ export default function HomePage() {
                   </div>
                   <span
                     className={`shrink-0 font-semibold ${
-                      tx.type === "INCOME" ? "text-emerald-800" : "text-red-800"
+                      tx.type === "INCOME"
+                        ? "text-emerald-800"
+                        : tx.type === "TRACK"
+                          ? "text-stone-700"
+                          : "text-red-800"
                     }`}
                   >
                     <Money
                       amount={Number(tx.amount)}
                       currency={currency}
                       locale={locale}
-                      extraSign={tx.type === "INCOME" ? "+" : "−"}
+                      extraSign={
+                        tx.type === "INCOME"
+                          ? "+"
+                          : tx.type === "TRACK"
+                            ? undefined
+                            : "−"
+                      }
                     />
                   </span>
                 </div>
                 {tx.user.name !== "House" || tx.note ? (
                   <p className="text-sm text-stone-500">
-                    {[tx.user.name === "House" ? null : labelFor(tx.user.name, t), tx.account ? labelFor(tx.account.name, t) : null, tx.note || null]
+                    {[
+                      tx.user.name === "House" ? null : labelFor(tx.user.name, t),
+                      tx.type === "TRACK"
+                        ? null
+                        : tx.account
+                          ? labelFor(tx.account.name, t)
+                          : null,
+                      tx.note || null,
+                    ]
                       .filter(Boolean)
                       .join(" · ")}
                   </p>

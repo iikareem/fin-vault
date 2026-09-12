@@ -36,27 +36,50 @@ export class TransactionsService {
     userId: string,
     dto: CreateTransactionDto,
   ) {
-    const [account, category] = await Promise.all([
-      this.prisma.account.findFirst({
-        where: { id: dto.accountId, householdId },
-      }),
-      this.prisma.category.findFirst({
-        where: { id: dto.categoryId, householdId },
-      }),
-    ]);
-    if (!account) throw new BadRequestException('Unknown account');
+    if (dto.type === 'TRACK' && kind !== 'PERSONAL') {
+      throw new BadRequestException('Track-only spend is for personal books');
+    }
+    const category = await this.prisma.category.findFirst({
+      where: { id: dto.categoryId, householdId },
+    });
     if (!category) throw new BadRequestException('Unknown category');
-    if (dto.type === 'EXPENSE' && category.kind !== 'EXPENSE') {
+    if (
+      (dto.type === 'EXPENSE' || dto.type === 'TRACK') &&
+      category.kind !== 'EXPENSE'
+    ) {
       throw new BadRequestException('Pick an expense category');
     }
     if (dto.type === 'INCOME' && category.kind !== 'INCOME') {
       throw new BadRequestException('Pick an income category');
     }
+
+    let accountId = dto.accountId;
+    if (!accountId) {
+      if (dto.type !== 'TRACK') {
+        throw new BadRequestException('Pick a wallet');
+      }
+      const cash = await this.prisma.account.findFirst({
+        where: {
+          householdId,
+          archived: false,
+          type: 'CASH',
+          name: { in: ['Current', 'Cash'] },
+        },
+      });
+      if (!cash) throw new BadRequestException('No cash wallet');
+      accountId = cash.id;
+    } else {
+      const account = await this.prisma.account.findFirst({
+        where: { id: accountId, householdId },
+      });
+      if (!account) throw new BadRequestException('Unknown account');
+    }
+
     const created = await this.prisma.transaction.create({
       data: {
         householdId,
         userId,
-        accountId: dto.accountId,
+        accountId,
         categoryId: dto.categoryId,
         type: dto.type,
         amount: new Prisma.Decimal(dto.amount),

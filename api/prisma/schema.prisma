@@ -33,6 +33,8 @@ enum TxType {
   EXPENSE
   INCOME
   REIMBURSEMENT
+  /** Logged spend that does not change wallet balance. */
+  TRACK
 }
 
 enum LoanStatus {

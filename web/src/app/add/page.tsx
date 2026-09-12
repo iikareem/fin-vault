@@ -59,6 +59,7 @@ function AddForm() {
   const [people, setPeople] = useState<Person[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [trackOnly, setTrackOnly] = useState(false);
 
   const houseAdmin = space?.kind === "HOUSE" && space.role === "ADMIN";
   const personalBooks = space?.kind === "PERSONAL";
@@ -66,6 +67,8 @@ function AddForm() {
   const coverMode = mode === "cover";
   const claimMode = mode === "claim";
   const transferMode = mode === "transfer";
+  const personalPaid =
+    personalBooks && mode === "wallet" && type === "EXPENSE";
 
   useEffect(() => {
     if (!active) return;
@@ -256,9 +259,9 @@ function AddForm() {
         await api(householdPath(space.householdId, "/transactions"), {
           method: "POST",
           body: JSON.stringify({
-            type,
+            type: personalPaid && trackOnly ? "TRACK" : type,
             amount: parseAmount(amount),
-            accountId,
+            ...(personalPaid && trackOnly ? {} : { accountId }),
             categoryId,
             occurredOn,
             note,
@@ -284,6 +287,7 @@ function AddForm() {
             onClick={() => {
               setMode("wallet");
               setType("EXPENSE");
+              setTrackOnly(false);
             }}
             className={`min-h-16 rounded-3xl px-2 text-lg font-semibold ${
               !claimMode && !coverMode && type === "EXPENSE"
@@ -298,6 +302,7 @@ function AddForm() {
             onClick={() => {
               setMode("wallet");
               setType("INCOME");
+              setTrackOnly(false);
             }}
             className={`min-h-16 rounded-3xl px-2 text-lg font-semibold ${
               !claimMode && !coverMode && type === "INCOME"
@@ -312,6 +317,7 @@ function AddForm() {
             onClick={() => {
               setMode("wallet");
               setType("GIVE");
+              setTrackOnly(false);
             }}
             className={`min-h-16 rounded-3xl px-2 text-lg font-semibold ${
               !claimMode && !coverMode && type === "GIVE"
@@ -323,7 +329,10 @@ function AddForm() {
           </button>
           <button
             type="button"
-            onClick={() => setMode("cover")}
+            onClick={() => {
+              setMode("cover");
+              setTrackOnly(false);
+            }}
             className={`min-h-16 rounded-3xl px-2 text-lg font-semibold ${
               coverMode ? "bg-indigo-800 text-white shadow" : "bg-white text-stone-700"
             }`}
@@ -332,7 +341,10 @@ function AddForm() {
           </button>
           <button
             type="button"
-            onClick={() => setMode("claim")}
+            onClick={() => {
+              setMode("claim");
+              setTrackOnly(false);
+            }}
             className={`min-h-16 rounded-3xl px-2 text-lg font-semibold ${
               claimMode ? "bg-amber-800 text-white shadow" : "bg-white text-stone-700"
             }`}
@@ -361,6 +373,7 @@ function AddForm() {
             onClick={() => {
               setMode("wallet");
               setType("INCOME");
+              setTrackOnly(false);
             }}
             className={`min-h-16 rounded-3xl text-lg font-semibold ${
               !transferMode && type === "INCOME"
@@ -373,7 +386,10 @@ function AddForm() {
           {personalBooks ? (
             <button
               type="button"
-              onClick={() => setMode("transfer")}
+              onClick={() => {
+                setMode("transfer");
+                setTrackOnly(false);
+              }}
               className={`col-span-2 min-h-14 rounded-3xl text-lg font-semibold ${
                 transferMode
                   ? "bg-stone-800 text-white shadow"
@@ -396,7 +412,9 @@ function AddForm() {
               ? t("giveFromHouseHint")
               : type === "INCOME"
                 ? t("moneyInHint")
-                : t("paidHint")}
+                : personalPaid && trackOnly
+                  ? t("spendTrackOnlyHint")
+                  : t("paidHint")}
       </Hint>
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
         {transferMode ? (
@@ -502,6 +520,38 @@ function AddForm() {
             <Hint>{t("amountHint")}</Hint>
           </label>
         ) : null}
+        {personalPaid ? (
+          <div>
+            <p className="mb-1 font-medium">{t("spendHowLabel")}</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setTrackOnly(false)}
+                className={`rounded-2xl px-3 py-3 text-lg font-bold ${
+                  !trackOnly
+                    ? "bg-emerald-800 text-white shadow"
+                    : "bg-white text-stone-700"
+                }`}
+              >
+                💸 {t("spendAffectsCash")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setTrackOnly(true)}
+                className={`rounded-2xl px-3 py-3 text-lg font-bold ${
+                  trackOnly
+                    ? "bg-stone-900 text-white shadow"
+                    : "bg-white text-stone-700"
+                }`}
+              >
+                📋 {t("spendTrackOnly")}
+              </button>
+            </div>
+            <p className="mt-2 text-sm leading-relaxed text-stone-500">
+              {trackOnly ? t("spendTrackOnlyHint") : t("spendAffectsCashHint")}
+            </p>
+          </div>
+        ) : null}
         {!transferMode && !claimMode && !coverMode && type === "INCOME" ? (
           <div className="space-y-3">
             <Hint>{t("splitIncomeHint")}</Hint>
@@ -543,7 +593,8 @@ function AddForm() {
           />
         ) : null}
         {!transferMode &&
-        !(claimMode || (!coverMode && type === "INCOME")) ? (
+        !(claimMode || (!coverMode && type === "INCOME")) &&
+        !(personalPaid && trackOnly) ? (
           <div>
             <p className="mb-1 font-medium">{t("pickWalletSpend")}</p>
             <div className="grid grid-cols-2 gap-2">
@@ -595,7 +646,7 @@ function AddForm() {
         >
           {busy ? t("saving") : `✅ ${t("save")}`}
         </button>
-        <Hint>{t("addSaveHint")}</Hint>
+        <Hint>{personalPaid && trackOnly ? t("spendTrackOnlyHint") : t("addSaveHint")}</Hint>
       </form>
       <BottomNav />
     </PageShell>

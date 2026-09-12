@@ -16,7 +16,7 @@ import { Hint } from "@/components/Hint";
 
 type Tx = {
   id: string;
-  type: "INCOME" | "EXPENSE" | "REIMBURSEMENT";
+  type: "INCOME" | "EXPENSE" | "REIMBURSEMENT" | "TRACK";
   amount: number;
   note: string;
   category: { id?: string; name: string };
@@ -293,19 +293,32 @@ export default function HistoryPage() {
                   <div className="money-row text-xl">
                     <span className="font-bold" dir="auto">
                       {labelFor(tx.category.name, t)}
+                      {tx.type === "TRACK" ? (
+                        <span className="ms-2 text-sm font-medium text-stone-500">
+                          ({t("trackOnlyBadge")})
+                        </span>
+                      ) : null}
                     </span>
                     <span
                       className={
                         tx.type === "INCOME"
                           ? "font-bold text-emerald-800"
-                          : "font-bold text-red-800"
+                          : tx.type === "TRACK"
+                            ? "font-bold text-stone-700"
+                            : "font-bold text-red-800"
                       }
                     >
                       <Money
                         amount={tx.amount}
                         currency={currency}
                         locale={locale}
-                        extraSign={tx.type === "INCOME" ? "+" : "−"}
+                        extraSign={
+                          tx.type === "INCOME"
+                            ? "+"
+                            : tx.type === "TRACK"
+                              ? undefined
+                              : "−"
+                        }
                       />
                     </span>
                   </div>
