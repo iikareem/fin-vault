@@ -160,7 +160,9 @@ export class AnalyticsService {
         })
       : [];
 
-    const todayExpense = this.pick(todayAgg, 'EXPENSE');
+    // TRACK still counts as spending for today/month totals; wallets ignore it.
+    const todayExpense =
+      this.pick(todayAgg, 'EXPENSE') + this.pick(todayAgg, 'TRACK');
 
     let youOwe = 0;
     let youAreOwed = 0;
@@ -280,13 +282,31 @@ export class AnalyticsService {
       }
     }
 
+    const monthKey = cash.current.month;
+    const [year, month] = monthKey.split('-').map(Number);
+    const monthStart = dateOnlyUtc(`${monthKey}-01`);
+    const monthEnd = dateOnlyUtc(
+      `${monthKey}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`,
+    );
+    const trackMonth = await this.prisma.transaction.aggregate({
+      where: {
+        householdId,
+        type: 'TRACK',
+        occurredOn: { gte: monthStart, lte: monthEnd },
+        category: { name: { not: 'Wallet transfer' } },
+      },
+      _sum: { amount: true },
+    });
+    const trackMonthSpend = Number(trackMonth._sum.amount ?? 0);
+
     return {
       totalMoney,
       cashNow: cash.cashNow,
       broughtForward: cash.current.broughtForward,
       savedThisMonth: cash.current.saved,
       monthIncome: cash.current.income,
-      monthExpense: cash.current.expense,
+      // Include TRACK so "month out" reflects all personal spending, not only wallet debits.
+      monthExpense: cash.current.expense + trackMonthSpend,
       todayIncome: this.pick(todayAgg, 'INCOME'),
       todayExpense,
       youOwe,
@@ -310,7 +330,7 @@ export class AnalyticsService {
       WHERE "householdId" = ${householdId}
         AND "occurredOn" >= ${dateOnlyUtc(from)}
         AND "occurredOn" <= ${dateOnlyUtc(to)}
-        AND type IN ('INCOME', 'EXPENSE')
+        AND type IN ('INCOME', 'EXPENSE', 'TRACK')
       GROUP BY "occurredOn", type
       ORDER BY "occurredOn" ASC
     `;
@@ -322,7 +342,7 @@ export class AnalyticsService {
       const key = isoFromDbDate(row.day);
       const cur = map.get(key) ?? { day: key, income: 0, expense: 0 };
       if (row.type === 'INCOME') cur.income = Number(row.total);
-      else cur.expense = Number(row.total);
+      else cur.expense += Number(row.total); // EXPENSE + TRACK
       map.set(key, cur);
     }
     if (membership.kind === 'HOUSE') {
@@ -504,10 +524,15 @@ export class AnalyticsService {
     const income = txs
       .filter((t) => t.type === 'INCOME')
       .reduce((s, t) => s + Number(t.amount), 0);
-    // TRACK is log-only: show in the day list, but do not count as cash out.
+    // TRACK does not change wallets, but still counts as spending for the day.
     const expense =
       txs
-        .filter((t) => t.type === 'EXPENSE' || t.type === 'REIMBURSEMENT')
+        .filter(
+          (t) =>
+            t.type === 'EXPENSE' ||
+            t.type === 'REIMBURSEMENT' ||
+            t.type === 'TRACK',
+        )
         .reduce((s, t) => s + Number(t.amount), 0) +
       claims.reduce((s, c) => s + Number(c.amount), 0) +
       gifts.reduce(
