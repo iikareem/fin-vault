@@ -49,7 +49,12 @@ type CharityTypeRow = {
   monthlyGoal: number;
 };
 type CharityMonth = { familyTotal: number; types: CharityTypeRow[] };
-type GoldHome = { totalValue: number; totalGrams: number };
+type GoldHome = {
+  totalValue: number;
+  totalGrams: number;
+  totalGainLoss: number | null;
+  totalGainLossPct: number | null;
+};
 type Tx = {
   id: string;
   type: "INCOME" | "EXPENSE" | "REIMBURSEMENT" | "TRACK";
@@ -1407,6 +1412,28 @@ export default function HomePage() {
               )}
             </span>
           </div>
+          {gold?.totalGainLoss != null ? (
+            <p
+              className={`mt-1 text-sm font-semibold ${
+                gold.totalGainLoss >= 0 ? "text-emerald-800" : "text-red-800"
+              }`}
+            >
+              {t("goldTotalGainLoss")}:{" "}
+              <Money
+                amount={gold.totalGainLoss}
+                currency={currency}
+                locale={locale}
+                extraSign={gold.totalGainLoss >= 0 ? "+" : "−"}
+              />
+              {gold.totalGainLossPct != null ? (
+                <span>
+                  {" "}
+                  ({gold.totalGainLossPct >= 0 ? "+" : ""}
+                  {gold.totalGainLossPct}%)
+                </span>
+              ) : null}
+            </p>
+          ) : null}
           <Hint>{t("goldHomeHint")}</Hint>
         </Link>
       )}

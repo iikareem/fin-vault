@@ -24,10 +24,13 @@ type Holding = {
   id: string;
   grams: number;
   karat: Karat;
+  paidAmount: number | null;
   note: string;
   acquiredOn: string | null;
   egpPerGram: number | null;
   currentValue: number | null;
+  gainLoss: number | null;
+  gainLossPct: number | null;
 };
 
 type GoldSummary = {
@@ -35,6 +38,9 @@ type GoldSummary = {
   holdings: Holding[];
   totalGrams: number;
   totalValue: number;
+  totalPaid: number | null;
+  totalGainLoss: number | null;
+  totalGainLossPct: number | null;
 };
 
 function karatLabel(
@@ -46,12 +52,19 @@ function karatLabel(
   return t("goldKarat24");
 }
 
+function gainLossClass(value: number) {
+  if (value > 0) return "text-emerald-800";
+  if (value < 0) return "text-red-800";
+  return "text-stone-600";
+}
+
 export default function GoldPage() {
   const { t, locale } = useI18n();
   const { personal, setKind, active } = useBooks();
   const currency = personal?.currency ?? "EGP";
   const [data, setData] = useState<GoldSummary | null>(null);
   const [grams, setGrams] = useState("");
+  const [paidAmount, setPaidAmount] = useState("");
   const [karat, setKarat] = useState<Karat>(21);
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
@@ -76,6 +89,12 @@ export default function GoldPage() {
       setError(t("goldGramsHint"));
       return;
     }
+    const paidRaw = paidAmount.trim();
+    const paid = paidRaw ? parseAmount(paidRaw) : null;
+    if (paidRaw && (paid == null || !(paid > 0))) {
+      setError(t("goldPaidAmountHint"));
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -86,12 +105,14 @@ export default function GoldPage() {
           body: JSON.stringify({
             grams: value,
             karat,
+            paidAmount: paid ?? undefined,
             note: note.trim() || undefined,
           }),
         },
       );
       setData(next);
       setGrams("");
+      setPaidAmount("");
       setNote("");
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
@@ -156,6 +177,37 @@ export default function GoldPage() {
           <p className="mt-2 text-sm opacity-80">
             {data.totalGrams} · {t("goldGrams")}
           </p>
+        ) : null}
+        {data?.totalPaid != null && data.totalGainLoss != null ? (
+          <div className="mt-3 space-y-1 border-t border-white/20 pt-3 text-sm">
+            <p className="flex items-center justify-between gap-2 opacity-90">
+              <span>{t("goldTotalPaid")}</span>
+              <Money
+                amount={data.totalPaid}
+                currency={currency}
+                locale={locale}
+              />
+            </p>
+            <p
+              className={`flex items-center justify-between gap-2 font-semibold ${gainLossClass(data.totalGainLoss)}`}
+            >
+              <span>{t("goldTotalGainLoss")}</span>
+              <span className="inline-flex flex-wrap items-baseline justify-end gap-1">
+                <Money
+                  amount={data.totalGainLoss}
+                  currency={currency}
+                  locale={locale}
+                  extraSign={data.totalGainLoss >= 0 ? "+" : "−"}
+                />
+                {data.totalGainLossPct != null ? (
+                  <span>
+                    ({data.totalGainLossPct >= 0 ? "+" : ""}
+                    {data.totalGainLossPct}%)
+                  </span>
+                ) : null}
+              </span>
+            </p>
+          </div>
         ) : null}
       </section>
 
@@ -231,6 +283,18 @@ export default function GoldPage() {
           <Hint>{t("goldKaratHint")}</Hint>
         </div>
         <label className="block">
+          <span className="mb-1 block font-medium">{t("goldPaidAmount")}</span>
+          <input
+            inputMode="decimal"
+            dir="ltr"
+            value={paidAmount}
+            onChange={(e) => setPaidAmount(e.target.value)}
+            className="amount-input w-full rounded-2xl border border-stone-300 bg-white px-4 py-4 text-2xl"
+            placeholder="50000"
+          />
+          <Hint>{t("goldPaidAmountHint")}</Hint>
+        </label>
+        <label className="block">
           <span className="mb-1 block font-medium">{t("noteOptional")}</span>
           <input
             value={note}
@@ -278,6 +342,51 @@ export default function GoldPage() {
                     )}
                   </span>
                 </div>
+                {h.paidAmount != null ? (
+                  <div className="mt-2 space-y-1 text-sm">
+                    <div className="money-row text-stone-600">
+                      <span>{t("goldPaid")}</span>
+                      <Money
+                        amount={h.paidAmount}
+                        currency={currency}
+                        locale={locale}
+                      />
+                    </div>
+                    {h.currentValue != null ? (
+                      <div className="money-row text-stone-600">
+                        <span>{t("goldCurrent")}</span>
+                        <Money
+                          amount={h.currentValue}
+                          currency={currency}
+                          locale={locale}
+                        />
+                      </div>
+                    ) : null}
+                    {h.gainLoss != null ? (
+                      <p
+                        className={`money-row font-semibold ${gainLossClass(h.gainLoss)}`}
+                      >
+                        <span>
+                          {h.gainLoss >= 0 ? t("goldGain") : t("goldLoss")}
+                        </span>
+                        <span className="inline-flex flex-wrap items-baseline justify-end gap-1">
+                          <Money
+                            amount={h.gainLoss}
+                            currency={currency}
+                            locale={locale}
+                            extraSign={h.gainLoss >= 0 ? "+" : "−"}
+                          />
+                          {h.gainLossPct != null ? (
+                            <span>
+                              ({h.gainLossPct >= 0 ? "+" : ""}
+                              {h.gainLossPct}%)
+                            </span>
+                          ) : null}
+                        </span>
+                      </p>
+                    ) : null}
+                  </div>
+                ) : null}
                 <button
                   type="button"
                   disabled={!!deletingId}
