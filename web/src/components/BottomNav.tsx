@@ -8,7 +8,7 @@ import type { MessageKey } from "@/lib/i18n";
 
 type NavIcon =
   | "home"
-  | "gold"
+  | "charts"
   | "between"
   | "history"
   | "profile"
@@ -26,7 +26,7 @@ const houseSide: SideItem[] = [
 
 const mineSide: SideItem[] = [
   { href: "/", key: "navHome", icon: "home" },
-  { href: "/gold", key: "navGold", icon: "gold" },
+  { href: "/analytics", key: "navCharts", icon: "charts" },
   { href: "/history", key: "navDays", icon: "history" },
   { href: "/profile", key: "navProfile", icon: "profile" },
 ];
@@ -71,11 +71,11 @@ function NavGlyph({
           <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z" />
         </svg>
       );
-    case "gold":
+    case "charts":
       return (
         <svg {...common}>
-          <circle cx="12" cy="12" r="7.5" />
-          <path d="M12 8.5v7M9.5 10.5c.6-1 1.5-1.5 2.5-1.5s1.9.5 2.5 1.5M9.5 13.5c.6 1 1.5 1.5 2.5 1.5s1.9-.5 2.5-1.5" />
+          <path d="M5 19V10.5M12 19V5M19 19v-6.5" />
+          <path d="M4 19h16" />
         </svg>
       );
     case "between":

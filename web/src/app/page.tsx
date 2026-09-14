@@ -1402,10 +1402,11 @@ export default function HomePage() {
             <span className="text-xl font-semibold">🥇 {t("navGold")}</span>
             <span className="font-semibold">
               {gold ? (
-                <Money
+                <PrivateMoney
                   amount={gold.totalValue}
                   currency={currency}
                   locale={locale}
+                  visible={moneyVisible}
                 />
               ) : (
                 ""
@@ -1415,17 +1416,22 @@ export default function HomePage() {
           {gold?.totalGainLoss != null ? (
             <p
               className={`mt-1 text-sm font-semibold ${
-                gold.totalGainLoss >= 0 ? "text-emerald-800" : "text-red-800"
+                moneyVisible
+                  ? gold.totalGainLoss >= 0
+                    ? "text-emerald-800"
+                    : "text-red-800"
+                  : "text-stone-500"
               }`}
             >
               {t("goldTotalGainLoss")}:{" "}
-              <Money
+              <PrivateMoney
                 amount={gold.totalGainLoss}
                 currency={currency}
                 locale={locale}
+                visible={moneyVisible}
                 extraSign={gold.totalGainLoss >= 0 ? "+" : "−"}
               />
-              {gold.totalGainLossPct != null ? (
+              {moneyVisible && gold.totalGainLossPct != null ? (
                 <span>
                   {" "}
                   ({gold.totalGainLossPct >= 0 ? "+" : ""}
@@ -1437,18 +1443,6 @@ export default function HomePage() {
           <Hint>{t("goldHomeHint")}</Hint>
         </Link>
       )}
-
-      {!isHouse ? (
-        <Link
-          href="/analytics"
-          className="surface mt-3 flex items-center justify-between rounded-[1.75rem] px-4 py-3"
-        >
-          <span className="font-semibold text-stone-800">
-            📊 {t("navCharts")}
-          </span>
-          <span className="text-sm font-semibold text-stone-500">→</span>
-        </Link>
-      ) : null}
 
       {isHouse ? (
         <Link
