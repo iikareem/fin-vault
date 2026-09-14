@@ -49,6 +49,7 @@ type CharityTypeRow = {
   monthlyGoal: number;
 };
 type CharityMonth = { familyTotal: number; types: CharityTypeRow[] };
+type GoldHome = { totalValue: number; totalGrams: number };
 type Tx = {
   id: string;
   type: "INCOME" | "EXPENSE" | "REIMBURSEMENT" | "TRACK";
@@ -95,6 +96,7 @@ export default function HomePage() {
   const [personalAccounts, setPersonalAccounts] = useState<Account[]>([]);
   const [txs, setTxs] = useState<Tx[]>([]);
   const [charity, setCharity] = useState<CharityMonth | null>(null);
+  const [gold, setGold] = useState<GoldHome | null>(null);
   const [claims, setClaims] = useState<Claim[]>([]);
   const [covers, setCovers] = useState<Cover[]>([]);
   const [payingId, setPayingId] = useState("");
@@ -154,6 +156,7 @@ export default function HomePage() {
       setCharity(null);
       setClaims([]);
       setCovers([]);
+      jobs.push(api<GoldHome>(householdPath(active.householdId, "/gold")));
     }
     Promise.all(jobs)
       .then((result) => {
@@ -170,6 +173,9 @@ export default function HomePage() {
           setCharity(result[3] as CharityMonth);
           setClaims(sortByOccurredOnDesc(result[4] as Claim[]));
           setCovers(sortByOccurredOnDesc(result[5] as Cover[]));
+          setGold(null);
+        } else {
+          setGold(result[3] as GoldHome);
         }
       })
       .catch((e) => setError(e.message));
@@ -1382,7 +1388,28 @@ export default function HomePage() {
             )}
           </span>
         </Link>
-      ) : null}
+      ) : (
+        <Link
+          href="/gold"
+          className="surface mt-4 flex flex-col rounded-[1.75rem] p-4"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xl font-semibold">🥇 {t("navGold")}</span>
+            <span className="font-semibold">
+              {gold ? (
+                <Money
+                  amount={gold.totalValue}
+                  currency={currency}
+                  locale={locale}
+                />
+              ) : (
+                ""
+              )}
+            </span>
+          </div>
+          <Hint>{t("goldHomeHint")}</Hint>
+        </Link>
+      )}
 
       {isHouse ? (
         <Link

@@ -26,6 +26,7 @@ type BooksValue = {
 const BooksContext = createContext<BooksValue | null>(null);
 
 const HOUSE_ONLY = ["/between", "/family", "/charity", "/more", "/with-house"];
+const PERSONAL_ONLY = ["/gold"];
 
 export function BooksProvider({ children }: { children: ReactNode }) {
   const path = usePathname();
@@ -78,6 +79,9 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       setActiveSpace(next.householdId);
       setActive(next);
       if (kind === "PERSONAL" && HOUSE_ONLY.some((p) => path.startsWith(p))) {
+        router.push("/");
+      }
+      if (kind === "HOUSE" && PERSONAL_ONLY.some((p) => path.startsWith(p))) {
         router.push("/");
       }
     },

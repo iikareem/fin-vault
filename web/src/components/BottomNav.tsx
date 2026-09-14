@@ -18,6 +18,7 @@ const houseItems: { href: string; key: MessageKey; emoji: string }[] = [
 const mineItems: { href: string; key: MessageKey; emoji: string }[] = [
   { href: "/", key: "navHome", emoji: "👛" },
   { href: "/add", key: "navAdd", emoji: "➕" },
+  { href: "/gold", key: "navGold", emoji: "🥇" },
   { href: "/history", key: "navDays", emoji: "📅" },
   { href: "/analytics", key: "navCharts", emoji: "📊" },
   { href: "/profile", key: "navProfile", emoji: "👤" },
