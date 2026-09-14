@@ -85,7 +85,7 @@ button {
   max-width: 32rem;
   padding-inline: max(1rem, env(safe-area-inset-left), env(safe-area-inset-right));
   padding-top: 0.75rem;
-  padding-bottom: calc(6.5rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(7.25rem + env(safe-area-inset-bottom, 0px));
 }
 
 @utility amount {

@@ -6,22 +6,29 @@ import { useI18n } from "./I18nProvider";
 import { useBooks } from "./BooksProvider";
 import type { MessageKey } from "@/lib/i18n";
 
-const houseItems: { href: string; key: MessageKey; emoji: string }[] = [
-  { href: "/", key: "navHome", emoji: "🏠" },
-  { href: "/add", key: "navAdd", emoji: "➕" },
-  { href: "/between", key: "navBetween", emoji: "🤝" },
-  { href: "/history", key: "navDays", emoji: "📅" },
-  { href: "/more", key: "navMore", emoji: "☰" },
-  { href: "/profile", key: "navProfile", emoji: "👤" },
+type NavIcon =
+  | "home"
+  | "gold"
+  | "between"
+  | "history"
+  | "profile"
+  | "more"
+  | "add";
+
+type SideItem = { href: string; key: MessageKey; icon: NavIcon };
+
+const houseSide: SideItem[] = [
+  { href: "/", key: "navHome", icon: "home" },
+  { href: "/between", key: "navBetween", icon: "between" },
+  { href: "/history", key: "navDays", icon: "history" },
+  { href: "/more", key: "navMore", icon: "more" },
 ];
 
-const mineItems: { href: string; key: MessageKey; emoji: string }[] = [
-  { href: "/", key: "navHome", emoji: "👛" },
-  { href: "/add", key: "navAdd", emoji: "➕" },
-  { href: "/gold", key: "navGold", emoji: "🥇" },
-  { href: "/history", key: "navDays", emoji: "📅" },
-  { href: "/analytics", key: "navCharts", emoji: "📊" },
-  { href: "/profile", key: "navProfile", emoji: "👤" },
+const mineSide: SideItem[] = [
+  { href: "/", key: "navHome", icon: "home" },
+  { href: "/gold", key: "navGold", icon: "gold" },
+  { href: "/history", key: "navDays", icon: "history" },
+  { href: "/profile", key: "navProfile", icon: "profile" },
 ];
 
 function isCurrent(path: string, href: string) {
@@ -37,68 +44,147 @@ function isCurrent(path: string, href: string) {
   return path.startsWith(href);
 }
 
+function NavGlyph({
+  name,
+  className = "",
+}: {
+  name: NavIcon;
+  className?: string;
+}) {
+  const common = {
+    className,
+    width: 22,
+    height: 22,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.85,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true as const,
+  };
+
+  switch (name) {
+    case "home":
+      return (
+        <svg {...common}>
+          <path d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z" />
+        </svg>
+      );
+    case "gold":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="7.5" />
+          <path d="M12 8.5v7M9.5 10.5c.6-1 1.5-1.5 2.5-1.5s1.9.5 2.5 1.5M9.5 13.5c.6 1 1.5 1.5 2.5 1.5s1.9-.5 2.5-1.5" />
+        </svg>
+      );
+    case "between":
+      return (
+        <svg {...common}>
+          <circle cx="8" cy="9" r="3" />
+          <circle cx="16" cy="9" r="3" />
+          <path d="M4.5 18c.8-2.4 2.6-3.5 4.5-3.5.8 0 1.5.2 2.2.6M19.5 18c-.8-2.4-2.6-3.5-4.5-3.5-.8 0-1.5.2-2.2.6" />
+        </svg>
+      );
+    case "history":
+      return (
+        <svg {...common}>
+          <rect x="4.5" y="5" width="15" height="15" rx="2.5" />
+          <path d="M8 3.5v3M16 3.5v3M4.5 10h15" />
+        </svg>
+      );
+    case "profile":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="9" r="3.25" />
+          <path d="M6 19.5c1.2-2.8 3.2-4 6-4s4.8 1.2 6 4" />
+        </svg>
+      );
+    case "more":
+      return (
+        <svg {...common}>
+          <path d="M5 7.5h14M5 12h14M5 16.5h14" />
+        </svg>
+      );
+    case "add":
+      return (
+        <svg {...common} width={26} height={26} strokeWidth={2.2}>
+          <path d="M12 6.5v11M6.5 12h11" />
+        </svg>
+      );
+  }
+}
+
 export function BottomNav() {
   const path = usePathname();
   const { t } = useI18n();
   const { active } = useBooks();
   const personal = active?.kind === "PERSONAL";
-  const items = personal ? mineItems : houseItems;
+  const side = personal ? mineSide : houseSide;
+  const left = side.slice(0, 2);
+  const right = side.slice(2);
+  const addActive = isCurrent(path, "/add");
   const accent = personal
     ? {
         text: "text-sky-900",
         soft: "bg-sky-50",
-        add: "bg-sky-800 text-white shadow-sm",
+        fab: "bg-sky-800 text-white shadow-[0_10px_24px_rgb(7_89_133/0.35)]",
+        fabIdle: "bg-sky-800 text-white shadow-[0_10px_24px_rgb(7_89_133/0.28)]",
       }
     : {
         text: "text-emerald-900",
         soft: "bg-emerald-50",
-        add: "bg-emerald-800 text-white shadow-sm",
+        fab: "bg-emerald-800 text-white shadow-[0_10px_24px_rgb(6_95_70/0.35)]",
+        fabIdle:
+          "bg-emerald-800 text-white shadow-[0_10px_24px_rgb(6_95_70/0.28)]",
       };
 
-  return (
-    <nav
-      className="pointer-events-none fixed inset-x-0 bottom-0 z-20 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-4"
-    >
-      <ul
-        className="pointer-events-auto mx-auto grid max-w-lg grid-cols-6 gap-0.5 rounded-2xl border border-white/70 bg-white/80 px-1.5 py-1.5 shadow-[0_8px_24px_rgb(15_59_42/0.06)] backdrop-blur-xl"
-      >
-        {items.map((item) => {
-          const current = isCurrent(path, item.href);
-          const isAdd = item.href === "/add";
-          const label = t(item.key);
+  function sideLink(item: SideItem) {
+    const current = isCurrent(path, item.href);
+    const label = t(item.key);
+    return (
+      <li key={item.href} className="min-w-0">
+        <Link
+          href={item.href}
+          aria-current={current ? "page" : undefined}
+          aria-label={label}
+          className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-center transition-colors ${
+            current
+              ? `${accent.soft} ${accent.text}`
+              : "text-stone-400 hover:text-stone-600"
+          }`}
+        >
+          <NavGlyph name={item.icon} />
+          {current ? (
+            <span className="max-w-full truncate text-[0.65rem] font-semibold leading-none tracking-tight">
+              {label}
+            </span>
+          ) : null}
+        </Link>
+      </li>
+    );
+  }
 
-          return (
-            <li key={item.href} className="min-w-0">
-              <Link
-                href={item.href}
-                aria-current={current ? "page" : undefined}
-                aria-label={label}
-                className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 text-center transition-colors ${
-                  isAdd
-                    ? current
-                      ? accent.add
-                      : "bg-stone-100 text-stone-700"
-                    : current
-                      ? `${accent.soft} ${accent.text}`
-                      : "text-stone-400 hover:text-stone-600"
-                }`}
-              >
-                <span
-                  className={`leading-none ${isAdd ? "text-lg" : "text-base"}`}
-                  aria-hidden
-                >
-                  {item.emoji}
-                </span>
-                {current && !isAdd ? (
-                  <span className="max-w-full truncate text-[0.65rem] font-semibold leading-none tracking-tight">
-                    {label}
-                  </span>
-                ) : null}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+  return (
+    <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-20 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-4">
+      <div className="pointer-events-auto relative mx-auto max-w-lg">
+        <ul className="grid grid-cols-5 items-end gap-0.5 rounded-2xl border border-white/70 bg-white/80 px-1.5 pb-1.5 pt-1.5 shadow-[0_8px_24px_rgb(15_59_42/0.06)] backdrop-blur-xl">
+          {left.map(sideLink)}
+          <li className="relative flex min-h-12 items-end justify-center pb-0.5">
+            <Link
+              href="/add"
+              aria-current={addActive ? "page" : undefined}
+              aria-label={t("navAdd")}
+              className={`-mt-8 mb-0.5 flex h-14 w-14 shrink-0 items-center justify-center rounded-full transition-transform ${
+                addActive ? accent.fab : accent.fabIdle
+              } ${addActive ? "scale-105 ring-4 ring-white" : "hover:scale-105"}`}
+            >
+              <NavGlyph name="add" />
+            </Link>
+          </li>
+          {right.map(sideLink)}
+        </ul>
+      </div>
     </nav>
   );
 }
