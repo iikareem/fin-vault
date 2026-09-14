@@ -17,6 +17,11 @@ export class CreateGoldHoldingDto {
   karat: 18 | 21 | 24;
 
   @IsOptional()
+  @IsNumber()
+  @Min(0.01)
+  paidAmount?: number;
+
+  @IsOptional()
   @IsString()
   @MaxLength(200)
   note?: string;

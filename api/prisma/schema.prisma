@@ -366,6 +366,7 @@ model GoldHolding {
   user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   grams       Decimal    @db.Decimal(14, 3)
   karat       GoldKarat
+  paidAmount  Decimal?   @db.Decimal(14, 2)
   note        String     @default("")
   acquiredOn  DateTime?  @db.Date
   createdAt   DateTime   @default(now())

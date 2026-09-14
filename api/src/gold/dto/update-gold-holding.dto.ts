@@ -19,6 +19,11 @@ export class UpdateGoldHoldingDto {
   karat?: 18 | 21 | 24;
 
   @IsOptional()
+  @IsNumber()
+  @Min(0.01)
+  paidAmount?: number | null;
+
+  @IsOptional()
   @IsString()
   @MaxLength(200)
   note?: string;

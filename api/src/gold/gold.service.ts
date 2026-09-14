@@ -38,17 +38,32 @@ export class GoldService {
     ]);
 
     let totalValue = 0;
+    let totalPaid = 0;
+    let totalGainLossSum = 0;
     const rows = holdings.map((h) => {
       const karat = ENUM_TO_KARAT[h.karat];
       const grams = Number(h.grams);
+      const paidAmount =
+        h.paidAmount == null ? null : Math.round(Number(h.paidAmount) * 100) / 100;
       const egpPerGram = this.prices.priceFor(quotes, karat);
       const currentValue =
         egpPerGram == null ? null : Math.round(grams * egpPerGram * 100) / 100;
       if (currentValue != null) totalValue += currentValue;
+      if (paidAmount != null) totalPaid += paidAmount;
+      const gainLoss =
+        currentValue != null && paidAmount != null
+          ? Math.round((currentValue - paidAmount) * 100) / 100
+          : null;
+      if (gainLoss != null) totalGainLossSum += gainLoss;
+      const gainLossPct =
+        gainLoss != null && paidAmount != null && paidAmount > 0
+          ? Math.round((gainLoss / paidAmount) * 10000) / 100
+          : null;
       return {
         id: h.id,
         grams,
         karat,
+        paidAmount,
         note: h.note,
         acquiredOn: h.acquiredOn
           ? h.acquiredOn.toISOString().slice(0, 10)
@@ -56,14 +71,30 @@ export class GoldService {
         createdAt: h.createdAt.toISOString(),
         egpPerGram,
         currentValue,
+        gainLoss,
+        gainLossPct,
       };
     });
+
+    const roundedTotalValue = Math.round(totalValue * 100) / 100;
+    const roundedTotalPaid = Math.round(totalPaid * 100) / 100;
+    const totalGainLoss =
+      totalPaid > 0
+        ? Math.round(totalGainLossSum * 100) / 100
+        : null;
+    const totalGainLossPct =
+      totalGainLoss != null && roundedTotalPaid > 0
+        ? Math.round((totalGainLoss / roundedTotalPaid) * 10000) / 100
+        : null;
 
     return {
       quotes,
       holdings: rows,
       totalGrams: rows.reduce((s, r) => s + r.grams, 0),
-      totalValue: Math.round(totalValue * 100) / 100,
+      totalValue: roundedTotalValue,
+      totalPaid: roundedTotalPaid > 0 ? roundedTotalPaid : null,
+      totalGainLoss,
+      totalGainLossPct,
     };
   }
 
@@ -74,6 +105,10 @@ export class GoldService {
         userId,
         grams: new Prisma.Decimal(dto.grams),
         karat: KARAT_TO_ENUM[dto.karat],
+        paidAmount:
+          dto.paidAmount != null
+            ? new Prisma.Decimal(dto.paidAmount)
+            : null,
         note: dto.note?.trim() ?? '',
         acquiredOn: dto.acquiredOn ? new Date(dto.acquiredOn) : null,
       },
@@ -105,6 +140,14 @@ export class GoldService {
           ? { grams: new Prisma.Decimal(dto.grams) }
           : {}),
         ...(dto.karat !== undefined ? { karat: KARAT_TO_ENUM[dto.karat] } : {}),
+        ...(dto.paidAmount !== undefined
+          ? {
+              paidAmount:
+                dto.paidAmount === null
+                  ? null
+                  : new Prisma.Decimal(dto.paidAmount),
+            }
+          : {}),
         ...(dto.note !== undefined ? { note: dto.note.trim() } : {}),
         ...(dto.acquiredOn !== undefined
           ? {
