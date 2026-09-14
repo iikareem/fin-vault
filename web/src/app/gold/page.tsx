@@ -9,6 +9,7 @@ import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
+import { fill } from "@/lib/i18n";
 
 type Karat = 18 | 21 | 24;
 
@@ -52,7 +53,12 @@ function karatLabel(
   return t("goldKarat24");
 }
 
-function gainLossClass(value: number) {
+function gainLossClass(value: number, onDark = false) {
+  if (onDark) {
+    if (value > 0) return "text-emerald-100";
+    if (value < 0) return "text-[#fecaca]";
+    return "text-white/80";
+  }
   if (value > 0) return "text-emerald-800";
   if (value < 0) return "text-red-800";
   return "text-stone-600";
@@ -189,7 +195,7 @@ export default function GoldPage() {
               />
             </p>
             <p
-              className={`flex items-center justify-between gap-2 font-semibold ${gainLossClass(data.totalGainLoss)}`}
+              className={`flex items-center justify-between gap-2 font-semibold ${gainLossClass(data.totalGainLoss, true)}`}
             >
               <span>{t("goldTotalGainLoss")}</span>
               <span className="inline-flex flex-wrap items-baseline justify-end gap-1">
@@ -311,92 +317,138 @@ export default function GoldPage() {
         </button>
       </form>
 
-      <section className="mt-6">
-        <h2 className="text-xl font-semibold">{t("goldHoldings")}</h2>
+      <section className="surface mt-6 overflow-hidden rounded-[1.75rem]">
+        <div className="border-b border-amber-100/80 bg-amber-50/60 px-4 py-3">
+          <div className="flex items-baseline justify-between gap-3">
+            <h2 className="text-xl font-semibold">{t("goldHoldings")}</h2>
+            {data && data.holdings.length > 0 ? (
+              <span className="text-sm font-medium text-stone-500">
+                {data.holdings.length === 1
+                  ? t("goldPieceOne")
+                  : fill(t("goldPieces"), {
+                      n: String(data.holdings.length),
+                    })}
+              </span>
+            ) : null}
+          </div>
+          <Hint>{t("goldHoldingsHint")}</Hint>
+        </div>
+
         {!data ? (
-          <p className="mt-3 text-stone-500">…</p>
+          <p className="px-4 py-5 text-stone-500">…</p>
         ) : data.holdings.length === 0 ? (
-          <p className="mt-3 text-stone-500">{t("goldEmpty")}</p>
+          <p className="px-4 py-5 text-stone-500">{t("goldEmpty")}</p>
         ) : (
-          <ul className="mt-3 space-y-2">
-            {data.holdings.map((h) => (
-              <li key={h.id} className="surface rounded-2xl px-4 py-3">
-                <div className="money-row">
-                  <div className="min-w-0" dir="auto">
-                    <p className="font-semibold">
-                      {h.grams} {t("goldGrams")} · {karatLabel(h.karat, t)}
-                    </p>
-                    {h.note ? (
-                      <p className="text-sm text-stone-500">{h.note}</p>
-                    ) : null}
-                  </div>
-                  <span className="shrink-0 font-semibold">
-                    {h.currentValue != null ? (
-                      <Money
-                        amount={h.currentValue}
-                        currency={currency}
-                        locale={locale}
-                      />
-                    ) : (
-                      "…"
-                    )}
-                  </span>
-                </div>
-                {h.paidAmount != null ? (
-                  <div className="mt-2 space-y-1 text-sm">
-                    <div className="money-row text-stone-600">
-                      <span>{t("goldPaid")}</span>
-                      <Money
-                        amount={h.paidAmount}
-                        currency={currency}
-                        locale={locale}
-                      />
-                    </div>
-                    {h.currentValue != null ? (
-                      <div className="money-row text-stone-600">
-                        <span>{t("goldCurrent")}</span>
-                        <Money
-                          amount={h.currentValue}
-                          currency={currency}
-                          locale={locale}
-                        />
-                      </div>
-                    ) : null}
-                    {h.gainLoss != null ? (
-                      <p
-                        className={`money-row font-semibold ${gainLossClass(h.gainLoss)}`}
-                      >
-                        <span>
-                          {h.gainLoss >= 0 ? t("goldGain") : t("goldLoss")}
+          <ul className="divide-y divide-stone-100">
+            {data.holdings.map((h) => {
+              const gain = h.gainLoss;
+              return (
+                <li key={h.id} className="px-4 py-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0" dir="auto">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-lg font-semibold text-stone-900">
+                          {h.grams}{" "}
+                          <span className="text-base font-medium text-stone-500">
+                            {t("goldGrams")}
+                          </span>
+                        </p>
+                        <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-sm font-semibold text-amber-900">
+                          {karatLabel(h.karat, t)}
                         </span>
-                        <span className="inline-flex flex-wrap items-baseline justify-end gap-1">
+                      </div>
+                      {h.note ? (
+                        <p className="mt-1 text-sm text-stone-500">{h.note}</p>
+                      ) : null}
+                      {h.acquiredOn ? (
+                        <p className="mt-0.5 text-xs text-stone-400">
+                          {h.acquiredOn}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="shrink-0 text-left">
+                      <p className="text-xs text-stone-500">{t("goldCurrent")}</p>
+                      <p className="font-bold text-stone-900">
+                        {h.currentValue != null ? (
                           <Money
-                            amount={h.gainLoss}
+                            amount={h.currentValue}
                             currency={currency}
                             locale={locale}
-                            extraSign={h.gainLoss >= 0 ? "+" : "−"}
                           />
-                          {h.gainLossPct != null ? (
-                            <span>
-                              ({h.gainLossPct >= 0 ? "+" : ""}
-                              {h.gainLossPct}%)
-                            </span>
-                          ) : null}
-                        </span>
+                        ) : (
+                          "…"
+                        )}
                       </p>
-                    ) : null}
+                    </div>
                   </div>
-                ) : null}
-                <button
-                  type="button"
-                  disabled={!!deletingId}
-                  onClick={() => onDelete(h.id)}
-                  className="mt-2 text-sm font-semibold text-red-800 disabled:opacity-60"
-                >
-                  {deletingId === h.id ? t("saving") : t("goldDelete")}
-                </button>
-              </li>
-            ))}
+
+                  {h.paidAmount != null ? (
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <div className="rounded-2xl bg-stone-50 px-3 py-2.5">
+                        <p className="text-xs text-stone-500">{t("goldPaid")}</p>
+                        <p className="mt-0.5 font-semibold text-stone-800">
+                          <Money
+                            amount={h.paidAmount}
+                            currency={currency}
+                            locale={locale}
+                          />
+                        </p>
+                      </div>
+                      <div
+                        className={`rounded-2xl px-3 py-2.5 ${
+                          gain == null
+                            ? "bg-stone-50"
+                            : gain >= 0
+                              ? "bg-emerald-50"
+                              : "bg-[#fef2f2]"
+                        }`}
+                      >
+                        <p className="text-xs text-stone-500">
+                          {gain == null
+                            ? t("goldTotalGainLoss")
+                            : gain >= 0
+                              ? t("goldGain")
+                              : t("goldLoss")}
+                        </p>
+                        {gain != null ? (
+                          <p
+                            className={`mt-0.5 font-semibold ${gainLossClass(gain)}`}
+                          >
+                            <span className="inline-flex flex-wrap items-baseline gap-1">
+                              <Money
+                                amount={gain}
+                                currency={currency}
+                                locale={locale}
+                                extraSign={gain >= 0 ? "+" : "−"}
+                              />
+                              {h.gainLossPct != null ? (
+                                <span className="text-sm">
+                                  ({h.gainLossPct >= 0 ? "+" : ""}
+                                  {h.gainLossPct}%)
+                                </span>
+                              ) : null}
+                            </span>
+                          </p>
+                        ) : (
+                          <p className="mt-0.5 text-stone-400">…</p>
+                        )}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <div className="mt-3 flex justify-end">
+                    <button
+                      type="button"
+                      disabled={!!deletingId}
+                      onClick={() => onDelete(h.id)}
+                      className="rounded-xl px-3 py-1.5 text-sm font-semibold text-red-800 hover:bg-[#fef2f2] disabled:opacity-60"
+                    >
+                      {deletingId === h.id ? t("saving") : t("goldDelete")}
+                    </button>
+                  </div>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
