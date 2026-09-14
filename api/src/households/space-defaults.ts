@@ -54,6 +54,7 @@ export const PERSONAL_EXPENSE: ExpenseDef[] = [
   { name: 'Transport', color: '#0284c7' },
   { name: 'Fuel', color: '#0369a1', group: 'Transport' },
   { name: 'Car maintenance', color: '#0e7490', group: 'Transport' },
+  { name: 'Rides', color: '#38bdf8', group: 'Transport' },
   { name: 'Other transport', color: '#a8a29e', group: 'Transport' },
 
   { name: 'Clothes & shoes', color: '#7c3aed' },

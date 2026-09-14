@@ -41,6 +41,7 @@ const REPARENT: Record<string, string> = {
   Beauty: 'Personal care',
   'Home food': 'Food',
   Fuel: 'Transport',
+  Rides: 'Transport',
   Cleaning: 'Hygiene',
   Pharmacy: 'Health',
   'Phone bills': 'Bills',
