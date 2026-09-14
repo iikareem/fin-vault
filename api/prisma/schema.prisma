@@ -59,6 +59,12 @@ enum CoverStatus {
   SETTLED
 }
 
+enum GoldKarat {
+  K18
+  K21
+  K24
+}
+
 model Household {
   id          String         @id @default(cuid())
   name        String
@@ -75,6 +81,7 @@ model Household {
   charityTypes CharityType[]
   charityGifts CharityGift[]
   payouts      HousePayout[]
+  goldHoldings GoldHolding[]
 }
 
 model User {
@@ -97,6 +104,7 @@ model User {
   charityGifts   CharityGift[]
   payoutsReceived HousePayout[] @relation("PayoutsReceived")
   payoutsRecorded HousePayout[] @relation("PayoutsRecorded")
+  goldHoldings   GoldHolding[]
 }
 
 model Membership {
@@ -348,4 +356,20 @@ model HousePayout {
   createdAt        DateTime    @default(now())
 
   @@index([householdId, occurredOn])
+}
+
+model GoldHolding {
+  id          String     @id @default(cuid())
+  householdId String
+  household   Household  @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grams       Decimal    @db.Decimal(14, 3)
+  karat       GoldKarat
+  note        String     @default("")
+  acquiredOn  DateTime?  @db.Date
+  createdAt   DateTime   @default(now())
+
+  @@index([householdId])
+  @@index([userId])
 }

@@ -14,6 +14,7 @@ import { CharityModule } from './charity/charity.module';
 import { PayoutsModule } from './payouts/payouts.module';
 import { CoversModule } from './covers/covers.module';
 import { HistoryModule } from './history/history.module';
+import { GoldModule } from './gold/gold.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -33,6 +34,7 @@ import { HealthController } from './health.controller';
     PayoutsModule,
     CoversModule,
     HistoryModule,
+    GoldModule,
   ],
   controllers: [HealthController],
 })

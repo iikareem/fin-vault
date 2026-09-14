@@ -3,6 +3,7 @@ import { HouseholdAccessService } from './household-access.service';
 import { HouseholdGuard } from './household.guard';
 import { HouseholdAdminGuard } from './household-admin.guard';
 import { HouseKindGuard } from './house-kind.guard';
+import { PersonalKindGuard } from './personal-kind.guard';
 import { HouseholdsService } from './households.service';
 import { HouseholdsController } from './households.controller';
 
@@ -12,6 +13,7 @@ import { HouseholdsController } from './households.controller';
     HouseholdGuard,
     HouseholdAdminGuard,
     HouseKindGuard,
+    PersonalKindGuard,
     HouseholdsService,
   ],
   controllers: [HouseholdsController],
@@ -20,6 +22,7 @@ import { HouseholdsController } from './households.controller';
     HouseholdGuard,
     HouseholdAdminGuard,
     HouseKindGuard,
+    PersonalKindGuard,
     HouseholdsService,
   ],
 })
