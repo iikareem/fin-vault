@@ -15,7 +15,13 @@ import { Hint } from "@/components/Hint";
 
 type Period = "day" | "month" | "year";
 type DayRow = { day: string; income: number; expense: number };
-type CatRow = { name: string; color: string; type: string; total: number };
+type CatRow = {
+  categoryId?: string;
+  name: string;
+  color: string;
+  type: string;
+  total: number;
+};
 type MemberRow = { name: string; type: string; total: number };
 type SavingsMonth = {
   month: string;
@@ -78,6 +84,7 @@ export default function AnalyticsPage() {
   const [cursor, setCursor] = useState(() => new Date());
   const [days, setDays] = useState<DayRow[]>([]);
   const [cats, setCats] = useState<CatRow[]>([]);
+  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [savingsMonths, setSavingsMonths] = useState<SavingsMonth[]>([]);
   const [savingsOpening, setSavingsOpening] = useState(0);
@@ -105,6 +112,7 @@ export default function AnalyticsPage() {
       .then(([d, c, m, s]) => {
         setDays(d);
         setCats(c.filter((x) => x.type === "EXPENSE"));
+        setSelectedGroups([]);
         setMembers(m);
         setSavingsOpening(s.opening);
         setSavingsMonths(s.months);
@@ -112,6 +120,26 @@ export default function AnalyticsPage() {
       .catch((e) => setError(e.message));
   }, [active?.householdId, from, to]);
 
+  const visibleCats = useMemo(() => {
+    if (selectedGroups.length === 0) return cats;
+    const picked = new Set(selectedGroups);
+    return cats.filter((c) => picked.has(c.categoryId ?? c.name));
+  }, [cats, selectedGroups]);
+
+  const selectedTotal = useMemo(
+    () => visibleCats.reduce((s, c) => s + c.total, 0),
+    [visibleCats],
+  );
+
+  function catKey(c: CatRow) {
+    return c.categoryId ?? c.name;
+  }
+
+  function toggleGroup(key: string) {
+    setSelectedGroups((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
+    );
+  }
   const months = useMemo(() => {
     const map = new Map<string, { key: string; income: number; expense: number }>();
     for (const d of days) {
@@ -131,7 +159,8 @@ export default function AnalyticsPage() {
   const bars =
     period === "year" ? months.map((m) => ({ key: m.key, expense: m.expense, label: monthLabel(m.key, locale) })) : period === "month" ? days.map((d) => ({ key: d.day, expense: d.expense, label: d.day })) : [];
   const maxBar = Math.max(1, ...bars.map((b) => b.expense));
-  const maxCat = Math.max(1, ...cats.map((c) => c.total));
+  const maxCat = Math.max(1, ...visibleCats.map((c) => c.total));
+  const selectionActive = selectedGroups.length > 0;
   const monthKey = `${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}`;
   const yearKey = String(cursor.getFullYear());
   const yearSavings = savingsMonths.filter((m) => m.month.startsWith(yearKey));
@@ -402,40 +431,153 @@ export default function AnalyticsPage() {
       ) : null}
 
       <h2 className="mt-8 text-xl font-semibold">{t("whereMoneyWent")}</h2>
-      <Hint>{t("whereMoneyWentHint")}</Hint>
-      <ul className="mt-3 space-y-3">
-        {cats.length === 0 ? (
-          <li className="text-stone-500">{t("noPeriodData")}</li>
+      <Hint>{t("pickGroupsHint")}</Hint>
+
+      {cats.length > 0 ? (
+        <section className="surface mt-3 rounded-[1.75rem] p-4">
+          <div className="flex items-center justify-between gap-2">
+            <p className="font-semibold">{t("pickGroups")}</p>
+            <div className="flex shrink-0 gap-2">
+              {selectionActive ? (
+                <button
+                  type="button"
+                  onClick={() => setSelectedGroups([])}
+                  className="rounded-full border border-[var(--input-border)] bg-[var(--panel-soft)] px-3 py-1.5 text-sm font-semibold"
+                >
+                  {t("clearSelection")}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => setSelectedGroups(cats.map(catKey))}
+                className="rounded-full border border-[var(--input-border)] bg-[var(--panel-soft)] px-3 py-1.5 text-sm font-semibold"
+              >
+                {t("selectAllGroups")}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {cats.map((c) => {
+              const key = catKey(c);
+              const on = selectedGroups.includes(key);
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => toggleGroup(key)}
+                  aria-pressed={on}
+                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition ${
+                    on
+                      ? "border-transparent text-white shadow-sm"
+                      : "border-[var(--input-border)] bg-[var(--panel-soft)] text-[var(--foreground)]"
+                  }`}
+                  style={on ? { background: c.color } : undefined}
+                >
+                  <span
+                    className="h-2.5 w-2.5 rounded-full"
+                    style={{
+                      background: on ? "rgba(255,255,255,0.9)" : c.color,
+                    }}
+                    aria-hidden
+                  />
+                  {labelFor(c.name, t)}
+                </button>
+              );
+            })}
+          </div>
+
+          {selectionActive ? (
+            <div className="mt-4 rounded-2xl bg-[var(--panel-soft)] px-4 py-3">
+              <p className="text-sm text-[var(--muted)]">
+                {t("nGroupsSelected", { n: String(selectedGroups.length) })}
+              </p>
+              <p className="mt-1 text-sm font-medium">{t("selectedSpend")}</p>
+              <p className="mt-1 text-2xl font-bold text-red-800">
+                {hideAggregates ? (
+                  "••••"
+                ) : (
+                  <Money
+                    amount={selectedTotal}
+                    currency={currency}
+                    locale={locale}
+                  />
+                )}
+              </p>
+              {!hideAggregates && totalOut > 0 ? (
+                <p className="mt-1 text-sm text-[var(--muted)]">
+                  {t("selectedShare", {
+                    pct: String(Math.round((selectedTotal / totalOut) * 100)),
+                  })}
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <p className="mt-3 text-sm text-[var(--muted)]">
+              {t("pickGroupsEmpty")}
+            </p>
+          )}
+        </section>
+      ) : null}
+
+      <ul className="mt-4 space-y-3">
+        {visibleCats.length === 0 ? (
+          <li className="text-[var(--muted)]">{t("noPeriodData")}</li>
         ) : (
-          cats.map((c) => (
-            <li key={c.name}>
-              <div className="flex justify-between">
-                <span>{labelFor(c.name, t)}</span>
-                <span className="font-semibold">
-                  {hideAggregates ? (
-                    "••••"
-                  ) : (
-                    <Money
-                      amount={c.total}
-                      currency={currency}
-                      locale={locale}
+          visibleCats.map((c) => {
+            const key = catKey(c);
+            const on = selectedGroups.includes(key);
+            return (
+              <li key={key}>
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(key)}
+                  className={`w-full rounded-2xl px-1 py-1 text-start transition ${
+                    on ? "bg-[var(--panel-soft)]" : ""
+                  }`}
+                >
+                  <div className="flex justify-between gap-3">
+                    <span className="inline-flex min-w-0 items-center gap-2 font-medium">
+                      <span
+                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-xs ${
+                          on
+                            ? "border-transparent text-white"
+                            : "border-[var(--input-border)] text-transparent"
+                        }`}
+                        style={on ? { background: c.color } : undefined}
+                        aria-hidden
+                      >
+                        ✓
+                      </span>
+                      <span className="truncate">{labelFor(c.name, t)}</span>
+                    </span>
+                    <span className="shrink-0 font-semibold">
+                      {hideAggregates ? (
+                        "••••"
+                      ) : (
+                        <Money
+                          amount={c.total}
+                          currency={currency}
+                          locale={locale}
+                        />
+                      )}
+                    </span>
+                  </div>
+                  <div className="mt-1 h-3 overflow-hidden rounded-full bg-stone-200">
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: hideAggregates
+                          ? "0%"
+                          : `${(c.total / maxCat) * 100}%`,
+                        background: c.color,
+                      }}
                     />
-                  )}
-                </span>
-              </div>
-              <div className="mt-1 h-3 overflow-hidden rounded-full bg-stone-200">
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    width: hideAggregates
-                      ? "0%"
-                      : `${(c.total / maxCat) * 100}%`,
-                    background: c.color,
-                  }}
-                />
-              </div>
-            </li>
-          ))
+                  </div>
+                </button>
+              </li>
+            );
+          })
         )}
       </ul>
 

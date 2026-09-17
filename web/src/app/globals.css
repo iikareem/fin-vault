@@ -183,10 +183,8 @@ html.dark .bg-white\/90 {
   background-color: rgb(23 30 28 / 0.9);
 }
 
-html.dark .bg-stone-50,
-html.dark .bg-stone-100,
-html.dark .bg-stone-100\/90 {
-  background-color: var(--panel-soft);
+html.dark .bg-stone-200 {
+  background-color: #2a3330;
 }
 
 html.dark .bg-stone-700 {

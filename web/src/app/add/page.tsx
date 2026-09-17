@@ -142,10 +142,17 @@ function AddForm() {
     const list =
       mode === "claim" || mode === "cover" ? expenseCats : walletCats;
     const preferred =
-      type === "INCOME" && mode === "wallet" ? "Salary" : "Consumables";
-    const pick = list.find((c) => c.name === preferred) ?? list[0];
+      type === "INCOME" && mode === "wallet"
+        ? "Salary"
+        : personalBooks
+          ? "Dining & cafés"
+          : "Home food";
+    const pick =
+      list.find((c) => c.name === preferred) ??
+      list.find((c) => c.name === "Consumables") ??
+      list[0];
     if (pick) setCategoryId(pick.id);
-  }, [mode, type, expenseCats, walletCats, transferMode]);
+  }, [mode, type, expenseCats, walletCats, transferMode, personalBooks]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
