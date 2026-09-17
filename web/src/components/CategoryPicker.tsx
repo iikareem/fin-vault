@@ -42,7 +42,6 @@ export function CategoryPicker({
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const activeGroupRef = useRef<HTMLButtonElement | null>(null);
-  const searchRef = useRef<HTMLInputElement | null>(null);
 
   const parents = useMemo(
     () => categories.filter((c) => !c.parentId),
@@ -67,6 +66,7 @@ export function CategoryPicker({
   const hasSubs = groupChildren.length > 0;
 
   const q = query.trim().toLowerCase();
+
   const filteredParents = useMemo(() => {
     if (!q) return parents;
     return parents.filter((p) => {
@@ -74,12 +74,39 @@ export function CategoryPicker({
       if (parentLabel.includes(q) || p.name.toLowerCase().includes(q)) {
         return true;
       }
-      const kids = childrenByParent.get(p.id) ?? [];
-      return kids.some((c) => {
+      return (childrenByParent.get(p.id) ?? []).some((c) => {
         const childLabel = labelFor(c.name, t).toLowerCase();
         return childLabel.includes(q) || c.name.toLowerCase().includes(q);
       });
     });
+  }, [parents, childrenByParent, q, t]);
+
+  /** When searching, flatten matching leaf categories for one-tap pick. */
+  const searchHits = useMemo(() => {
+    if (!q) return [] as CategoryItem[];
+    const hits: CategoryItem[] = [];
+    for (const p of parents) {
+      const kids = childrenByParent.get(p.id) ?? [];
+      if (kids.length === 0) {
+        const label = labelFor(p.name, t).toLowerCase();
+        if (label.includes(q) || p.name.toLowerCase().includes(q)) {
+          hits.push(p);
+        }
+        continue;
+      }
+      for (const c of kids) {
+        const childLabel = labelFor(c.name, t).toLowerCase();
+        const parentLabel = labelFor(p.name, t).toLowerCase();
+        if (
+          childLabel.includes(q) ||
+          c.name.toLowerCase().includes(q) ||
+          parentLabel.includes(q)
+        ) {
+          hits.push(c);
+        }
+      }
+    }
+    return hits.slice(0, 12);
   }, [parents, childrenByParent, q, t]);
 
   const filteredChildren = useMemo(() => {
@@ -95,16 +122,9 @@ export function CategoryPicker({
     if (!open) return;
     activeGroupRef.current?.scrollIntoView({
       block: "nearest",
-      inline: "center",
       behavior: "smooth",
     });
   }, [groupId, open]);
-
-  useEffect(() => {
-    if (open && parents.length > 6) {
-      searchRef.current?.focus();
-    }
-  }, [open, parents.length]);
 
   function pickGroup(id: string) {
     const kids = childrenByParent.get(id);
@@ -124,7 +144,7 @@ export function CategoryPicker({
     setOpen(false);
   }
 
-  function pickSub(id: string) {
+  function pickLeaf(id: string) {
     onChange(id);
     setQuery("");
     setOpen(false);
@@ -135,6 +155,8 @@ export function CategoryPicker({
       ? `${labelFor(group?.name ?? "", t)} · ${labelFor(selected.name, t)}`
       : labelFor(selected.name, t)
     : t("catPickGroup");
+
+  const showSearchHits = q.length >= 1 && searchHits.length > 0;
 
   return (
     <div className="space-y-2">
@@ -156,88 +178,147 @@ export function CategoryPicker({
       </button>
 
       {open ? (
-        <div className="space-y-2 rounded-2xl bg-[var(--panel-soft)] p-2.5 ring-1 ring-[var(--input-border)]">
-          {parents.length > 6 ? (
-            <input
-              ref={searchRef}
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t("catSearch")}
-              className="field !rounded-xl !py-2 text-sm"
-              enterKeyHint="search"
-              autoComplete="off"
-            />
-          ) : null}
+        <div className="space-y-2.5 rounded-2xl bg-[var(--panel-soft)] p-2.5 ring-1 ring-[var(--input-border)]">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("catSearch")}
+            className="field !rounded-xl !py-2.5 text-base"
+            enterKeyHint="search"
+            autoComplete="off"
+          />
 
-          {filteredParents.length === 0 ? (
-            <p className="px-2 py-2 text-sm text-[var(--muted)]">
-              {t("catNoMatch")}
-            </p>
-          ) : (
-            <div
-              className="chip-rail -mx-0.5 px-0.5"
-              role="listbox"
-              aria-label={groupLabel ?? t("forWhat")}
-            >
-              {filteredParents.map((p) => {
-                const active = groupId === p.id;
-                return (
-                  <button
-                    key={p.id}
-                    ref={active ? activeGroupRef : undefined}
-                    type="button"
-                    role="option"
-                    aria-selected={active}
-                    onClick={() => pickGroup(p.id)}
-                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold ${
-                      active
-                        ? "bg-[var(--cta-bg)] text-[var(--cta-fg)]"
-                        : "bg-[var(--surface-bg)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
-                    }`}
-                  >
-                    <ColorDot color={p.color} active={active} />
-                    {labelFor(p.name, t)}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-
-          {hasSubs ? (
-            <div
-              className="max-h-36 overflow-y-auto overscroll-contain rounded-xl bg-[var(--surface-bg)] p-1.5"
-              role="listbox"
-              aria-label={t("pickSubCategory")}
-            >
-              <div className="flex flex-wrap gap-1.5">
-                {filteredChildren.map((c) => {
-                  const active = selected?.parentId ? value === c.id : false;
+          {showSearchHits ? (
+            <div className="space-y-1.5">
+              <p className="px-0.5 text-xs font-semibold text-[var(--muted)]">
+                {t("catQuickResults")}
+              </p>
+              <div className="grid grid-cols-1 gap-1.5">
+                {searchHits.map((c) => {
+                  const parent = c.parentId
+                    ? parents.find((p) => p.id === c.parentId)
+                    : null;
+                  const active = value === c.id;
+                  const title = parent
+                    ? `${labelFor(parent.name, t)} · ${labelFor(c.name, t)}`
+                    : labelFor(c.name, t);
                   return (
                     <button
                       key={c.id}
                       type="button"
-                      role="option"
-                      aria-selected={active}
-                      onClick={() => pickSub(c.id)}
-                      className={`inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${
+                      onClick={() => pickLeaf(c.id)}
+                      className={`flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-start ${
                         active
                           ? "bg-[var(--cta-bg)] text-[var(--cta-fg)]"
-                          : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
+                          : "bg-[var(--surface-bg)] text-[var(--foreground)]"
                       }`}
                     >
                       <ColorDot
-                        color={c.color || group?.color}
+                        color={c.color || parent?.color}
                         active={active}
                       />
-                      {labelFor(c.name, t)}
+                      <span className="min-w-0 flex-1 truncate font-semibold">
+                        {title}
+                      </span>
                       {active ? <span aria-hidden>✓</span> : null}
                     </button>
                   );
                 })}
               </div>
             </div>
-          ) : null}
+          ) : (
+            <>
+              <div>
+                <p className="mb-1.5 px-0.5 text-xs font-semibold text-[var(--muted)]">
+                  {t("catPickGroup")}
+                </p>
+                {filteredParents.length === 0 ? (
+                  <p className="rounded-xl bg-[var(--surface-bg)] px-3 py-3 text-sm text-[var(--muted)]">
+                    {t("catNoMatch")}
+                  </p>
+                ) : (
+                  <div
+                    className="grid max-h-48 grid-cols-3 gap-1.5 overflow-y-auto overscroll-contain sm:grid-cols-4"
+                    role="listbox"
+                    aria-label={groupLabel ?? t("forWhat")}
+                  >
+                    {filteredParents.map((p) => {
+                      const active = groupId === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          ref={active ? activeGroupRef : undefined}
+                          type="button"
+                          role="option"
+                          aria-selected={active}
+                          onClick={() => pickGroup(p.id)}
+                          className={`flex min-h-[3.25rem] flex-col items-center justify-center gap-1 rounded-xl px-1.5 py-2 text-center ${
+                            active
+                              ? "bg-[var(--cta-bg)] text-[var(--cta-fg)] shadow-sm"
+                              : "bg-[var(--surface-bg)] text-[var(--foreground)]"
+                          }`}
+                        >
+                          <ColorDot color={p.color} active={active} />
+                          <span className="line-clamp-2 text-[0.7rem] font-bold leading-tight">
+                            {labelFor(p.name, t)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {hasSubs ? (
+                <div>
+                  <p className="mb-1.5 px-0.5 text-xs font-semibold text-[var(--muted)]">
+                    {t("pickSubCategory")}
+                    {group ? (
+                      <span className="font-medium">
+                        {" "}
+                        · {labelFor(group.name, t)}
+                      </span>
+                    ) : null}
+                  </p>
+                  <div
+                    className="grid max-h-40 grid-cols-2 gap-1.5 overflow-y-auto overscroll-contain"
+                    role="listbox"
+                    aria-label={t("pickSubCategory")}
+                  >
+                    {filteredChildren.map((c) => {
+                      const active = selected?.parentId
+                        ? value === c.id
+                        : false;
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          role="option"
+                          aria-selected={active}
+                          onClick={() => pickLeaf(c.id)}
+                          className={`flex min-h-11 items-center gap-2 rounded-xl px-2.5 py-2 text-start ${
+                            active
+                              ? "bg-[var(--cta-bg)] text-[var(--cta-fg)]"
+                              : "bg-[var(--surface-bg)] text-[var(--foreground)]"
+                          }`}
+                        >
+                          <ColorDot
+                            color={c.color || group?.color}
+                            active={active}
+                          />
+                          <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                            {labelFor(c.name, t)}
+                          </span>
+                          {active ? <span aria-hidden>✓</span> : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
       ) : null}
     </div>

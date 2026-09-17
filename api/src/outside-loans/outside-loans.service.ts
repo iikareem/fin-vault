@@ -8,8 +8,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateOutsideLoanDto } from './dto/create-outside-loan.dto';
 import { CollectOutsideLoanDto } from './dto/collect-outside-loan.dto';
 
-const LEND_CAT = { name: 'Outside loan', color: '#b91c1c' };
-const COLLECT_CAT = { name: 'Loan collected', color: '#15803d' };
+const CATS = {
+  lend: { name: 'Outside loan', kind: 'EXPENSE' as const, color: '#b91c1c' },
+  collect: { name: 'Loan collected', kind: 'INCOME' as const, color: '#15803d' },
+  borrow: { name: 'Loan received', kind: 'INCOME' as const, color: '#0369a1' },
+  repay: { name: 'Loan repaid', kind: 'EXPENSE' as const, color: '#c2410c' },
+};
 
 @Injectable()
 export class OutsideLoansService {
@@ -28,13 +32,19 @@ export class OutsideLoansService {
     householdId: string;
     userId: string;
     personName: string;
+    direction: 'LEND' | 'BORROW';
     originalAmount: Prisma.Decimal;
     note: string;
     occurredOn: Date;
     status: string;
     accountId: string;
     createdAt: Date;
-    collections: { amount: Prisma.Decimal; occurredOn: Date; note: string; id: string }[];
+    collections: {
+      amount: Prisma.Decimal;
+      occurredOn: Date;
+      note: string;
+      id: string;
+    }[];
     account?: { id: string; name: string };
   }) {
     const remaining = this.remaining(loan.originalAmount, loan.collections);
@@ -43,6 +53,7 @@ export class OutsideLoansService {
       householdId: loan.householdId,
       userId: loan.userId,
       personName: loan.personName,
+      direction: loan.direction,
       note: loan.note,
       occurredOn: loan.occurredOn,
       status: remaining <= 0.001 ? 'SETTLED' : loan.status,
@@ -51,6 +62,7 @@ export class OutsideLoansService {
       createdAt: loan.createdAt,
       originalAmount: Number(loan.originalAmount),
       remaining: Math.max(0, remaining),
+      settledAmount: Number(loan.originalAmount) - Math.max(0, remaining),
       collected: Number(loan.originalAmount) - Math.max(0, remaining),
       collections: loan.collections.map((c) => ({
         id: c.id,
@@ -104,11 +116,16 @@ export class OutsideLoansService {
       orderBy: [{ status: 'asc' }, { occurredOn: 'desc' }],
     });
     const shaped = loans.map((l) => this.shape(l));
+    const open = shaped.filter((l) => l.status !== 'SETTLED');
+    const settled = shaped.filter((l) => l.status === 'SETTLED');
     return {
-      open: shaped.filter((l) => l.status !== 'SETTLED'),
-      settled: shaped.filter((l) => l.status === 'SETTLED'),
-      owedToYou: shaped
-        .filter((l) => l.status !== 'SETTLED')
+      open,
+      settled,
+      owedToYou: open
+        .filter((l) => l.direction === 'LEND')
+        .reduce((s, l) => s + l.remaining, 0),
+      youOwe: open
+        .filter((l) => l.direction === 'BORROW')
         .reduce((s, l) => s + l.remaining, 0),
     };
   }
@@ -116,28 +133,32 @@ export class OutsideLoansService {
   async create(householdId: string, userId: string, dto: CreateOutsideLoanDto) {
     const personName = dto.personName.trim();
     if (!personName) throw new BadRequestException('Enter a name');
+    const direction = dto.direction === 'BORROW' ? 'BORROW' : 'LEND';
+    const openCat = direction === 'LEND' ? CATS.lend : CATS.borrow;
 
     const loan = await this.prisma.$transaction(async (tx) => {
       const wallet = await this.cashWallet(tx, householdId, dto.accountId);
       const category = await this.ensureCategory(
         tx,
         householdId,
-        LEND_CAT.name,
-        'EXPENSE',
-        LEND_CAT.color,
+        openCat.name,
+        openCat.kind,
+        openCat.color,
       );
-      const lendTx = await tx.transaction.create({
+      const openTx = await tx.transaction.create({
         data: {
           householdId,
           accountId: wallet.id,
           categoryId: category.id,
           userId,
-          type: 'EXPENSE',
+          type: openCat.kind,
           amount: new Prisma.Decimal(dto.amount),
           occurredOn: new Date(dto.occurredOn),
           note: dto.note?.trim()
             ? `${personName} · ${dto.note.trim()}`
-            : `Lent to ${personName}`,
+            : direction === 'LEND'
+              ? `Lent to ${personName}`
+              : `Borrowed from ${personName}`,
         },
       });
       return tx.outsideLoan.create({
@@ -145,11 +166,12 @@ export class OutsideLoansService {
           householdId,
           userId,
           personName,
+          direction,
           originalAmount: new Prisma.Decimal(dto.amount),
           note: dto.note?.trim() ?? '',
           occurredOn: new Date(dto.occurredOn),
           accountId: wallet.id,
-          lendTxId: lendTx.id,
+          lendTxId: openTx.id,
         },
         include: {
           account: { select: { id: true, name: true } },
@@ -183,27 +205,32 @@ export class OutsideLoansService {
       throw new BadRequestException('Amount is more than remaining');
     }
 
+    const settleCat =
+      existing.direction === 'BORROW' ? CATS.repay : CATS.collect;
+
     const loan = await this.prisma.$transaction(async (tx) => {
       const wallet = await this.cashWallet(tx, householdId, dto.accountId);
       const category = await this.ensureCategory(
         tx,
         householdId,
-        COLLECT_CAT.name,
-        'INCOME',
-        COLLECT_CAT.color,
+        settleCat.name,
+        settleCat.kind,
+        settleCat.color,
       );
-      const collectTx = await tx.transaction.create({
+      const settleTx = await tx.transaction.create({
         data: {
           householdId,
           accountId: wallet.id,
           categoryId: category.id,
           userId,
-          type: 'INCOME',
+          type: settleCat.kind,
           amount: new Prisma.Decimal(dto.amount),
           occurredOn: new Date(dto.occurredOn),
           note: dto.note?.trim()
             ? `${existing.personName} · ${dto.note.trim()}`
-            : `Collected from ${existing.personName}`,
+            : existing.direction === 'BORROW'
+              ? `Repaid ${existing.personName}`
+              : `Collected from ${existing.personName}`,
         },
       });
       await tx.outsideLoanCollection.create({
@@ -213,7 +240,7 @@ export class OutsideLoansService {
           occurredOn: new Date(dto.occurredOn),
           note: dto.note?.trim() ?? '',
           accountId: wallet.id,
-          collectTxId: collectTx.id,
+          collectTxId: settleTx.id,
         },
       });
       const nextRemaining = remaining - dto.amount;

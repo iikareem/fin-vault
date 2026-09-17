@@ -1,5 +1,6 @@
 import {
   IsDateString,
+  IsIn,
   IsNumber,
   IsOptional,
   IsString,
@@ -11,6 +12,11 @@ export class CreateOutsideLoanDto {
   @IsString()
   @MaxLength(80)
   personName: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['LEND', 'BORROW'])
+  direction?: 'LEND' | 'BORROW';
 
   @IsNumber()
   @Min(0.01)

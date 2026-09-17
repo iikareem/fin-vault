@@ -42,6 +42,13 @@ enum LoanStatus {
   SETTLED
 }
 
+enum OutsideLoanDirection {
+  /** You gave them money; they owe you. */
+  LEND
+  /** They gave you money; you owe them. */
+  BORROW
+}
+
 enum LoanKind {
   TRACK_ONLY
   CASH
@@ -383,7 +390,7 @@ model GoldHolding {
   @@index([userId])
 }
 
-/** Money lent to someone outside the app (personal books only). */
+/** Money lent to / borrowed from someone outside the app (personal books). */
 model OutsideLoan {
   id             String                  @id @default(cuid())
   householdId    String
@@ -391,6 +398,7 @@ model OutsideLoan {
   userId         String
   user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   personName     String
+  direction      OutsideLoanDirection    @default(LEND)
   originalAmount Decimal                 @db.Decimal(14, 2)
   note           String                  @default("")
   occurredOn     DateTime                @db.Date
@@ -404,6 +412,7 @@ model OutsideLoan {
 
   @@index([householdId, status])
   @@index([userId])
+  @@index([householdId, direction, status])
 }
 
 model OutsideLoanCollection {

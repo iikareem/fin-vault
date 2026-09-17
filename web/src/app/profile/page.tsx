@@ -15,7 +15,7 @@ import type { MessageKey } from "@/lib/i18n";
 const THEME_LABEL: Record<ThemeMode, MessageKey> = {
   light: "themeLight",
   dark: "themeDark",
-  ocean: "themeOcean",
+  blue: "themeBlue",
   sand: "themeSand",
   rose: "themeRose",
 };
@@ -104,30 +104,44 @@ export default function ProfilePage() {
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             {THEME_OPTIONS.map((opt) => {
               const active = theme === opt.id;
+              const [bg, houseColor, mineColor] = opt.swatch;
               return (
                 <button
                   key={opt.id}
                   type="button"
                   disabled={themeBusy}
                   onClick={() => onTheme(opt.id)}
-                  className={`flex min-h-16 flex-col items-start gap-2 rounded-2xl px-3 py-2.5 text-start ${
+                  className={`overflow-hidden rounded-2xl text-start ring-2 ${
                     active
-                      ? "bg-[var(--cta-bg)] text-[var(--cta-fg)] shadow-md"
-                      : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
+                      ? "ring-[var(--cta-bg)]"
+                      : "ring-transparent"
                   }`}
                 >
-                  <span className="flex items-center gap-1.5" aria-hidden>
-                    <span
-                      className="h-5 w-5 rounded-full ring-1 ring-black/10"
-                      style={{ backgroundColor: opt.swatch[0] }}
-                    />
-                    <span
-                      className="h-5 w-5 rounded-full ring-1 ring-black/10"
-                      style={{ backgroundColor: opt.swatch[1] }}
-                    />
-                  </span>
-                  <span className="text-sm font-bold leading-tight">
-                    {t(THEME_LABEL[opt.id])}
+                  <span
+                    className="block h-10 w-full"
+                    style={{ backgroundColor: bg }}
+                    aria-hidden
+                  />
+                  <span
+                    className={`flex items-center justify-between gap-2 px-3 py-2 ${
+                      active
+                        ? "bg-[var(--cta-bg)] text-[var(--cta-fg)]"
+                        : "bg-[var(--surface-bg)] text-[var(--foreground)]"
+                    }`}
+                  >
+                    <span className="text-sm font-bold leading-tight">
+                      {t(THEME_LABEL[opt.id])}
+                    </span>
+                    <span className="flex items-center gap-1" aria-hidden>
+                      <span
+                        className="h-3.5 w-3.5 rounded-full ring-1 ring-black/10"
+                        style={{ backgroundColor: houseColor }}
+                      />
+                      <span
+                        className="h-3.5 w-3.5 rounded-full ring-1 ring-black/10"
+                        style={{ backgroundColor: mineColor }}
+                      />
+                    </span>
                   </span>
                 </button>
               );
