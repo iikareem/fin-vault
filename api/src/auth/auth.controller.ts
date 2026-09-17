@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Post, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Res, UseGuards } from '@nestjs/common';
 import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { CurrentUser } from './current-user.decorator';
 import { AuthUser } from './auth-user';
@@ -51,6 +52,15 @@ export class AuthController {
     @Body() dto: ChangePasswordDto,
   ) {
     return this.auth.changePassword(user.id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('preferences')
+  updatePreferences(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: UpdatePreferencesDto,
+  ) {
+    return this.auth.updatePreferences(user.id, dto);
   }
 
   @UseGuards(JwtAuthGuard)

@@ -10,8 +10,10 @@ import {
   type ReactNode,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { AUTH_REQUIRED } from "@/lib/api";
+import { AUTH_REQUIRED, api } from "@/lib/api";
 import { loadSpace, setActiveSpace, type Space } from "@/lib/space";
+
+export type ThemeMode = "light" | "dark";
 
 type BooksValue = {
   userId: string;
@@ -20,13 +22,25 @@ type BooksValue = {
   personal: Space | null;
   active: Space | null;
   loading: boolean;
+  preferredCurrency: string;
+  theme: ThemeMode;
   setKind: (kind: "HOUSE" | "PERSONAL") => void;
+  refreshSpaces: () => Promise<void>;
+  setPreferences: (prefs: {
+    preferredCurrency?: string;
+    theme?: ThemeMode;
+  }) => Promise<void>;
 };
 
 const BooksContext = createContext<BooksValue | null>(null);
 
 const HOUSE_ONLY = ["/between", "/family", "/charity", "/more", "/with-house"];
-const PERSONAL_ONLY = ["/gold"];
+const PERSONAL_ONLY = ["/gold", "/outside-loans"];
+
+function applyTheme(theme: ThemeMode) {
+  if (typeof document === "undefined") return;
+  document.documentElement.classList.toggle("dark", theme === "dark");
+}
 
 export function BooksProvider({ children }: { children: ReactNode }) {
   const path = usePathname();
@@ -38,28 +52,53 @@ export function BooksProvider({ children }: { children: ReactNode }) {
   const [personal, setPersonal] = useState<Space | null>(null);
   const [active, setActive] = useState<Space | null>(null);
   const [loading, setLoading] = useState(true);
+  const [preferredCurrency, setPreferredCurrency] = useState("EGP");
+  const [theme, setTheme] = useState<ThemeMode>("light");
+
+  const applyMe = useCallback(
+    (me: {
+      id: string;
+      name: string;
+      preferredCurrency?: string;
+      theme?: string;
+      spaces: Space[];
+      space: Space | null;
+    }) => {
+      setUserId(me.id);
+      setName(me.name);
+      const h = me.spaces.find((s) => s.kind === "HOUSE") ?? null;
+      const p = me.spaces.find((s) => s.kind === "PERSONAL") ?? null;
+      setHouse(h);
+      setPersonal(p);
+      setActive(me.space ?? h ?? p);
+      const nextTheme: ThemeMode = me.theme === "dark" ? "dark" : "light";
+      setTheme(nextTheme);
+      applyTheme(nextTheme);
+      setPreferredCurrency(me.preferredCurrency ?? p?.currency ?? "EGP");
+    },
+    [],
+  );
+
+  const refreshSpaces = useCallback(async () => {
+    const me = await loadSpace();
+    applyMe(me);
+  }, [applyMe]);
 
   useEffect(() => {
     if (onLogin) {
       setLoading(false);
+      applyTheme("light");
       return;
     }
     let cancelled = false;
     setLoading(true);
     loadSpace()
-      .then(({ id, name: n, spaces, space }) => {
+      .then((me) => {
         if (cancelled) return;
-        setUserId(id);
-        setName(n);
-        const h = spaces.find((s) => s.kind === "HOUSE") ?? null;
-        const p = spaces.find((s) => s.kind === "PERSONAL") ?? null;
-        setHouse(h);
-        setPersonal(p);
-        setActive(space ?? h ?? p);
+        applyMe(me);
       })
       .catch((err) => {
         if (cancelled) return;
-        // Only leave the app when the session is actually gone.
         if (err instanceof Error && err.message === AUTH_REQUIRED) {
           router.replace("/login");
         }
@@ -70,7 +109,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [onLogin, router]);
+  }, [onLogin, router, applyMe]);
 
   const setKind = useCallback(
     (kind: "HOUSE" | "PERSONAL") => {
@@ -88,9 +127,51 @@ export function BooksProvider({ children }: { children: ReactNode }) {
     [house, personal, path, router],
   );
 
+  const setPreferences = useCallback(
+    async (prefs: { preferredCurrency?: string; theme?: ThemeMode }) => {
+      const res = await api<{ preferredCurrency: string; theme: string }>(
+        "/auth/preferences",
+        {
+          method: "PATCH",
+          body: JSON.stringify(prefs),
+        },
+      );
+      const nextTheme: ThemeMode = res.theme === "dark" ? "dark" : "light";
+      setTheme(nextTheme);
+      applyTheme(nextTheme);
+      setPreferredCurrency(res.preferredCurrency);
+      await refreshSpaces();
+    },
+    [refreshSpaces],
+  );
+
   const value = useMemo(
-    () => ({ userId, name, house, personal, active, loading, setKind }),
-    [userId, name, house, personal, active, loading, setKind],
+    () => ({
+      userId,
+      name,
+      house,
+      personal,
+      active,
+      loading,
+      preferredCurrency,
+      theme,
+      setKind,
+      refreshSpaces,
+      setPreferences,
+    }),
+    [
+      userId,
+      name,
+      house,
+      personal,
+      active,
+      loading,
+      preferredCurrency,
+      theme,
+      setKind,
+      refreshSpaces,
+      setPreferences,
+    ],
   );
 
   return (

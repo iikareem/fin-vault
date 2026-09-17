@@ -79,7 +79,21 @@ export const PERSONAL_EXPENSE: ExpenseDef[] = [
   { name: 'Other care', color: '#a8a29e', group: 'Personal care' },
 
   { name: 'Social occasions', color: '#e11d48' },
+
   { name: 'Charity & sadaqah', color: '#0f766e' },
+  { name: 'Ongoing sadaqah', color: '#15803d', group: 'Charity & sadaqah' },
+  { name: 'Zakat', color: '#b45309', group: 'Charity & sadaqah' },
+  { name: 'Sadaqah', color: '#0f766e', group: 'Charity & sadaqah' },
+  { name: 'Other charity', color: '#a8a29e', group: 'Charity & sadaqah' },
+
+  { name: 'Debts', color: '#b91c1c' },
+  { name: 'Debt repayment', color: '#dc2626', group: 'Debts' },
+  { name: 'Other debts', color: '#a8a29e', group: 'Debts' },
+
+  { name: 'Installments', color: '#9333ea' },
+  { name: 'Apartment installments', color: '#7c3aed', group: 'Installments' },
+  { name: 'Car installments', color: '#6d28d9', group: 'Installments' },
+  { name: 'Other installments', color: '#a8a29e', group: 'Installments' },
 
   { name: 'Government fees', color: '#0891b2' },
   { name: 'Licenses', color: '#65a30d', group: 'Government fees' },
@@ -90,7 +104,14 @@ export const PERSONAL_EXPENSE: ExpenseDef[] = [
   { name: 'Sports', color: '#059669' },
   { name: 'Subscriptions', color: '#4f46e5' },
   { name: 'Rent', color: '#7c3aed' },
+  { name: 'Insurance', color: '#0369a1' },
+  { name: 'Family support', color: '#be185d' },
   { name: 'Education', color: '#2563eb' },
+
+  { name: 'Children', color: '#f59e0b' },
+  { name: 'Pocket money', color: '#fbbf24', group: 'Children' },
+  { name: 'School needs', color: '#d97706', group: 'Children' },
+  { name: 'Other children', color: '#a8a29e', group: 'Children' },
 
   { name: 'Travel & trips', color: '#0d9488' },
   { name: 'Travel tickets', color: '#2dd4bf', group: 'Travel & trips' },
@@ -196,6 +217,10 @@ export async function seedHouseBooks(client: Db, householdId: string) {
     ],
   });
   await client.charityType.createMany({
-    data: [{ householdId, name: 'Mosque', color: '#0f766e' }],
+    data: [
+      { householdId, name: 'Mosque', color: '#0f766e' },
+      { householdId, name: 'Zakat', color: '#b45309' },
+      { householdId, name: 'Help someone', color: '#0369a1' },
+    ],
   });
 }

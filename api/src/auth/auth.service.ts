@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
+import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 import { normalizeLoginEmail, normalizeLoginPassword } from './login-text';
 
 @Injectable()
@@ -29,6 +30,8 @@ export class AuthService {
         id: user.id,
         name: user.name,
         email: user.email,
+        preferredCurrency: user.preferredCurrency,
+        theme: user.theme,
       },
     };
   }
@@ -57,6 +60,46 @@ export class AuthService {
     return { ok: true };
   }
 
+  async updatePreferences(userId: string, dto: UpdatePreferencesDto) {
+    const data: { preferredCurrency?: string; theme?: string } = {};
+    if (dto.preferredCurrency) data.preferredCurrency = dto.preferredCurrency;
+    if (dto.theme) data.theme = dto.theme;
+
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data,
+      include: {
+        memberships: { include: { household: true } },
+      },
+    });
+
+    if (dto.preferredCurrency) {
+      const personal = user.memberships.find(
+        (m) => m.household.kind === 'PERSONAL',
+      );
+      if (personal) {
+        await this.prisma.household.update({
+          where: { id: personal.householdId },
+          data: { currency: dto.preferredCurrency },
+        });
+      }
+      const houseAdmin = user.memberships.find(
+        (m) => m.household.kind === 'HOUSE' && m.role === 'ADMIN',
+      );
+      if (houseAdmin) {
+        await this.prisma.household.update({
+          where: { id: houseAdmin.householdId },
+          data: { currency: dto.preferredCurrency },
+        });
+      }
+    }
+
+    return {
+      preferredCurrency: user.preferredCurrency,
+      theme: user.theme,
+    };
+  }
+
   async me(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -69,6 +112,8 @@ export class AuthService {
       id: user.id,
       name: user.name,
       email: user.email,
+      preferredCurrency: user.preferredCurrency,
+      theme: user.theme,
       spaces: user.memberships.map((m) => ({
         householdId: m.householdId,
         name: m.household.name,

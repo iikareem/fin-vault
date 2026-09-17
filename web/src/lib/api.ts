@@ -65,7 +65,18 @@ function digits(amount: number) {
 }
 
 function currencyLabel(currency: string, locale: "ar" | "en") {
-  if (locale === "ar" && currency === "EGP") return "ج.م.";
+  if (locale === "ar") {
+    if (currency === "EGP") return "ج.م.";
+    if (currency === "SAR") return "ر.س.";
+    if (currency === "USD") return "دولار";
+    if (currency === "LYD") return "د.ل.";
+    if (currency === "AED") return "د.إ.";
+    if (currency === "EUR") return "يورو";
+    if (currency === "GBP") return "جنيه";
+    if (currency === "KWD") return "د.ك.";
+    if (currency === "QAR") return "ر.ق.";
+    if (currency === "BHD") return "د.ب.";
+  }
   return currency;
 }
 

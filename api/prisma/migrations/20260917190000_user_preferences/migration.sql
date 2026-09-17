@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN "preferredCurrency" TEXT NOT NULL DEFAULT 'EGP';
+ALTER TABLE "User" ADD COLUMN "theme" TEXT NOT NULL DEFAULT 'light';

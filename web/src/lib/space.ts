@@ -23,7 +23,13 @@ export function personalSpace(spaces: Space[]) {
 }
 
 export async function loadSpace() {
-  const me = await api<{ id: string; name: string; spaces: Space[] }>("/auth/me");
+  const me = await api<{
+    id: string;
+    name: string;
+    preferredCurrency?: string;
+    theme?: string;
+    spaces: Space[];
+  }>("/auth/me");
   const stored = localStorage.getItem(KEY);
   const house = me.spaces.find((s) => s.kind === "HOUSE");
   const personal = me.spaces.find((s) => s.kind === "PERSONAL");
@@ -35,5 +41,12 @@ export async function loadSpace() {
       : (personal ?? house ?? me.spaces[0])
     : (remembered ?? house ?? personal ?? me.spaces[0]);
   if (space) setActiveSpace(space.householdId);
-  return { id: me.id, name: me.name, spaces: me.spaces, space };
+  return {
+    id: me.id,
+    name: me.name,
+    preferredCurrency: me.preferredCurrency,
+    theme: me.theme,
+    spaces: me.spaces,
+    space,
+  };
 }

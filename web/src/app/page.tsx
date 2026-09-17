@@ -1394,6 +1394,7 @@ export default function HomePage() {
           </span>
         </Link>
       ) : (
+        <>
         <Link
           href="/gold"
           className="surface mt-4 flex flex-col rounded-[1.75rem] p-4"
@@ -1442,6 +1443,16 @@ export default function HomePage() {
           ) : null}
           <Hint>{t("goldHomeHint")}</Hint>
         </Link>
+        <Link
+          href="/outside-loans"
+          className="surface mt-3 flex flex-col rounded-[1.75rem] p-4"
+        >
+          <span className="text-xl font-semibold">
+            🤝 {t("navOutsideLoans")}
+          </span>
+          <Hint>{t("outsideLoansHomeHint")}</Hint>
+        </Link>
+        </>
       )}
 
       {isHouse ? (

@@ -12,15 +12,16 @@ import { dateOnlyUtc, daysInMonth } from '../common/calendar';
 import { CreateCharityGiftDto } from './dto/create-charity-gift.dto';
 import { UpdateCharityGiftDto } from './dto/update-charity-gift.dto';
 
-const MOSQUE = { name: 'Mosque', color: '#0f766e' };
-const EXTRA_DEFAULTS = [
+const DEFAULT_TYPES = [
+  { name: 'Mosque', color: '#0f766e' },
   { name: 'Zakat', color: '#b45309' },
-  { name: 'Orphans', color: '#7c3aed' },
-  { name: 'Sadaqah', color: '#15803d' },
+  { name: 'Help someone', color: '#0369a1' },
 ];
+const TYPE_ORDER = DEFAULT_TYPES.map((t) => t.name);
 const KNOWN_COLORS: Record<string, string> = {
   Mosque: '#0f766e',
   Zakat: '#b45309',
+  'Help someone': '#0369a1',
   Orphans: '#7c3aed',
   Sadaqah: '#15803d',
 };
@@ -42,28 +43,14 @@ export class CharityService {
   }
 
   async ensureDefaults(householdId: string) {
-    await this.prisma.charityType.upsert({
-      where: {
-        householdId_name: { householdId, name: MOSQUE.name },
-      },
-      create: { householdId, name: MOSQUE.name, color: MOSQUE.color },
-      update: { archived: false },
-    });
-
-    for (const type of EXTRA_DEFAULTS) {
-      const existing = await this.prisma.charityType.findUnique({
-        where: { householdId_name: { householdId, name: type.name } },
+    for (const type of DEFAULT_TYPES) {
+      await this.prisma.charityType.upsert({
+        where: {
+          householdId_name: { householdId, name: type.name },
+        },
+        create: { householdId, name: type.name, color: type.color },
+        update: { archived: false, color: type.color },
       });
-      if (!existing || existing.archived) continue;
-      const used = await this.prisma.charityGift.count({
-        where: { typeId: existing.id },
-      });
-      if (used === 0) {
-        await this.prisma.charityType.update({
-          where: { id: existing.id },
-          data: { archived: true },
-        });
-      }
     }
   }
 
@@ -88,8 +75,11 @@ export class CharityService {
       },
     });
     types.sort((a, b) => {
-      if (a.name === 'Mosque') return -1;
-      if (b.name === 'Mosque') return 1;
+      const ai = TYPE_ORDER.indexOf(a.name);
+      const bi = TYPE_ORDER.indexOf(b.name);
+      if (ai !== -1 || bi !== -1) {
+        return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+      }
       return a.name.localeCompare(b.name);
     });
 
