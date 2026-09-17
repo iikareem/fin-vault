@@ -53,39 +53,51 @@ export function CategoryPicker({
 
   return (
     <div className="space-y-3">
-      <label className="block">
-        <span className="mb-1 block font-medium">
-          {groupLabel ?? t("forWhat")}
-        </span>
-        <select
-          className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-lg"
-          value={groupId}
-          onChange={(e) => pickGroup(e.target.value)}
-        >
-          {parents.map((p) => (
-            <option key={p.id} value={p.id}>
-              {labelFor(p.name, t)}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div>
+        <p className="mb-2 font-medium">{groupLabel ?? t("forWhat")}</p>
+        <div className="chip-rail" role="listbox" aria-label={groupLabel ?? t("forWhat")}>
+          {parents.map((p) => {
+            const active = groupId === p.id;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                role="option"
+                aria-selected={active}
+                onClick={() => pickGroup(p.id)}
+                className={`chip shrink-0 ${active ? "chip-active" : ""}`}
+              >
+                {labelFor(p.name, t)}
+              </button>
+            );
+          })}
+        </div>
+      </div>
       {groupChildren.length > 0 ? (
-        <label className="block">
-          <span className="mb-1 block font-medium">
-            {t("pickSubCategory")}
-          </span>
-          <select
-            className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-lg"
-            value={selected?.parentId ? value : ""}
-            onChange={(e) => onChange(e.target.value)}
+        <div>
+          <p className="mb-2 font-medium">{t("pickSubCategory")}</p>
+          <div
+            className="flex flex-wrap gap-2"
+            role="listbox"
+            aria-label={t("pickSubCategory")}
           >
-            {groupChildren.map((c) => (
-              <option key={c.id} value={c.id}>
-                {labelFor(c.name, t)}
-              </option>
-            ))}
-          </select>
-        </label>
+            {groupChildren.map((c) => {
+              const active = selected?.parentId ? value === c.id : false;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  role="option"
+                  aria-selected={active}
+                  onClick={() => onChange(c.id)}
+                  className={`chip ${active ? "chip-active" : ""}`}
+                >
+                  {labelFor(c.name, t)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       ) : null}
       <Hint>{t("forWhatHint")}</Hint>
     </div>

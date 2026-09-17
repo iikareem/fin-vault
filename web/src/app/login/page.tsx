@@ -90,13 +90,13 @@ export default function LoginPage() {
           priority
           className="rounded-2xl shadow-sm"
         />
-        <h1 className="mt-3 text-2xl font-bold tracking-tight sm:text-3xl">{t("appTitle")}</h1>
+        <h1 className="page-title mt-3">{t("appTitle")}</h1>
         <p className="mt-2 text-lg text-stone-600">{t("appSubtitle")}</p>
         <form noValidate onSubmit={onSubmit} className="mt-8 space-y-4">
           <label className="block">
-            <span className="mb-1 block text-sm font-medium">{t("email")}</span>
+            <span className="mb-1.5 block text-sm font-medium">{t("email")}</span>
             <input
-              className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-lg"
+              className="field text-lg"
               type="text"
               name="email"
               inputMode="email"
@@ -111,9 +111,9 @@ export default function LoginPage() {
             <Hint>{t("emailHint")}</Hint>
           </label>
           <label className="block">
-            <span className="mb-1 block text-sm font-medium">{t("password")}</span>
+            <span className="mb-1.5 block text-sm font-medium">{t("password")}</span>
             <input
-              className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-lg"
+              className="field text-lg"
               type="password"
               name="password"
               autoCapitalize="none"
@@ -130,7 +130,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded-2xl bg-emerald-800 px-4 py-4 text-lg font-semibold text-white disabled:opacity-60"
+            className="w-full rounded-2xl bg-emerald-800 px-4 py-4 text-lg font-semibold text-white shadow-md transition hover:opacity-95 disabled:opacity-60"
           >
             {busy ? t("loggingIn") : `🔑 ${t("login")}`}
           </button>

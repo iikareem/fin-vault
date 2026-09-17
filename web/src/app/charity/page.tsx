@@ -181,7 +181,7 @@ export default function CharityPage() {
 
   return (
     <PageShell>
-      <h1 className="text-2xl font-bold leading-tight sm:text-3xl">🕌 {t("charityTitle")}</h1>
+      <h1 className="page-title">🕌 {t("charityTitle")}</h1>
       <p className="mt-2 text-stone-600">{t("charityHint")}</p>
 
       <div className="mt-4 flex items-center justify-between gap-3">

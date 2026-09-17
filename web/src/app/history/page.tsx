@@ -193,20 +193,18 @@ export default function HistoryPage() {
 
   return (
     <PageShell>
-      <h1 className="text-2xl font-bold leading-tight sm:text-3xl">
-        {t("eachDay")}
-      </h1>
+      <h1 className="page-title">{t("eachDay")}</h1>
       <Hint>{t("daysHint")}</Hint>
       <div className="mt-4 flex items-center gap-2">
         <button
           type="button"
           aria-label={t("pickDayHint")}
-          className="min-h-16 rounded-3xl bg-white px-5 text-3xl font-bold shadow-sm"
+          className="icon-btn px-5 text-3xl"
           onClick={() => setDay((d) => shiftDay(d, -1))}
         >
           ‹
         </button>
-        <label className="relative flex min-h-16 min-w-0 flex-1 cursor-pointer flex-col items-center justify-center rounded-3xl border border-stone-300 bg-white px-3 py-2 shadow-sm">
+        <label className="surface relative flex min-h-16 min-w-0 flex-1 cursor-pointer flex-col items-center justify-center rounded-3xl px-3 py-2">
           <time
             dateTime={day}
             className="text-center text-xl font-bold leading-tight text-stone-900 sm:text-2xl"
@@ -227,7 +225,7 @@ export default function HistoryPage() {
         <button
           type="button"
           aria-label={t("pickDayHint")}
-          className="min-h-16 rounded-3xl bg-white px-5 text-3xl font-bold shadow-sm"
+          className="icon-btn px-5 text-3xl"
           onClick={() => setDay((d) => shiftDay(d, 1))}
         >
           ›
@@ -235,12 +233,12 @@ export default function HistoryPage() {
       </div>
       <Hint>{t("pickDayHint")}</Hint>
       {hideAggregates ? (
-        <p className="mt-4 rounded-3xl bg-white px-4 py-3 text-sm text-stone-500 shadow-sm">
+        <p className="surface mt-4 rounded-3xl px-4 py-3 text-sm text-stone-500">
           {t("aggregatesAdminOnly")}
         </p>
       ) : (
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className="rounded-3xl bg-white p-4 shadow-sm">
+          <div className="surface rounded-3xl p-4">
             <p className="text-lg text-stone-500">{t("in")}</p>
             <p className="text-2xl font-bold text-emerald-800">
               <Money
@@ -251,7 +249,7 @@ export default function HistoryPage() {
             </p>
             <Hint>{t("dayInHint")}</Hint>
           </div>
-          <div className="rounded-3xl bg-white p-4 shadow-sm">
+          <div className="surface rounded-3xl p-4">
             <p className="text-lg text-stone-500">{t("out")}</p>
             <p className="text-2xl font-bold text-red-800">
               <Money
@@ -275,7 +273,7 @@ export default function HistoryPage() {
           {log?.txs.map((tx) => {
             const editing = openId === tx.id;
             return (
-              <li key={tx.id} className="rounded-3xl bg-white p-4 shadow-sm">
+              <li key={tx.id} className="surface rounded-3xl p-4">
                 <button
                   type="button"
                   className="w-full text-start"

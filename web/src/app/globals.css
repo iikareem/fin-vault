@@ -31,16 +31,17 @@
   --background: #edf4f0;
   --foreground: #1c1917;
   --chrome-bg: rgb(237 244 240 / 0.92);
-  --surface-bg: rgb(255 255 255 / 0.92);
+  --surface-bg: rgb(255 255 255 / 0.94);
   --surface-border: rgb(255 255 255 / 0.95);
   --surface-shadow: 0 10px 28px rgb(15 59 42 / 0.08);
-  --nav-bg: rgb(255 255 255 / 0.82);
-  --nav-border: rgb(255 255 255 / 0.7);
-  --nav-shadow: 0 8px 24px rgb(15 59 42 / 0.06);
+  --nav-bg: rgb(255 255 255 / 0.86);
+  --nav-border: rgb(255 255 255 / 0.72);
+  --nav-shadow: 0 8px 24px rgb(15 59 42 / 0.07);
   --input-bg: #ffffff;
   --input-border: #d6d3d1;
+  --input-focus: #059669;
   --muted: #78716c;
-  --panel-soft: #fafaf9;
+  --panel-soft: #f7f8f6;
   --soft-emerald: #ecfdf5;
   --soft-sky: #f0f9ff;
   --soft-amber: #fffbeb;
@@ -50,6 +51,8 @@
   --cta-fg: #ffffff;
   --grad-a: rgba(16, 185, 129, 0.18);
   --grad-b: rgba(14, 165, 233, 0.12);
+  --ring: rgb(5 150 105 / 0.35);
+  --press: rgb(15 23 42 / 0.04);
 }
 
 html.dark {
@@ -65,6 +68,7 @@ html.dark {
   --nav-shadow: 0 8px 24px rgb(0 0 0 / 0.4);
   --input-bg: #121916;
   --input-border: #3a433f;
+  --input-focus: #34d399;
   --muted: #a8a29e;
   --panel-soft: #252e2a;
   --soft-emerald: #123028;
@@ -76,6 +80,8 @@ html.dark {
   --cta-fg: #1c1917;
   --grad-a: rgba(16, 185, 129, 0.1);
   --grad-b: rgba(14, 165, 233, 0.07);
+  --ring: rgb(52 211 153 / 0.35);
+  --press: rgb(255 255 255 / 0.05);
 }
 
 html {
@@ -95,6 +101,7 @@ body {
   color: var(--foreground);
   font-family: var(--font-arabic), system-ui, sans-serif;
   -webkit-tap-highlight-color: transparent;
+  text-rendering: optimizeLegibility;
 }
 
 /* Full-viewport wash so scroll/overscroll never shows a light strip. */
@@ -136,6 +143,39 @@ textarea {
   background-color: var(--input-bg);
   border-color: var(--input-border);
   color: var(--foreground);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+button:active:not(:disabled),
+a:active {
+  transform: translateY(0.5px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  button:active:not(:disabled),
+  a:active {
+    transform: none;
+  }
 }
 
 @utility surface {
@@ -152,6 +192,116 @@ textarea {
   background-color: var(--nav-bg);
   border: 1px solid var(--nav-border);
   box-shadow: var(--nav-shadow);
+}
+
+@utility field {
+  width: 100%;
+  border-radius: 1rem;
+  border: 1px solid var(--input-border);
+  background-color: var(--input-bg);
+  padding: 0.85rem 1rem;
+  color: var(--foreground);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.field:focus-visible {
+  border-color: var(--input-focus);
+  box-shadow: 0 0 0 3px var(--ring);
+}
+
+@utility chip {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid var(--input-border);
+  background-color: var(--panel-soft);
+  padding: 0.4rem 0.9rem;
+  font-weight: 600;
+  color: var(--foreground);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 120ms ease;
+}
+
+@utility chip-active {
+  border-color: transparent;
+  background-color: var(--cta-bg);
+  color: var(--cta-fg);
+  box-shadow: 0 6px 16px rgb(15 23 42 / 0.12);
+}
+
+@utility seg {
+  display: grid;
+  gap: 0.25rem;
+  border-radius: 1.25rem;
+  background-color: var(--panel-soft);
+  padding: 0.35rem;
+}
+
+@utility flash {
+  border-radius: 1rem;
+  background-color: var(--soft-emerald);
+  padding: 0.85rem 1rem;
+  font-weight: 600;
+  color: #065f46;
+}
+
+@utility banner-warn {
+  border-radius: 1rem;
+  background-color: var(--soft-amber);
+  padding: 0.85rem 1rem;
+}
+
+@utility banner-info {
+  border-radius: 1rem;
+  background-color: var(--soft-indigo);
+  padding: 0.85rem 1rem;
+}
+
+@utility page-title {
+  font-size: clamp(1.35rem, 4.8vw, 1.85rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+@utility soft-card {
+  border-radius: 1.25rem;
+  background-color: var(--panel-soft);
+  padding: 0.85rem 1rem;
+}
+
+@utility icon-btn {
+  display: inline-flex;
+  min-height: 3rem;
+  min-width: 3rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 1rem;
+  background-color: var(--surface-bg);
+  border: 1px solid var(--surface-border);
+  box-shadow: var(--surface-shadow);
+  font-weight: 700;
+  transition:
+    background-color 160ms ease,
+    transform 120ms ease;
+}
+
+@utility list-row {
+  border-radius: 1rem;
+  background-color: var(--surface-bg);
+  border: 1px solid var(--surface-border);
+  box-shadow: var(--surface-shadow);
+  padding: 0.85rem 1rem;
+  transition:
+    background-color 160ms ease,
+    transform 120ms ease;
 }
 
 /* Dark: remap light-only utility colors used across pages. */
@@ -181,6 +331,11 @@ html.dark .bg-white\/80 {
 }
 html.dark .bg-white\/90 {
   background-color: rgb(23 30 28 / 0.9);
+}
+
+html.dark .bg-stone-50,
+html.dark .bg-stone-100 {
+  background-color: var(--panel-soft);
 }
 
 html.dark .bg-stone-200 {
@@ -231,16 +386,22 @@ html.dark .text-sky-800 {
   color: #7dd3fc;
 }
 html.dark .text-amber-800,
-html.dark .text-amber-900 {
+html.dark .text-amber-900,
+html.dark .text-amber-950 {
   color: #fcd34d;
 }
 html.dark .text-indigo-800,
-html.dark .text-indigo-900 {
+html.dark .text-indigo-900,
+html.dark .text-indigo-950 {
   color: #c7d2fe;
 }
 html.dark .text-red-700,
 html.dark .text-red-800 {
   color: #fca5a5;
+}
+
+html.dark .flash {
+  color: #a7f3d0;
 }
 
 /* Neutral CTAs stay high-contrast on dark pages. */
@@ -253,6 +414,11 @@ html.dark .border-amber-100\/80 {
   border-color: #4a3b1c;
 }
 
+html.dark .shadow-sm,
+html.dark .shadow-lg {
+  box-shadow: var(--surface-shadow);
+}
+
 @utility page-shell {
   margin-inline: auto;
   width: 100%;
@@ -260,6 +426,18 @@ html.dark .border-amber-100\/80 {
   padding-inline: max(1rem, env(safe-area-inset-left), env(safe-area-inset-right));
   padding-top: 0.75rem;
   padding-bottom: calc(7.25rem + env(safe-area-inset-bottom, 0px));
+  animation: page-in 280ms ease-out;
+}
+
+@keyframes page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 @utility amount {
@@ -282,4 +460,18 @@ html.dark .border-amber-100\/80 {
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+}
+
+/* Hide horizontal scrollbar on chip rails, keep scroll. */
+.chip-rail {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.15rem;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.chip-rail::-webkit-scrollbar {
+  display: none;
 }

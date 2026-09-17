@@ -27,21 +27,31 @@ export default function MorePage() {
 
   return (
     <PageShell>
-      <h1 className="text-2xl font-bold leading-tight sm:text-3xl">☰ {t("moreTitle")}</h1>
+      <h1 className="page-title">☰ {t("moreTitle")}</h1>
       <Hint>{t("moreHint")}</Hint>
       <ul className="mt-6 space-y-3">
         {links.map((link) => (
           <li key={link.href}>
             <Link
               href={link.href}
-              className="surface flex min-h-20 flex-col justify-center gap-1 rounded-3xl px-5 py-4"
+              className="surface flex min-h-20 items-center gap-3 rounded-3xl px-5 py-4 transition hover:bg-[var(--panel-soft)]"
             >
-              <span className="flex items-center gap-4 text-2xl font-bold">
-                <span aria-hidden>{link.emoji}</span>
-                <span>{link.label}</span>
+              <span
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--panel-soft)] text-2xl"
+                aria-hidden
+              >
+                {link.emoji}
               </span>
-              <span className="text-base font-normal leading-relaxed text-stone-500">
-                {link.hint}
+              <span className="min-w-0 flex-1 text-right">
+                <span className="block text-xl font-bold leading-tight">
+                  {link.label}
+                </span>
+                <span className="mt-1 block text-sm font-normal leading-relaxed text-stone-500">
+                  {link.hint}
+                </span>
+              </span>
+              <span className="shrink-0 text-lg text-stone-400" aria-hidden>
+                →
               </span>
             </Link>
           </li>

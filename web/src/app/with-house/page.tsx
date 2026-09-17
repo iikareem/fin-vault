@@ -96,7 +96,7 @@ export default function WithHouseHistoryPage() {
 
   return (
     <PageShell>
-      <h1 className="text-2xl font-bold leading-tight sm:text-3xl">
+      <h1 className="page-title">
         🏠 {t("withHouseTitle")}
       </h1>
       <Hint>{t("withHouseHint")}</Hint>

@@ -18,7 +18,7 @@ export function ItemDate({ value, locale, className = "" }: Props) {
   return (
     <time
       dateTime={key}
-      className={`inline-flex items-center rounded-md bg-[var(--panel-soft)] px-2 py-0.5 text-xs font-medium tabular-nums tracking-wide text-[var(--muted)] ${className}`}
+      className={`inline-flex items-center rounded-lg bg-[var(--panel-soft)] px-2 py-0.5 text-xs font-medium tabular-nums tracking-wide text-[var(--muted)] ring-1 ring-[var(--input-border)]/50 ${className}`}
     >
       {label}
     </time>

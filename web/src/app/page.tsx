@@ -406,22 +406,18 @@ export default function HomePage() {
       <p className="mt-1 text-sm leading-relaxed text-stone-500">
         {isHouse ? t("homeHintHouse") : t("homeHintMine")}
       </p>
-      {flash ? (
-        <p className="mt-3 rounded-2xl bg-emerald-50 px-4 py-3 text-emerald-900">
-          {flash}
-        </p>
-      ) : null}
+      {flash ? <p className="flash mt-3">{flash}</p> : null}
       {error ? <p className="mt-2 text-red-700">{error}</p> : null}
 
       <section
-        className={`mt-3 rounded-[1.75rem] p-5 shadow-lg ${
-          canToggleMoney ? "cursor-pointer select-none" : ""
+        className={`mt-3 rounded-[1.75rem] p-5 shadow-lg transition-transform duration-200 ${
+          canToggleMoney ? "cursor-pointer select-none active:scale-[0.99]" : ""
         }`}
         style={{
           color: "#fff",
           background: isHouse
-            ? "linear-gradient(to bottom right, #047857, #022c22)"
-            : "linear-gradient(to bottom right, #0369a1, #082f49)",
+            ? "linear-gradient(145deg, #059669 0%, #047857 42%, #022c22 100%)"
+            : "linear-gradient(145deg, #0ea5e9 0%, #0369a1 42%, #082f49 100%)",
         }}
         onClick={
           canToggleMoney
@@ -651,7 +647,7 @@ export default function HomePage() {
       {isHouse && summary && !quietAdminHome ? (
         <div className="mt-4 space-y-2">
           {summary.claimsWaiting > 0.001 ? (
-            <div className="rounded-2xl bg-amber-50 px-4 py-3">
+            <div className="banner-warn">
               <p className="font-semibold text-amber-950">
                 🏠{" "}
                 {t("houseOwesYou", {
@@ -662,7 +658,7 @@ export default function HomePage() {
             </div>
           ) : null}
           {(summary.coversWaiting ?? 0) > 0.001 ? (
-            <div className="rounded-2xl bg-indigo-50 px-4 py-3">
+            <div className="banner-info">
               <p className="font-semibold text-indigo-950">
                 🏠{" "}
                 {t("youOweHouse", {
@@ -1468,13 +1464,13 @@ export default function HomePage() {
         <div className="mt-5 grid grid-cols-1 gap-2">
           <Link
             href="/add"
-            className="flex min-h-16 items-center justify-center rounded-3xl bg-stone-900 text-lg font-semibold text-white"
+            className="flex min-h-16 items-center justify-center rounded-3xl bg-stone-900 text-lg font-semibold text-white shadow-md transition hover:opacity-95"
           >
             🧾 {t("addHousePayment")}
           </Link>
           <Link
             href="/add?mode=cover"
-            className="flex min-h-14 items-center justify-center rounded-3xl bg-indigo-800 text-lg font-semibold text-white"
+            className="flex min-h-14 items-center justify-center rounded-3xl bg-indigo-800 text-lg font-semibold text-white shadow-md transition hover:opacity-95"
           >
             🏠 {t("housePaidForTitle")}
           </Link>
@@ -1483,7 +1479,7 @@ export default function HomePage() {
         <>
           <Link
             href="/add"
-            className="mt-5 flex min-h-16 items-center justify-center rounded-3xl bg-stone-900 text-lg font-semibold text-white"
+            className="mt-5 flex min-h-16 items-center justify-center rounded-3xl bg-stone-900 text-lg font-semibold text-white shadow-md transition hover:opacity-95"
           >
             ➕ {t("addFromMyMoney")}
           </Link>
@@ -1493,14 +1489,14 @@ export default function HomePage() {
         <>
         <Link
           href="/add"
-          className="mt-5 flex min-h-16 items-center justify-center rounded-3xl bg-stone-900 text-lg font-semibold text-white"
+          className="mt-5 flex min-h-16 items-center justify-center rounded-3xl bg-stone-900 text-lg font-semibold text-white shadow-md transition hover:opacity-95"
         >
           ➕ {t("addPersonal")}
         </Link>
         <Hint>{t("addPersonalHint")}</Hint>
         <Link
           href="/add?mode=transfer"
-          className="mt-2 flex min-h-14 items-center justify-center rounded-3xl bg-stone-700 text-lg font-semibold text-white"
+          className="mt-2 flex min-h-14 items-center justify-center rounded-3xl bg-stone-700 text-lg font-semibold text-white shadow-md transition hover:opacity-95"
         >
           🔁 {t("transferWallets")}
         </Link>
@@ -1513,10 +1509,7 @@ export default function HomePage() {
           <Hint>{t("latestHint")}</Hint>
           <ul className="mt-3 space-y-2">
             {txs.map((tx) => (
-              <li
-                key={tx.id}
-                className="surface rounded-2xl px-4 py-3 text-[var(--foreground)]"
-              >
+              <li key={tx.id} className="list-row text-[var(--foreground)]">
                 <div className="money-row min-w-0">
                   <div className="min-w-0 text-right" dir="auto">
                     <span className="font-medium">

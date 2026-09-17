@@ -164,7 +164,7 @@ export default function GoldPage() {
 
   return (
     <PageShell>
-      <h1 className="text-2xl font-bold leading-tight sm:text-3xl">
+      <h1 className="page-title">
         🥇 {t("goldTitle")}
       </h1>
       <Hint>{t("goldHint")}</Hint>

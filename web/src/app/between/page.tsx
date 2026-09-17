@@ -296,7 +296,7 @@ export default function BetweenPage() {
 
   return (
     <PageShell>
-      <h1 className="text-2xl font-bold leading-tight sm:text-3xl">🤝 {t("betweenTitle")}</h1>
+      <h1 className="page-title">🤝 {t("betweenTitle")}</h1>
       <p className="mt-2 text-stone-600">{t("betweenHint")}</p>
       {error ? <p className="mt-3 text-red-700">{error}</p> : null}
 

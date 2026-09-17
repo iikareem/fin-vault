@@ -148,10 +148,10 @@ export function BottomNav() {
           href={item.href}
           aria-current={current ? "page" : undefined}
           aria-label={label}
-          className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-center transition-colors ${
+          className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-center transition-all duration-200 ${
             current
               ? `${accent.soft} ${accent.text}`
-              : "text-stone-400 hover:text-stone-600"
+              : "text-stone-400 hover:bg-[var(--panel-soft)] hover:text-stone-600"
           }`}
         >
           <NavGlyph name={item.icon} />
@@ -159,7 +159,9 @@ export function BottomNav() {
             <span className="max-w-full truncate text-[0.65rem] font-semibold leading-none tracking-tight">
               {label}
             </span>
-          ) : null}
+          ) : (
+            <span className="h-1 w-1 rounded-full bg-transparent" aria-hidden />
+          )}
         </Link>
       </li>
     );
@@ -175,9 +177,9 @@ export function BottomNav() {
               href="/add"
               aria-current={addActive ? "page" : undefined}
               aria-label={t("navAdd")}
-              className={`-mt-8 mb-0.5 flex h-14 w-14 shrink-0 items-center justify-center rounded-full transition-transform ${
+              className={`-mt-8 mb-0.5 flex h-14 w-14 shrink-0 items-center justify-center rounded-full transition-all duration-200 ${
                 addActive ? accent.fab : accent.fabIdle
-              } ${addActive ? "scale-105 ring-4 ring-[var(--background)]" : "hover:scale-105"}`}
+              } ${addActive ? "scale-105 ring-4 ring-[var(--background)]" : "hover:scale-105 active:scale-95"}`}
             >
               <NavGlyph name="add" />
             </Link>

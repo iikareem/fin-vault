@@ -40,13 +40,13 @@ export function ChangePasswordForm() {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-3 rounded-2xl bg-white p-4 shadow-sm">
+    <form onSubmit={submit} className="surface space-y-3 rounded-2xl p-4">
       <p className="text-lg font-semibold">🔐 {t("changePassword")}</p>
       <label className="block">
-        <span className="mb-1 block font-medium">{t("currentPassword")}</span>
+        <span className="mb-1.5 block font-medium">{t("currentPassword")}</span>
         <input
           type="password"
-          className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-lg"
+          className="field text-lg"
           value={currentPassword}
           onChange={(e) => setCurrentPassword(e.target.value)}
           autoComplete="current-password"
@@ -54,10 +54,10 @@ export function ChangePasswordForm() {
         />
       </label>
       <label className="block">
-        <span className="mb-1 block font-medium">{t("newPassword")}</span>
+        <span className="mb-1.5 block font-medium">{t("newPassword")}</span>
         <input
           type="password"
-          className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-lg"
+          className="field text-lg"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
           autoComplete="new-password"
@@ -66,14 +66,14 @@ export function ChangePasswordForm() {
         />
       </label>
       {done ? (
-        <p className="rounded-xl bg-emerald-50 px-3 py-2 text-emerald-800">
+        <p className="flash">
           {t("passwordChanged")} {t("passwordChangedHint")}
         </p>
       ) : null}
       {error ? <p className="text-red-700">{error}</p> : null}
       <button
         disabled={busy}
-        className="w-full rounded-2xl bg-emerald-800 px-4 py-3 text-lg font-semibold text-white disabled:opacity-60"
+        className="w-full rounded-2xl bg-emerald-800 px-4 py-3 text-lg font-semibold text-white shadow-md transition hover:opacity-95 disabled:opacity-60"
       >
         {busy ? t("saving") : t("changePassword")}
       </button>

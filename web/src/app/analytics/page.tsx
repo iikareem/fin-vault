@@ -201,9 +201,9 @@ export default function AnalyticsPage() {
 
   return (
     <PageShell>
-      <h1 className="text-2xl font-bold leading-tight sm:text-3xl">📊 {t("navCharts")}</h1>
+      <h1 className="page-title">📊 {t("navCharts")}</h1>
       <Hint>{t("chartsHint")}</Hint>
-      <div className="mt-4 grid grid-cols-3 gap-2 rounded-3xl bg-[var(--panel-soft)] p-1.5">
+      <div className="seg mt-4 grid-cols-3">
         {(["day", "month", "year"] as Period[]).map((p) => (
           <button
             key={p}
@@ -223,7 +223,7 @@ export default function AnalyticsPage() {
       <div className="mt-4 flex items-center justify-between gap-3">
         <button
           type="button"
-          className="surface rounded-2xl px-4 py-3 text-xl font-bold"
+          className="icon-btn px-4 text-xl"
           onClick={() => setCursor((c) => shift(period, c, -1))}
         >
           ‹
@@ -236,7 +236,7 @@ export default function AnalyticsPage() {
               onChange={(e) => {
                 if (e.target.value) setCursor(new Date(`${e.target.value}T12:00:00`));
               }}
-              className="w-full rounded-2xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-center text-lg font-semibold"
+              className="field text-center text-lg font-semibold"
             />
           ) : period === "month" ? (
             <input
@@ -245,7 +245,7 @@ export default function AnalyticsPage() {
               onChange={(e) => {
                 if (e.target.value) setCursor(new Date(`${e.target.value}-01T12:00:00`));
               }}
-              className="w-full rounded-2xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-center text-lg font-semibold"
+              className="field text-center text-lg font-semibold"
             />
           ) : (
             <input
@@ -257,13 +257,13 @@ export default function AnalyticsPage() {
                 const y = Number(e.target.value);
                 if (y) setCursor(new Date(y, 0, 1));
               }}
-              className="w-full rounded-2xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-center text-lg font-semibold"
+              className="field text-center text-lg font-semibold"
             />
           )}
         </div>
         <button
           type="button"
-          className="surface rounded-2xl px-4 py-3 text-xl font-bold"
+          className="icon-btn px-4 text-xl"
           onClick={() => setCursor((c) => shift(period, c, 1))}
         >
           ›
@@ -272,13 +272,13 @@ export default function AnalyticsPage() {
       <Hint>{t("pickPeriodHint")}</Hint>
       {error ? <p className="mt-3 text-red-700">{error}</p> : null}
       {hideAggregates ? (
-        <p className="mt-4 rounded-3xl bg-white px-4 py-3 text-sm text-stone-500 shadow-sm">
+        <p className="surface mt-4 rounded-3xl px-4 py-3 text-sm text-stone-500">
           {t("aggregatesAdminOnly")}
         </p>
       ) : null}
 
       {period === "month" && !hideAggregates ? (
-        <section className="mt-5 rounded-3xl bg-white p-4 shadow-sm">
+        <section className="surface mt-5 rounded-3xl p-4">
           <h2 className="text-xl font-semibold">{t("savingsTitle")}</h2>
           <Hint>{t("chartsSavingsHint")}</Hint>
           <div className="mt-3 grid grid-cols-1 gap-2 text-base">
@@ -339,7 +339,7 @@ export default function AnalyticsPage() {
                 <button
                   key={row.month}
                   type="button"
-                  className="w-full rounded-2xl bg-white px-4 py-3 text-start shadow-sm"
+                  className="list-row w-full text-start"
                   onClick={() => {
                     const [y, m] = row.month.split("-").map(Number);
                     setCursor(new Date(y, m - 1, 1));
@@ -751,7 +751,7 @@ export default function AnalyticsPage() {
             {members.map((m) => (
               <li
                 key={`${m.name}-${m.type}`}
-                className="flex justify-between rounded-2xl bg-white px-4 py-3 shadow-sm"
+                className="list-row flex justify-between"
               >
                 <span>
                   {labelFor(m.name, t)} ·{" "}

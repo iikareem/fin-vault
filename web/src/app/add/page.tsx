@@ -285,7 +285,7 @@ function AddForm() {
 
   return (
     <PageShell>
-      <h1 className="text-2xl font-bold leading-tight sm:text-3xl">➕ {t("navAdd")}</h1>
+      <h1 className="page-title">➕ {t("navAdd")}</h1>
       <Hint>{t("addPageHint")}</Hint>
       {houseAdmin ? (
         <div className="mt-4 grid grid-cols-2 gap-2">
@@ -296,10 +296,10 @@ function AddForm() {
               setType("EXPENSE");
               setTrackOnly(false);
             }}
-            className={`min-h-16 rounded-3xl px-2 text-lg font-semibold ${
+            className={`min-h-16 rounded-3xl px-2 text-lg font-semibold transition ${
               !claimMode && !coverMode && type === "EXPENSE"
-                ? "bg-red-800 text-white shadow"
-                : "bg-white text-stone-700"
+                ? "bg-red-800 text-white shadow-md"
+                : "bg-[var(--surface-bg)] text-stone-700 ring-1 ring-[var(--input-border)]"
             }`}
           >
             🧾 {t("paid")}
@@ -311,10 +311,10 @@ function AddForm() {
               setType("INCOME");
               setTrackOnly(false);
             }}
-            className={`min-h-16 rounded-3xl px-2 text-lg font-semibold ${
+            className={`min-h-16 rounded-3xl px-2 text-lg font-semibold transition ${
               !claimMode && !coverMode && type === "INCOME"
-                ? "bg-emerald-800 text-white shadow"
-                : "bg-white text-stone-700"
+                ? "bg-emerald-800 text-white shadow-md"
+                : "bg-[var(--surface-bg)] text-stone-700 ring-1 ring-[var(--input-border)]"
             }`}
           >
             📈 {t("moneyIn")}
@@ -326,10 +326,10 @@ function AddForm() {
               setType("GIVE");
               setTrackOnly(false);
             }}
-            className={`min-h-16 rounded-3xl px-2 text-lg font-semibold ${
+            className={`min-h-16 rounded-3xl px-2 text-lg font-semibold transition ${
               !claimMode && !coverMode && type === "GIVE"
-                ? "bg-teal-800 text-white shadow"
-                : "bg-white text-stone-700"
+                ? "bg-teal-800 text-white shadow-md"
+                : "bg-[var(--surface-bg)] text-stone-700 ring-1 ring-[var(--input-border)]"
             }`}
           >
             💵 {t("giveFromHouse")}
@@ -340,8 +340,10 @@ function AddForm() {
               setMode("cover");
               setTrackOnly(false);
             }}
-            className={`min-h-16 rounded-3xl px-2 text-lg font-semibold ${
-              coverMode ? "bg-indigo-800 text-white shadow" : "bg-white text-stone-700"
+            className={`min-h-16 rounded-3xl px-2 text-lg font-semibold transition ${
+              coverMode
+                ? "bg-indigo-800 text-white shadow-md"
+                : "bg-[var(--surface-bg)] text-stone-700 ring-1 ring-[var(--input-border)]"
             }`}
           >
             🏠 {t("housePaidForTitle")}
@@ -352,8 +354,10 @@ function AddForm() {
               setMode("claim");
               setTrackOnly(false);
             }}
-            className={`min-h-16 rounded-3xl px-2 text-lg font-semibold ${
-              claimMode ? "bg-amber-800 text-white shadow" : "bg-white text-stone-700"
+            className={`min-h-16 rounded-3xl px-2 text-lg font-semibold transition ${
+              claimMode
+                ? "bg-amber-800 text-white shadow-md"
+                : "bg-[var(--surface-bg)] text-stone-700 ring-1 ring-[var(--input-border)]"
             }`}
           >
             👛 {t("paidFromMyMoneyTitle")}
@@ -367,10 +371,10 @@ function AddForm() {
               setMode("wallet");
               setType("EXPENSE");
             }}
-            className={`min-h-16 rounded-3xl text-lg font-semibold ${
+            className={`min-h-16 rounded-3xl text-lg font-semibold transition ${
               !transferMode && type === "EXPENSE"
-                ? "bg-red-800 text-white shadow"
-                : "bg-white text-stone-700"
+                ? "bg-red-800 text-white shadow-md"
+                : "bg-[var(--surface-bg)] text-stone-700 ring-1 ring-[var(--input-border)]"
             }`}
           >
             🧾 {t("paid")}
@@ -382,10 +386,10 @@ function AddForm() {
               setType("INCOME");
               setTrackOnly(false);
             }}
-            className={`min-h-16 rounded-3xl text-lg font-semibold ${
+            className={`min-h-16 rounded-3xl text-lg font-semibold transition ${
               !transferMode && type === "INCOME"
-                ? "bg-emerald-800 text-white shadow"
-                : "bg-white text-stone-700"
+                ? "bg-emerald-800 text-white shadow-md"
+                : "bg-[var(--surface-bg)] text-stone-700 ring-1 ring-[var(--input-border)]"
             }`}
           >
             📈 {t("moneyIn")}
@@ -397,10 +401,10 @@ function AddForm() {
                 setMode("transfer");
                 setTrackOnly(false);
               }}
-              className={`col-span-2 min-h-14 rounded-3xl text-lg font-semibold ${
+              className={`col-span-2 min-h-14 rounded-3xl text-lg font-semibold transition ${
                 transferMode
-                  ? "bg-stone-800 text-white shadow"
-                  : "bg-white text-stone-700"
+                  ? "bg-stone-800 text-white shadow-md"
+                  : "bg-[var(--surface-bg)] text-stone-700 ring-1 ring-[var(--input-border)]"
               }`}
             >
               🔁 {t("transferWallets")}

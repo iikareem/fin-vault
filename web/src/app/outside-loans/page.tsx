@@ -144,7 +144,7 @@ export default function OutsideLoansPage() {
 
   return (
     <PageShell>
-      <h1 className="text-2xl font-bold leading-tight sm:text-3xl">
+      <h1 className="page-title">
         🤝 {t("outsideLoansTitle")}
       </h1>
       <Hint>{t("outsideLoansHint")}</Hint>
@@ -161,7 +161,7 @@ export default function OutsideLoansPage() {
         <label className="block">
           <span className="mb-1 block font-medium">{t("outsidePersonName")}</span>
           <input
-            className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-lg"
+            className="field text-lg"
             value={personName}
             onChange={(e) => setPersonName(e.target.value)}
             required
@@ -172,7 +172,7 @@ export default function OutsideLoansPage() {
           <span className="mb-1 block font-medium">{t("outsideAmount")}</span>
           <input
             inputMode="decimal"
-            className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-lg"
+            className="field text-lg"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             required
@@ -181,7 +181,7 @@ export default function OutsideLoansPage() {
         <label className="block">
           <span className="mb-1 block font-medium">{t("outsidePickWallet")}</span>
           <select
-            className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-lg"
+            className="field text-lg"
             value={accountId}
             onChange={(e) => setAccountId(e.target.value)}
             required
@@ -197,7 +197,7 @@ export default function OutsideLoansPage() {
           <span className="mb-1 block font-medium">{t("day")}</span>
           <input
             type="date"
-            className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-lg"
+            className="field text-lg"
             value={occurredOn}
             onChange={(e) => setOccurredOn(e.target.value)}
             required
@@ -206,7 +206,7 @@ export default function OutsideLoansPage() {
         <label className="block">
           <span className="mb-1 block font-medium">{t("noteOptional")}</span>
           <input
-            className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-lg"
+            className="field text-lg"
             value={note}
             onChange={(e) => setNote(e.target.value)}
           />
@@ -221,7 +221,7 @@ export default function OutsideLoansPage() {
       </form>
 
       {error ? <p className="mt-3 text-red-700">{error}</p> : null}
-      {message ? <p className="mt-3 text-emerald-800">{message}</p> : null}
+      {message ? <p className="flash mt-3">{message}</p> : null}
 
       <section className="mt-6 space-y-3">
         <h2 className="text-xl font-bold">{t("outsideOpen")}</h2>
@@ -261,7 +261,7 @@ export default function OutsideLoansPage() {
                   </span>
                   <input
                     inputMode="decimal"
-                    className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3"
+                    className="field"
                     placeholder={String(loan.remaining)}
                     value={collectAmount[loan.id] ?? ""}
                     onChange={(e) =>
@@ -277,7 +277,7 @@ export default function OutsideLoansPage() {
                     {t("outsidePickWalletBack")}
                   </span>
                   <select
-                    className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3"
+                    className="field"
                     value={collectWallet[loan.id] || accountId}
                     onChange={(e) =>
                       setCollectWallet((prev) => ({

@@ -59,21 +59,19 @@ export default function ProfilePage() {
 
   return (
     <PageShell>
-      <h1 className="text-2xl font-bold leading-tight sm:text-3xl">
-        {t("profileTitle")}
-      </h1>
+      <h1 className="page-title">{t("profileTitle")}</h1>
       {name ? (
         <p className="mt-2 text-lg font-semibold text-stone-800">{name}</p>
       ) : null}
       <Hint>{t("profileHint")}</Hint>
 
-      <section className="surface mt-6 space-y-4 rounded-[1.75rem] p-4">
+      <section className="surface mt-6 space-y-5 rounded-[1.75rem] p-4">
         <h2 className="text-xl font-bold">{t("settingsTitle")}</h2>
 
         <label className="block">
-          <span className="mb-1 block font-medium">{t("currencyPref")}</span>
+          <span className="mb-1.5 block font-medium">{t("currencyPref")}</span>
           <select
-            className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-lg"
+            className="field text-lg"
             value={preferredCurrency}
             disabled={currencyBusy}
             onChange={(e) => onCurrency(e.target.value)}
@@ -93,15 +91,15 @@ export default function ProfilePage() {
 
         <div>
           <span className="mb-2 block font-medium">{t("themePref")}</span>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="seg grid-cols-2">
             <button
               type="button"
               disabled={themeBusy}
               onClick={() => onTheme("light")}
-              className={`min-h-12 rounded-2xl border px-3 py-2 font-semibold ${
+              className={`min-h-12 rounded-2xl px-3 py-2 font-semibold transition ${
                 theme === "light"
-                  ? "border-stone-900 bg-stone-900 text-white"
-                  : "border-stone-300 bg-white text-stone-800"
+                  ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
+                  : "text-[var(--muted)]"
               }`}
             >
               ☀️ {t("themeLight")}
@@ -110,10 +108,10 @@ export default function ProfilePage() {
               type="button"
               disabled={themeBusy}
               onClick={() => onTheme("dark")}
-              className={`min-h-12 rounded-2xl border px-3 py-2 font-semibold ${
+              className={`min-h-12 rounded-2xl px-3 py-2 font-semibold transition ${
                 theme === "dark"
-                  ? "border-stone-900 bg-stone-900 text-white"
-                  : "border-stone-300 bg-white text-stone-800"
+                  ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
+                  : "text-[var(--muted)]"
               }`}
             >
               🌙 {t("themeDark")}
@@ -123,9 +121,9 @@ export default function ProfilePage() {
         </div>
 
         <label className="block">
-          <span className="mb-1 block font-medium">{t("languagePref")}</span>
+          <span className="mb-1.5 block font-medium">{t("languagePref")}</span>
           <select
-            className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-lg"
+            className="field text-lg"
             value={locale}
             onChange={(e) => setLocale(e.target.value as "ar" | "en")}
           >
@@ -135,7 +133,7 @@ export default function ProfilePage() {
         </label>
 
         {prefsError ? <p className="text-red-700">{prefsError}</p> : null}
-        {prefsSaved ? <p className="text-emerald-800">{prefsSaved}</p> : null}
+        {prefsSaved ? <p className="flash">{prefsSaved}</p> : null}
       </section>
 
       <div className="mt-6">
@@ -144,7 +142,7 @@ export default function ProfilePage() {
       <button
         type="button"
         onClick={logout}
-        className="mt-10 w-full rounded-2xl border border-stone-300 px-4 py-3 text-lg"
+        className="mt-10 w-full rounded-2xl border border-[var(--input-border)] bg-[var(--surface-bg)] px-4 py-3 text-lg font-semibold transition hover:bg-[var(--panel-soft)]"
       >
         {t("logOut")}
       </button>

@@ -40,7 +40,7 @@ export default function FamilyPage() {
 
   return (
     <PageShell>
-      <h1 className="text-2xl font-bold leading-tight sm:text-3xl">👨‍👩‍👧‍👦 {t("family")}</h1>
+      <h1 className="page-title">👨‍👩‍👧‍👦 {t("family")}</h1>
       <p className="mt-2 text-stone-600">{t("familyBlurb")}</p>
       <Hint>{t("familyRoleHint")}</Hint>
       <ul className="mt-5 space-y-2">
