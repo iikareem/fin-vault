@@ -13,6 +13,7 @@ import { useCalendarClock } from "@/hooks/useCalendarClock";
 import { formatItemDate, isoLocal } from "@/lib/calendar";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
+import { HIDDEN_EXPENSE_CATEGORIES, HIDDEN_INCOME_CATEGORIES } from "@/lib/category-visibility";
 
 type Tx = {
   id: string;
@@ -186,7 +187,9 @@ export default function HistoryPage() {
     }
   }
 
-  const expenseCats = categories.filter((c) => c.kind === "EXPENSE");
+  const expenseCats = categories.filter(
+    (c) => c.kind === "EXPENSE" && !HIDDEN_EXPENSE_CATEGORIES.has(c.name),
+  );
   const empty =
     !log ||
     (log.txs.length === 0 && log.claims.length === 0 && log.gifts.length === 0);
@@ -337,7 +340,11 @@ export default function HistoryPage() {
                     categoryId={categoryId}
                     categories={
                       tx.type === "INCOME"
-                        ? categories.filter((c) => c.kind === "INCOME")
+                        ? categories.filter(
+                            (c) =>
+                              c.kind === "INCOME" &&
+                              !HIDDEN_INCOME_CATEGORIES.has(c.name),
+                          )
                         : expenseCats
                     }
                     t={t}

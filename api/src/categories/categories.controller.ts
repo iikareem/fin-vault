@@ -4,6 +4,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { HouseholdGuard } from '../households/household.guard';
 import { HouseholdAdminGuard } from '../households/household-admin.guard';
 import { CurrentMembership } from '../households/current-membership.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { AuthUser } from '../auth/auth-user';
 import { MembershipContext } from '../households/membership-context';
 import { CreateCategoryDto } from './dto/create-category.dto';
 
@@ -13,8 +15,15 @@ export class CategoriesController {
   constructor(private categories: CategoriesService) {}
 
   @Get()
-  list(@CurrentMembership() membership: MembershipContext) {
-    return this.categories.list(membership.householdId, membership.kind);
+  list(
+    @CurrentMembership() membership: MembershipContext,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.categories.list(
+      membership.householdId,
+      membership.kind,
+      user.id,
+    );
   }
 
   @Post()

@@ -124,10 +124,8 @@ export const PERSONAL_EXPENSE: ExpenseDef[] = [
   { name: 'Help someone', color: '#0369a1', group: 'Charity & sadaqah' },
   { name: 'Other charity', color: '#a8a29e', group: 'Charity & sadaqah' },
 
-  // Debts
-  { name: 'Debts', color: '#b91c1c' },
-  { name: 'Debt repayment', color: '#dc2626', group: 'Debts' },
-  { name: 'Other debts', color: '#a8a29e', group: 'Debts' },
+  // رد سلفة — alone (no Debts group)
+  { name: 'Loan repayment', color: '#dc2626' },
 
   // Installments (non-car)
   { name: 'Installments', color: '#9333ea' },

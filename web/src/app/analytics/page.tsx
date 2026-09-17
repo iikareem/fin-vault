@@ -85,7 +85,6 @@ export default function AnalyticsPage() {
   const [days, setDays] = useState<DayRow[]>([]);
   const [cats, setCats] = useState<CatRow[]>([]);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
-  const [selectedOnly, setSelectedOnly] = useState(true);
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [savingsMonths, setSavingsMonths] = useState<SavingsMonth[]>([]);
   const [savingsOpening, setSavingsOpening] = useState(0);
@@ -114,7 +113,6 @@ export default function AnalyticsPage() {
         setDays(d);
         setCats(c.filter((x) => x.type === "EXPENSE"));
         setSelectedGroups([]);
-        setSelectedOnly(true);
         setMembers(m);
         setSavingsOpening(s.opening);
         setSavingsMonths(s.months);
@@ -134,23 +132,12 @@ export default function AnalyticsPage() {
     return cats.filter((c) => selectedSet.has(catKey(c)));
   }, [cats, selectedSet, selectionActive]);
 
-  const otherCats = useMemo(() => {
-    if (!selectionActive) return [];
-    return cats.filter((c) => !selectedSet.has(catKey(c)));
-  }, [cats, selectedSet, selectionActive]);
-
   const selectedTotal = useMemo(
     () => selectedCats.reduce((s, c) => s + c.total, 0),
     [selectedCats],
   );
 
-  const listCats = useMemo(() => {
-    if (!selectionActive) return cats;
-    if (selectedOnly) return selectedCats;
-    return [...selectedCats, ...otherCats];
-  }, [selectionActive, selectedOnly, cats, selectedCats, otherCats]);
-
-  const maxCat = Math.max(1, ...listCats.map((c) => c.total));
+  const maxCat = Math.max(1, ...cats.map((c) => c.total));
 
   function toggleGroup(key: string) {
     setSelectedGroups((prev) =>
@@ -158,9 +145,12 @@ export default function AnalyticsPage() {
     );
   }
 
+  function unselectGroup(key: string) {
+    setSelectedGroups((prev) => prev.filter((k) => k !== key));
+  }
+
   function pickTop(n: number) {
     setSelectedGroups(cats.slice(0, n).map(catKey));
-    setSelectedOnly(true);
   }
 
   const months = useMemo(() => {
@@ -482,7 +472,6 @@ export default function AnalyticsPage() {
                   type="button"
                   onClick={() => {
                     setSelectedGroups(cats.map(catKey));
-                    setSelectedOnly(true);
                   }}
                   className="rounded-full bg-[var(--panel-soft)] px-3 py-1.5 text-sm font-semibold"
                 >
@@ -500,57 +489,88 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
-            <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {cats.map((c) => {
-                const key = catKey(c);
-                const on = selectedSet.has(key);
-                const pct =
-                  totalOut > 0 ? Math.round((c.total / totalOut) * 100) : 0;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => toggleGroup(key)}
-                    aria-pressed={on}
-                    className={`inline-flex shrink-0 flex-col items-start gap-0.5 rounded-2xl border px-3 py-2 text-start transition ${
-                      on
-                        ? "border-transparent text-white shadow-sm"
-                        : "border-[var(--input-border)] bg-[var(--panel-soft)] text-[var(--foreground)]"
-                    }`}
-                    style={on ? { background: c.color } : undefined}
-                  >
-                    <span className="inline-flex items-center gap-2 text-sm font-semibold">
-                      <span
-                        className="h-2.5 w-2.5 rounded-full"
-                        style={{
-                          background: on ? "rgba(255,255,255,0.95)" : c.color,
-                        }}
-                        aria-hidden
-                      />
-                      {labelFor(c.name, t)}
-                    </span>
-                    {!hideAggregates ? (
-                      <span
-                        className={`text-xs ${on ? "text-white/90" : "text-[var(--muted)]"}`}
-                      >
-                        <Money
-                          amount={c.total}
-                          currency={currency}
-                          locale={locale}
+            <div className="mt-3 flex flex-col gap-2">
+              {cats.length === 0 ? (
+                <p className="text-sm text-[var(--muted)]">{t("noPeriodData")}</p>
+              ) : (
+                cats.map((c) => {
+                  const key = catKey(c);
+                  const on = selectedSet.has(key);
+                  const shareBase =
+                    selectionActive && on && selectedTotal > 0
+                      ? selectedTotal
+                      : totalOut;
+                  const pct =
+                    shareBase > 0 ? Math.round((c.total / shareBase) * 100) : 0;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => toggleGroup(key)}
+                      aria-pressed={on}
+                      className={`w-full rounded-2xl border px-3 py-2.5 text-start transition ${
+                        on
+                          ? "border-transparent bg-[var(--panel-soft)] ring-1 ring-[var(--input-border)]"
+                          : "border-[var(--input-border)] bg-[var(--surface-bg)]"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="inline-flex min-w-0 items-center gap-2 font-semibold">
+                          <span
+                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-xs ${
+                              on
+                                ? "border-transparent text-white"
+                                : "border-[var(--input-border)] text-transparent"
+                            }`}
+                            style={on ? { background: c.color } : undefined}
+                            aria-hidden
+                          >
+                            ✓
+                          </span>
+                          <span className="truncate">{labelFor(c.name, t)}</span>
+                        </span>
+                        <span className="shrink-0 text-end">
+                          <span className="block font-semibold">
+                            {hideAggregates ? (
+                              "••••"
+                            ) : (
+                              <Money
+                                amount={c.total}
+                                currency={currency}
+                                locale={locale}
+                              />
+                            )}
+                          </span>
+                          {!hideAggregates && pct > 0 ? (
+                            <span className="text-xs text-[var(--muted)]">
+                              {selectionActive && on
+                                ? t("ofSelection", { pct: String(pct) })
+                                : t("ofPeriod", { pct: String(pct) })}
+                            </span>
+                          ) : null}
+                        </span>
+                      </div>
+                      <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-stone-200">
+                        <div
+                          className="h-full rounded-full transition-[width]"
+                          style={{
+                            width: hideAggregates
+                              ? "0%"
+                              : `${(c.total / maxCat) * 100}%`,
+                            background: c.color,
+                          }}
                         />
-                        {pct > 0 ? ` · ${pct}%` : ""}
-                      </span>
-                    ) : null}
-                  </button>
-                );
-              })}
+                      </div>
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>
 
           <div className="px-4 py-4">
             {selectionActive ? (
-              <>
-                <div className="rounded-2xl bg-[var(--panel-soft)] px-4 py-3">
+              <div className="rounded-2xl bg-[var(--panel-soft)] px-4 py-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-sm text-[var(--muted)]">
@@ -602,146 +622,39 @@ export default function AnalyticsPage() {
                           />
                         ))}
                       </div>
-                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
-                        {selectedCats.slice(0, 4).map((c) => (
-                          <span
+                      <div className="mt-2 flex flex-col gap-1">
+                        {selectedCats.map((c) => (
+                          <button
                             key={catKey(c)}
-                            className="inline-flex items-center gap-1.5 text-xs text-[var(--muted)]"
+                            type="button"
+                            onClick={() => unselectGroup(catKey(c))}
+                            className="inline-flex items-center gap-1.5 rounded-lg px-1 py-0.5 text-start text-xs text-[var(--muted)] hover:bg-[var(--surface-bg)]"
                           >
                             <span
-                              className="h-2 w-2 rounded-full"
+                              className="h-2 w-2 shrink-0 rounded-full"
                               style={{ background: c.color }}
                             />
-                            {labelFor(c.name, t)}{" "}
-                            {Math.round((c.total / selectedTotal) * 100)}%
-                          </span>
+                            <span className="min-w-0 flex-1 truncate">
+                              {labelFor(c.name, t)}
+                            </span>
+                            <span className="shrink-0">
+                              {Math.round((c.total / selectedTotal) * 100)}%
+                            </span>
+                            <span className="shrink-0 text-[var(--muted)]" aria-hidden>
+                              ×
+                            </span>
+                          </button>
                         ))}
                       </div>
                     </div>
                   ) : null}
-                </div>
-
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedOnly(true)}
-                    className={`rounded-2xl px-3 py-2.5 text-sm font-semibold ${
-                      selectedOnly
-                        ? "bg-[var(--cta-bg)] text-[var(--cta-fg)]"
-                        : "bg-[var(--panel-soft)]"
-                    }`}
-                  >
-                    {t("showSelectedOnly")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedOnly(false)}
-                    className={`rounded-2xl px-3 py-2.5 text-sm font-semibold ${
-                      !selectedOnly
-                        ? "bg-[var(--cta-bg)] text-[var(--cta-fg)]"
-                        : "bg-[var(--panel-soft)]"
-                    }`}
-                  >
-                    {t("showAllGroups")}
-                  </button>
-                </div>
-              </>
+              </div>
             ) : (
               <p className="text-sm text-[var(--muted)]">{t("pickGroupsEmpty")}</p>
             )}
           </div>
         </section>
       ) : null}
-
-      <ul className="mt-4 space-y-2">
-        {listCats.length === 0 ? (
-          <li className="text-[var(--muted)]">{t("noPeriodData")}</li>
-        ) : (
-          listCats.map((c, i) => {
-            const key = catKey(c);
-            const on = selectedSet.has(key);
-            const dim = selectionActive && !on;
-            const shareBase = selectionActive && on && selectedTotal > 0
-              ? selectedTotal
-              : totalOut;
-            const pct =
-              shareBase > 0 ? Math.round((c.total / shareBase) * 100) : 0;
-            const showOtherHeader =
-              selectionActive &&
-              !selectedOnly &&
-              i === selectedCats.length &&
-              otherCats.length > 0;
-            return (
-              <li key={key}>
-                {showOtherHeader ? (
-                  <p className="mb-2 mt-3 text-sm font-semibold text-[var(--muted)]">
-                    {t("compareOthers")}
-                  </p>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => toggleGroup(key)}
-                  className={`w-full rounded-2xl px-3 py-2.5 text-start transition ${
-                    on
-                      ? "bg-[var(--panel-soft)] ring-1 ring-[var(--input-border)]"
-                      : dim
-                        ? "opacity-45"
-                        : "hover:bg-[var(--panel-soft)]"
-                  }`}
-                >
-                  <div className="flex justify-between gap-3">
-                    <span className="inline-flex min-w-0 items-center gap-2 font-medium">
-                      <span
-                        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-xs ${
-                          on
-                            ? "border-transparent text-white"
-                            : "border-[var(--input-border)] text-transparent"
-                        }`}
-                        style={on ? { background: c.color } : undefined}
-                        aria-hidden
-                      >
-                        ✓
-                      </span>
-                      <span className="truncate">{labelFor(c.name, t)}</span>
-                    </span>
-                    <span className="shrink-0 text-end">
-                      <span className="block font-semibold">
-                        {hideAggregates ? (
-                          "••••"
-                        ) : (
-                          <Money
-                            amount={c.total}
-                            currency={currency}
-                            locale={locale}
-                          />
-                        )}
-                      </span>
-                      {!hideAggregates && pct > 0 ? (
-                        <span className="text-xs text-[var(--muted)]">
-                          {selectionActive && on
-                            ? t("ofSelection", { pct: String(pct) })
-                            : t("ofPeriod", { pct: String(pct) })}
-                        </span>
-                      ) : null}
-                    </span>
-                  </div>
-                  <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-stone-200">
-                    <div
-                      className="h-full rounded-full transition-[width]"
-                      style={{
-                        width: hideAggregates
-                          ? "0%"
-                          : `${(c.total / maxCat) * 100}%`,
-                        background: c.color,
-                      }}
-                    />
-                  </div>
-                </button>
-              </li>
-            );
-          })
-        )}
-      </ul>
 
       {active?.kind === "HOUSE" ? (
         <>

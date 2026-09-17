@@ -26,6 +26,7 @@ const RENAME: Record<string, string> = {
   'Other durables': 'Other shopping',
   'Sports gear': 'Sports',
   'Other children': 'Other family',
+  'Debt repayment': 'Loan repayment',
 };
 
 /** Source category is merged into the target, remapping rows then deleting. */
@@ -39,6 +40,10 @@ const MERGE: Record<string, string> = {
   Snacks: 'Supermarket food',
   Hygiene: 'Personal care',
   Children: 'Family',
+  /** Collapse old Debts / سلفة شخصية labels into the single رد سلفة category. */
+  'Other debts': 'Loan repayment',
+  Debts: 'Loan repayment',
+  'Personal loan': 'Loan repayment',
 };
 
 /** Categories moved under a group by group name. */
@@ -104,8 +109,6 @@ const REPARENT: Record<string, string> = {
   Sadaqah: 'Charity & sadaqah',
   'Help someone': 'Charity & sadaqah',
   'Other charity': 'Charity & sadaqah',
-  'Debt repayment': 'Debts',
-  'Other debts': 'Debts',
   'Apartment installments': 'Installments',
   'Other installments': 'Installments',
   Licenses: 'Government fees',
@@ -124,7 +127,7 @@ const DELETE_LIST = [
 export class CategoriesService {
   constructor(private prisma: PrismaService) {}
 
-  async list(householdId: string, kind: HouseholdKind) {
+  async list(householdId: string, kind: HouseholdKind, userId: string) {
     await this.mergeLegacyGift(householdId);
     if (kind === 'HOUSE') {
       for (const cat of HOUSE_PAID) {
@@ -144,10 +147,60 @@ export class CategoriesService {
     if (kind === 'PERSONAL') {
       await this.syncPersonal(householdId);
     }
-    return this.prisma.category.findMany({
+    const cats = await this.prisma.category.findMany({
       where: { householdId },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
     });
+    return this.orderByUserUsage(householdId, userId, cats);
+  }
+
+  /** Most-used categories for this user float to the top (groups and subs). */
+  private async orderByUserUsage<
+    T extends { id: string; parentId: string | null; sortOrder: number; name: string },
+  >(householdId: string, userId: string, cats: T[]): Promise<T[]> {
+    const grouped = await this.prisma.transaction.groupBy({
+      by: ['categoryId'],
+      where: { householdId, userId },
+      _count: { _all: true },
+    });
+    const countById = new Map(
+      grouped.map((row) => [row.categoryId, row._count._all]),
+    );
+    const score = (id: string) => countById.get(id) ?? 0;
+
+    const parents = cats.filter((c) => !c.parentId);
+    const children = cats.filter((c) => c.parentId);
+    const kidsOf = (parentId: string) =>
+      children
+        .filter((c) => c.parentId === parentId)
+        .sort(
+          (a, b) =>
+            score(b.id) - score(a.id) ||
+            a.sortOrder - b.sortOrder ||
+            a.name.localeCompare(b.name),
+        );
+
+    const parentScore = (p: T) => {
+      const kids = children.filter((c) => c.parentId === p.id);
+      if (!kids.length) return score(p.id);
+      return (
+        score(p.id) + kids.reduce((sum, k) => sum + score(k.id), 0)
+      );
+    };
+
+    parents.sort(
+      (a, b) =>
+        parentScore(b) - parentScore(a) ||
+        a.sortOrder - b.sortOrder ||
+        a.name.localeCompare(b.name),
+    );
+
+    const ordered: T[] = [];
+    for (const parent of parents) {
+      ordered.push(parent);
+      ordered.push(...kidsOf(parent.id));
+    }
+    return ordered;
   }
 
   /** Aligns a personal household's expense categories with the target tree. */
@@ -228,6 +281,30 @@ export class CategoriesService {
       const target = await byName(targetName);
       if (source && target && source.id !== target.id) {
         await this.mergeCategory(source.id, target.id);
+      }
+    }
+
+    /** رد سلفة stays a single top-level category — no group, no children. */
+    const loanRepayment = await byName('Loan repayment');
+    if (loanRepayment) {
+      await this.prisma.category.update({
+        where: { id: loanRepayment.id },
+        data: { parentId: null },
+      });
+      const strayKids = await this.prisma.category.findMany({
+        where: { householdId, parentId: loanRepayment.id, kind: 'EXPENSE' },
+      });
+      for (const kid of strayKids) {
+        await this.mergeCategory(kid.id, loanRepayment.id);
+      }
+
+      /** Any leftover «سلفة شخصية» in personal books → رد سلفة. */
+      const personalLoanRows = await this.prisma.category.findMany({
+        where: { householdId, name: 'Personal loan' },
+      });
+      for (const row of personalLoanRows) {
+        if (row.id === loanRepayment.id) continue;
+        await this.mergeCategory(row.id, loanRepayment.id);
       }
     }
 

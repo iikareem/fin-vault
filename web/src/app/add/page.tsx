@@ -16,6 +16,10 @@ import {
   isSavingsWallet,
   sortCashWallets,
 } from "@/lib/wallets";
+import {
+  HIDDEN_EXPENSE_CATEGORIES,
+  HIDDEN_INCOME_CATEGORIES,
+} from "@/lib/category-visibility";
 
 type Account = { id: string; name: string; type?: string };
 type Category = {
@@ -27,14 +31,6 @@ type Category = {
 };
 type Person = { id: string; name: string };
 type WalletKind = "EXPENSE" | "INCOME" | "GIVE";
-
-const HIDDEN_EXPENSE = new Set([
-  "Member payback",
-  "Given to member",
-  "Allowance",
-  "Wallet transfer",
-]);
-const HIDDEN_INCOME = new Set(["Wallet transfer"]);
 
 function AddForm() {
   const router = useRouter();
@@ -123,7 +119,7 @@ function AddForm() {
   const expenseCats = useMemo(
     () =>
       categories.filter(
-        (c) => c.kind === "EXPENSE" && !HIDDEN_EXPENSE.has(c.name),
+        (c) => c.kind === "EXPENSE" && !HIDDEN_EXPENSE_CATEGORIES.has(c.name),
       ),
     [categories],
   );
@@ -132,8 +128,8 @@ function AddForm() {
       categories.filter(
         (c) =>
           c.kind === type &&
-          !(type === "EXPENSE" && HIDDEN_EXPENSE.has(c.name)) &&
-          !(type === "INCOME" && HIDDEN_INCOME.has(c.name)),
+          !(type === "EXPENSE" && HIDDEN_EXPENSE_CATEGORIES.has(c.name)) &&
+          !(type === "INCOME" && HIDDEN_INCOME_CATEGORIES.has(c.name)),
       ),
     [categories, type],
   );
