@@ -48,7 +48,7 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var t=localStorage.getItem("fb_theme")||"light";var ok={light:1,dark:1,ocean:1,sand:1,rose:1};if(!ok[t])t="light";var r=document.documentElement;r.setAttribute("data-theme",t);if(t==="dark")r.classList.add("dark");else r.classList.remove("dark");var c={light:"#edf4f0",dark:"#0b110f",ocean:"#e7f1f8",sand:"#f2efe8",rose:"#fceef3"};var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",c[t]||c.light);}catch(e){}`,
+            __html: `try{var t=localStorage.getItem("fb_theme")||"light";var ok={light:1,dark:1,ocean:1,sand:1,rose:1};if(!ok[t])t="light";var r=document.documentElement;r.setAttribute("data-theme",t);if(t==="dark")r.classList.add("dark");else r.classList.remove("dark");var c={light:"#edf4f0",dark:"#0b110f",ocean:"#e8f3f1",sand:"#f2efe8",rose:"#fceef3"};var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content",c[t]||c.light);}catch(e){}`,
           }}
         />
       </head>

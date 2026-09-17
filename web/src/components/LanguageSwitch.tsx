@@ -12,7 +12,9 @@ export function LanguageSwitch({ compact = false }: { compact?: boolean }) {
         onClick={() => setLocale("ar")}
         aria-label={t("langAr")}
         className={`rounded-full ${pad} ${
-          locale === "ar" ? "bg-emerald-800 text-white" : "text-stone-600"
+          locale === "ar"
+            ? "bg-[var(--accent-a)] text-[var(--accent-a-fg)]"
+            : "text-stone-600"
         }`}
       >
         {compact ? "ع" : t("langAr")}
@@ -22,7 +24,9 @@ export function LanguageSwitch({ compact = false }: { compact?: boolean }) {
         onClick={() => setLocale("en")}
         aria-label={t("langEn")}
         className={`rounded-full ${pad} ${
-          locale === "en" ? "bg-emerald-800 text-white" : "text-stone-600"
+          locale === "en"
+            ? "bg-[var(--accent-a)] text-[var(--accent-a-fg)]"
+            : "text-stone-600"
         }`}
       >
         {compact ? "En" : t("langEn")}

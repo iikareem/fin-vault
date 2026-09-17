@@ -12,7 +12,7 @@ export type ThemeOption = {
   id: ThemeId;
   /** Browser / PWA chrome color */
   themeColor: string;
-  /** Swatch preview: background + accent */
+  /** Swatch preview: house accent + personal accent */
   swatch: [string, string];
   dark?: boolean;
 };
@@ -21,28 +21,28 @@ export const THEME_OPTIONS: ThemeOption[] = [
   {
     id: "light",
     themeColor: "#edf4f0",
-    swatch: ["#edf4f0", "#059669"],
+    swatch: ["#065f46", "#c2410c"],
   },
   {
     id: "dark",
     themeColor: "#0b110f",
-    swatch: ["#0b110f", "#34d399"],
+    swatch: ["#059669", "#7c3aed"],
     dark: true,
   },
   {
     id: "ocean",
-    themeColor: "#e7f1f8",
-    swatch: ["#e7f1f8", "#0284c7"],
+    themeColor: "#e8f3f1",
+    swatch: ["#0f766e", "#0369a1"],
   },
   {
     id: "sand",
     themeColor: "#f2efe8",
-    swatch: ["#f2efe8", "#0f766e"],
+    swatch: ["#3f6212", "#b45309"],
   },
   {
     id: "rose",
     themeColor: "#fceef3",
-    swatch: ["#fceef3", "#db2777"],
+    swatch: ["#be185d", "#7e22ce"],
   },
 ];
 

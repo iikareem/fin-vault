@@ -126,17 +126,18 @@ export function BottomNav() {
   const addActive = isCurrent(path, "/add");
   const accent = personal
     ? {
-        text: "text-sky-900",
-        soft: "bg-sky-50",
-        fab: "bg-sky-800 text-white shadow-[0_10px_24px_rgb(7_89_133/0.35)]",
-        fabIdle: "bg-sky-800 text-white shadow-[0_10px_24px_rgb(7_89_133/0.28)]",
+        text: "text-[var(--accent-b-text)]",
+        soft: "bg-[var(--accent-b-soft)]",
+        fab: "bg-[var(--accent-b)] text-[var(--accent-b-fg)] shadow-[0_10px_24px_color-mix(in_srgb,var(--accent-b)_40%,transparent)]",
+        fabIdle:
+          "bg-[var(--accent-b)] text-[var(--accent-b-fg)] shadow-[0_10px_24px_color-mix(in_srgb,var(--accent-b)_28%,transparent)]",
       }
     : {
-        text: "text-emerald-900",
-        soft: "bg-emerald-50",
-        fab: "bg-emerald-800 text-white shadow-[0_10px_24px_rgb(6_95_70/0.35)]",
+        text: "text-[var(--accent-a-text)]",
+        soft: "bg-[var(--accent-a-soft)]",
+        fab: "bg-[var(--accent-a)] text-[var(--accent-a-fg)] shadow-[0_10px_24px_color-mix(in_srgb,var(--accent-a)_40%,transparent)]",
         fabIdle:
-          "bg-emerald-800 text-white shadow-[0_10px_24px_rgb(6_95_70/0.28)]",
+          "bg-[var(--accent-a)] text-[var(--accent-a-fg)] shadow-[0_10px_24px_color-mix(in_srgb,var(--accent-a)_28%,transparent)]",
       };
 
   function sideLink(item: SideItem) {

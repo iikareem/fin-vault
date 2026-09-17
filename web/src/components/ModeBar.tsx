@@ -22,7 +22,7 @@ export function ModeBar() {
             onClick={() => setKind("HOUSE")}
             className={`min-h-11 rounded-full px-2 text-base font-bold sm:text-lg ${
               kind === "HOUSE"
-                ? "bg-emerald-800 text-white"
+                ? "bg-[var(--accent-a)] text-[var(--accent-a-fg)]"
                 : "text-stone-500"
             }`}
           >
@@ -32,7 +32,9 @@ export function ModeBar() {
             type="button"
             onClick={() => setKind("PERSONAL")}
             className={`min-h-11 rounded-full px-2 text-base font-bold sm:text-lg ${
-              kind === "PERSONAL" ? "bg-sky-800 text-white" : "text-stone-500"
+              kind === "PERSONAL"
+                ? "bg-[var(--accent-b)] text-[var(--accent-b-fg)]"
+                : "text-stone-500"
             }`}
           >
             👛 {t("modeMine")}

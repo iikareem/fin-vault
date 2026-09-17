@@ -415,9 +415,7 @@ export default function HomePage() {
         }`}
         style={{
           color: "#fff",
-          background: isHouse
-            ? "linear-gradient(145deg, #059669 0%, #047857 42%, #022c22 100%)"
-            : "linear-gradient(145deg, #0ea5e9 0%, #0369a1 42%, #082f49 100%)",
+          background: isHouse ? "var(--wallet-a)" : "var(--wallet-b)",
         }}
         onClick={
           canToggleMoney
