@@ -489,9 +489,11 @@ export default function AnalyticsPage() {
               </div>
             </div>
 
-            <div className="mt-3 flex flex-col gap-2">
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
               {cats.length === 0 ? (
-                <p className="text-sm text-[var(--muted)]">{t("noPeriodData")}</p>
+                <p className="col-span-full text-sm text-[var(--muted)]">
+                  {t("noPeriodData")}
+                </p>
               ) : (
                 cats.map((c) => {
                   const key = catKey(c);
@@ -502,65 +504,70 @@ export default function AnalyticsPage() {
                       : totalOut;
                   const pct =
                     shareBase > 0 ? Math.round((c.total / shareBase) * 100) : 0;
+                  const barPct = hideAggregates
+                    ? 0
+                    : Math.max(8, Math.round((c.total / maxCat) * 100));
                   return (
                     <button
                       key={key}
                       type="button"
                       onClick={() => toggleGroup(key)}
                       aria-pressed={on}
-                      className={`w-full rounded-2xl border px-3 py-2.5 text-start transition ${
+                      className={`relative flex min-h-[5.5rem] flex-col overflow-hidden rounded-2xl border p-2.5 text-start transition ${
                         on
-                          ? "border-transparent bg-[var(--panel-soft)] ring-1 ring-[var(--input-border)]"
+                          ? "border-transparent bg-[var(--panel-soft)]"
                           : "border-[var(--input-border)] bg-[var(--surface-bg)]"
                       }`}
+                      style={
+                        on
+                          ? { boxShadow: `0 0 0 2px ${c.color}` }
+                          : undefined
+                      }
                     >
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="inline-flex min-w-0 items-center gap-2 font-semibold">
-                          <span
-                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border text-xs ${
-                              on
-                                ? "border-transparent text-white"
-                                : "border-[var(--input-border)] text-transparent"
-                            }`}
-                            style={on ? { background: c.color } : undefined}
-                            aria-hidden
-                          >
-                            ✓
-                          </span>
-                          <span className="truncate">{labelFor(c.name, t)}</span>
+                      <span
+                        className="absolute inset-x-0 top-0 h-1.5"
+                        style={{
+                          background: `linear-gradient(90deg, ${c.color} ${barPct}%, rgb(0 0 0 / 0.06) ${barPct}%)`,
+                          opacity: on ? 1 : 0.7,
+                        }}
+                        aria-hidden
+                      />
+                      <span className="mt-1.5 flex items-start justify-between gap-1.5">
+                        <span className="line-clamp-2 min-w-0 text-sm font-bold leading-snug">
+                          {labelFor(c.name, t)}
                         </span>
-                        <span className="shrink-0 text-end">
-                          <span className="block font-semibold">
-                            {hideAggregates ? (
-                              "••••"
-                            ) : (
-                              <Money
-                                amount={c.total}
-                                currency={currency}
-                                locale={locale}
-                              />
-                            )}
-                          </span>
-                          {!hideAggregates && pct > 0 ? (
-                            <span className="text-xs text-[var(--muted)]">
-                              {selectionActive && on
-                                ? t("ofSelection", { pct: String(pct) })
-                                : t("ofPeriod", { pct: String(pct) })}
-                            </span>
-                          ) : null}
+                        <span
+                          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                            on
+                              ? "text-white"
+                              : "border border-[var(--input-border)] text-transparent"
+                          }`}
+                          style={on ? { background: c.color } : undefined}
+                          aria-hidden
+                        >
+                          ✓
                         </span>
-                      </div>
-                      <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-stone-200">
-                        <div
-                          className="h-full rounded-full transition-[width]"
-                          style={{
-                            width: hideAggregates
-                              ? "0%"
-                              : `${(c.total / maxCat) * 100}%`,
-                            background: c.color,
-                          }}
-                        />
-                      </div>
+                      </span>
+                      <span className="mt-auto pt-2">
+                        <span className="block text-sm font-semibold tabular-nums">
+                          {hideAggregates ? (
+                            "••••"
+                          ) : (
+                            <Money
+                              amount={c.total}
+                              currency={currency}
+                              locale={locale}
+                            />
+                          )}
+                        </span>
+                        {!hideAggregates && pct > 0 ? (
+                          <span className="mt-0.5 block text-[11px] text-[var(--muted)]">
+                            {selectionActive && on
+                              ? t("ofSelection", { pct: String(pct) })
+                              : t("ofPeriod", { pct: String(pct) })}
+                          </span>
+                        ) : null}
+                      </span>
                     </button>
                   );
                 })
@@ -622,22 +629,22 @@ export default function AnalyticsPage() {
                           />
                         ))}
                       </div>
-                      <div className="mt-2 flex flex-col gap-1">
+                      <div className="mt-2 flex flex-wrap gap-1.5">
                         {selectedCats.map((c) => (
                           <button
                             key={catKey(c)}
                             type="button"
                             onClick={() => unselectGroup(catKey(c))}
-                            className="inline-flex items-center gap-1.5 rounded-lg px-1 py-0.5 text-start text-xs text-[var(--muted)] hover:bg-[var(--surface-bg)]"
+                            className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-[var(--surface-bg)] px-2.5 py-1 text-xs font-medium"
                           >
                             <span
                               className="h-2 w-2 shrink-0 rounded-full"
                               style={{ background: c.color }}
                             />
-                            <span className="min-w-0 flex-1 truncate">
+                            <span className="min-w-0 truncate">
                               {labelFor(c.name, t)}
                             </span>
-                            <span className="shrink-0">
+                            <span className="shrink-0 text-[var(--muted)]">
                               {Math.round((c.total / selectedTotal) * 100)}%
                             </span>
                             <span className="shrink-0 text-[var(--muted)]" aria-hidden>

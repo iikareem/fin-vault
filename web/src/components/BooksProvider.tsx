@@ -11,7 +11,13 @@ import {
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AUTH_REQUIRED, api } from "@/lib/api";
-import { loadSpace, setActiveSpace, type Space } from "@/lib/space";
+import { HOUSE_BOOKS_ENABLED } from "@/lib/features";
+import {
+  isPersonalOnly,
+  loadSpace,
+  setActiveSpace,
+  type Space,
+} from "@/lib/space";
 import {
   normalizeTheme,
   themeMetaColor,
@@ -27,6 +33,8 @@ type BooksValue = {
   personal: Space | null;
   active: Space | null;
   loading: boolean;
+  /** Hide house switch / house routes for this user. */
+  personalOnly: boolean;
   preferredCurrency: string;
   theme: ThemeMode;
   setKind: (kind: "HOUSE" | "PERSONAL") => void;
@@ -74,6 +82,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
   const [personal, setPersonal] = useState<Space | null>(null);
   const [active, setActive] = useState<Space | null>(null);
   const [loading, setLoading] = useState(true);
+  const [personalOnly, setPersonalOnly] = useState(!HOUSE_BOOKS_ENABLED);
   const [preferredCurrency, setPreferredCurrency] = useState("EGP");
   const [theme, setTheme] = useState<ThemeMode>("light");
 
@@ -85,14 +94,22 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       theme?: string;
       spaces: Space[];
       space: Space | null;
+      personalOnly?: boolean;
     }) => {
       setUserId(me.id);
       setName(me.name);
       const h = me.spaces.find((s) => s.kind === "HOUSE") ?? null;
       const p = me.spaces.find((s) => s.kind === "PERSONAL") ?? null;
+      const only = me.personalOnly ?? isPersonalOnly(me.spaces);
       setHouse(h);
       setPersonal(p);
-      setActive(me.space ?? h ?? p);
+      setPersonalOnly(only);
+      const nextActive =
+        only && me.space?.kind === "HOUSE" ? (p ?? me.space) : me.space;
+      if (nextActive && nextActive !== me.space) {
+        setActiveSpace(nextActive.householdId);
+      }
+      setActive(nextActive ?? p ?? (!only ? h : null));
       const nextTheme = normalizeTheme(me.theme);
       setTheme(nextTheme);
       applyTheme(nextTheme);
@@ -133,8 +150,16 @@ export function BooksProvider({ children }: { children: ReactNode }) {
     };
   }, [onLogin, router, applyMe]);
 
+  useEffect(() => {
+    if (loading || onLogin || !personalOnly) return;
+    if (HOUSE_ONLY.some((p) => path.startsWith(p))) {
+      router.replace("/");
+    }
+  }, [loading, onLogin, personalOnly, path, router]);
+
   const setKind = useCallback(
     (kind: "HOUSE" | "PERSONAL") => {
+      if (kind === "HOUSE" && personalOnly) return;
       const next = kind === "HOUSE" ? house : personal;
       if (!next) return;
       setActiveSpace(next.householdId);
@@ -146,7 +171,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
         router.push("/");
       }
     },
-    [house, personal, path, router],
+    [house, personal, personalOnly, path, router],
   );
 
   const setPreferences = useCallback(
@@ -175,6 +200,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       personal,
       active,
       loading,
+      personalOnly,
       preferredCurrency,
       theme,
       setKind,
@@ -188,6 +214,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       personal,
       active,
       loading,
+      personalOnly,
       preferredCurrency,
       theme,
       setKind,

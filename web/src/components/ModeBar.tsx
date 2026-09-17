@@ -7,10 +7,11 @@ import { useBooks } from "./BooksProvider";
 export function ModeBar() {
   const path = usePathname();
   const { t } = useI18n();
-  const { house, personal, active, setKind } = useBooks();
+  const { house, personal, active, setKind, personalOnly } = useBooks();
   if (path === "/login") return null;
+  if (personalOnly) return null;
   if (!house || !personal) return null;
-  const kind = active?.kind ?? "HOUSE";
+  const kind = active?.kind ?? "PERSONAL";
 
   return (
     <div className="chrome-bar sticky top-0 z-30 pt-[env(safe-area-inset-top)] backdrop-blur-xl">

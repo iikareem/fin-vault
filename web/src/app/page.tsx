@@ -94,7 +94,8 @@ type Cover = {
 
 export default function HomePage() {
   const { t, locale } = useI18n();
-  const { name, userId, active, personal, house, setKind } = useBooks();
+  const { name, userId, active, personal, house, setKind, personalOnly } =
+    useBooks();
   const cal = useCalendarClock();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -595,6 +596,7 @@ export default function HomePage() {
       </section>
 
       {summary &&
+      !personalOnly &&
       ((summary.claimsWaiting ?? 0) > 0.001 ||
         (summary.coversWaiting ?? 0) > 0.001) &&
       !isHouse ? (
