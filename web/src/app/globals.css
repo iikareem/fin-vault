@@ -69,42 +69,42 @@ html[data-theme="light"] {
 html.dark,
 html[data-theme="dark"] {
   color-scheme: dark;
-  --background: #0b110f;
-  --foreground: #eef2f0;
-  --chrome-bg: rgb(11 17 15 / 0.94);
-  --surface-bg: #1c2522;
-  --surface-border: #33403b;
-  --surface-shadow: 0 8px 22px rgb(0 0 0 / 0.35);
-  --nav-bg: rgb(18 24 22 / 0.92);
-  --nav-border: #2a3330;
-  --nav-shadow: 0 8px 24px rgb(0 0 0 / 0.4);
-  --input-bg: #121916;
-  --input-border: #3a433f;
-  --input-focus: #34d399;
-  --muted: #a8a29e;
-  --panel-soft: #252e2a;
-  --soft-emerald: #123028;
-  --soft-sky: #102a36;
-  --soft-amber: #322714;
-  --soft-indigo: #1d1a36;
-  --soft-red: #321818;
-  --cta-bg: #e7e5e4;
-  --cta-fg: #1c1917;
-  --grad-a: rgba(16, 185, 129, 0.1);
-  --grad-b: rgba(14, 165, 233, 0.07);
-  --ring: rgb(52 211 153 / 0.35);
+  --background: #06090e;
+  --foreground: #e8eef5;
+  --chrome-bg: rgb(6 9 14 / 0.96);
+  --surface-bg: #121820;
+  --surface-border: #243040;
+  --surface-shadow: 0 8px 22px rgb(0 0 0 / 0.45);
+  --nav-bg: rgb(10 14 20 / 0.94);
+  --nav-border: #1e2836;
+  --nav-shadow: 0 8px 24px rgb(0 0 0 / 0.5);
+  --input-bg: #0c1118;
+  --input-border: #2a3545;
+  --input-focus: #38bdf8;
+  --muted: #94a3b8;
+  --panel-soft: #161d28;
+  --soft-emerald: #0f2a22;
+  --soft-sky: #0c2236;
+  --soft-amber: #2a2112;
+  --soft-indigo: #161a2e;
+  --soft-red: #2a1418;
+  --cta-bg: #e2e8f0;
+  --cta-fg: #0f172a;
+  --grad-a: rgba(16, 185, 129, 0.12);
+  --grad-b: rgba(56, 189, 248, 0.1);
+  --ring: rgb(56 189 248 / 0.35);
   --press: rgb(255 255 255 / 0.05);
-  /* House: mint · Personal: violet (not the same sky blue as Light) */
-  --accent-a: #059669;
+  /* House: mint · Personal: bright blue */
+  --accent-a: #10b981;
   --accent-a-fg: #ecfdf5;
-  --accent-a-soft: #123028;
+  --accent-a-soft: #0f2a22;
   --accent-a-text: #6ee7b7;
-  --accent-b: #8b5cf6;
-  --accent-b-fg: #f5f3ff;
-  --accent-b-soft: #1d1a36;
-  --accent-b-text: #c4b5fd;
-  --wallet-a: linear-gradient(145deg, #34d399 0%, #047857 45%, #022c22 100%);
-  --wallet-b: linear-gradient(145deg, #a78bfa 0%, #7c3aed 45%, #4c1d95 100%);
+  --accent-b: #38bdf8;
+  --accent-b-fg: #082f49;
+  --accent-b-soft: #0c2236;
+  --accent-b-text: #7dd3fc;
+  --wallet-a: linear-gradient(145deg, #34d399 0%, #059669 45%, #022c22 100%);
+  --wallet-b: linear-gradient(145deg, #7dd3fc 0%, #0ea5e9 45%, #0c4a6e 100%);
 }
 
 html[data-theme="blue"],

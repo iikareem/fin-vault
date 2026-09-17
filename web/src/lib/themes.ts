@@ -26,9 +26,9 @@ export const THEME_OPTIONS: ThemeOption[] = [
   },
   {
     id: "dark",
-    themeColor: "#0b110f",
-    /** page · house (mint) · personal (violet) */
-    swatch: ["#0b110f", "#059669", "#8b5cf6"],
+    themeColor: "#06090e",
+    /** page · house (mint) · personal (blue) */
+    swatch: ["#06090e", "#10b981", "#38bdf8"],
     dark: true,
   },
   {

@@ -3,7 +3,6 @@
 import { usePathname } from "next/navigation";
 import { useI18n } from "./I18nProvider";
 import { useBooks } from "./BooksProvider";
-import { LanguageSwitch } from "./LanguageSwitch";
 
 export function ModeBar() {
   const path = usePathname();
@@ -40,7 +39,6 @@ export function ModeBar() {
             👛 {t("modeMine")}
           </button>
         </div>
-        <LanguageSwitch compact />
       </div>
     </div>
   );
