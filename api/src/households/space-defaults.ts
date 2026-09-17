@@ -22,20 +22,25 @@ type ExpenseDef = {
   group?: string;
 };
 
+/**
+ * Personal expense tree — parents first, children via `group`.
+ * Keep names stable when possible; sync in CategoriesService migrates old rows.
+ */
 export const PERSONAL_EXPENSE: ExpenseDef[] = [
-  // Main groups and standalone categories, in display order.
+  // Food & drink
   { name: 'Food', color: '#16a34a' },
   { name: 'Home food', color: '#65a30d', group: 'Food' },
+  { name: 'Dining & cafés', color: '#f97316', group: 'Food' },
+  { name: 'Supermarket food', color: '#4ade80', group: 'Food' },
+  { name: 'Other food', color: '#a8a29e', group: 'Food' },
 
+  // Non-food supermarket / household supplies
   { name: 'Supermarket', color: '#22c55e' },
-  { name: 'Supermarket food', color: '#4ade80', group: 'Supermarket' },
   { name: 'Supermarket cleaning', color: '#0ea5e9', group: 'Supermarket' },
   { name: 'Supermarket household', color: '#a16207', group: 'Supermarket' },
   { name: 'Other supermarket', color: '#a8a29e', group: 'Supermarket' },
 
-  { name: 'Hygiene', color: '#2dd4bf' },
-  { name: 'Cleaning', color: '#0ea5e9', group: 'Hygiene' },
-
+  // Bills & utilities
   { name: 'Bills', color: '#ea580c' },
   { name: 'Electricity', color: '#facc15', group: 'Bills' },
   { name: 'Water', color: '#38bdf8', group: 'Bills' },
@@ -44,28 +49,34 @@ export const PERSONAL_EXPENSE: ExpenseDef[] = [
   { name: 'Internet', color: '#0891b2', group: 'Bills' },
   { name: 'Other bills', color: '#a8a29e', group: 'Bills' },
 
-  { name: 'Home expenses', color: '#a16207' },
-  { name: 'Home decor', color: '#f59e0b', group: 'Home expenses' },
-  { name: 'Facility maintenance', color: '#78716c', group: 'Home expenses' },
-  { name: 'Appliance repair', color: '#57534e', group: 'Home expenses' },
-  { name: 'Repairs & fixes', color: '#78716c', group: 'Home expenses' },
-  { name: 'Other home', color: '#a8a29e', group: 'Home expenses' },
+  // Housing & home
+  { name: 'Housing', color: '#a16207' },
+  { name: 'Rent', color: '#7c3aed', group: 'Housing' },
+  { name: 'Insurance', color: '#0369a1', group: 'Housing' },
+  { name: 'Home decor', color: '#f59e0b', group: 'Housing' },
+  { name: 'Facility maintenance', color: '#78716c', group: 'Housing' },
+  { name: 'Appliance repair', color: '#57534e', group: 'Housing' },
+  { name: 'Repairs & fixes', color: '#78716c', group: 'Housing' },
+  { name: 'Other home', color: '#a8a29e', group: 'Housing' },
 
+  // Transport
   { name: 'Transport', color: '#0284c7' },
   { name: 'Fuel', color: '#0369a1', group: 'Transport' },
   { name: 'Car maintenance', color: '#0e7490', group: 'Transport' },
+  { name: 'Car installments', color: '#6d28d9', group: 'Transport' },
   { name: 'Rides', color: '#38bdf8', group: 'Transport' },
   { name: 'Other transport', color: '#a8a29e', group: 'Transport' },
 
-  { name: 'Clothes & shoes', color: '#7c3aed' },
+  // Shopping & durables
+  { name: 'Shopping', color: '#059669' },
+  { name: 'Clothes & shoes', color: '#7c3aed', group: 'Shopping' },
+  { name: 'Electronics', color: '#475569', group: 'Shopping' },
+  { name: 'Electrical appliances', color: '#64748b', group: 'Shopping' },
+  { name: 'Furniture', color: '#d97706', group: 'Shopping' },
+  { name: 'Lamps', color: '#fde047', group: 'Shopping' },
+  { name: 'Other shopping', color: '#a8a29e', group: 'Shopping' },
 
-  { name: 'Durable purchases', color: '#059669' },
-  { name: 'Lamps', color: '#fde047', group: 'Durable purchases' },
-  { name: 'Electrical appliances', color: '#64748b', group: 'Durable purchases' },
-  { name: 'Electronics', color: '#475569', group: 'Durable purchases' },
-  { name: 'Furniture', color: '#d97706', group: 'Durable purchases' },
-  { name: 'Other durables', color: '#a8a29e', group: 'Durable purchases' },
-
+  // Health
   { name: 'Health', color: '#db2777' },
   { name: 'Doctor visit', color: '#f472b6', group: 'Health' },
   { name: 'Medicines', color: '#be185d', group: 'Health' },
@@ -73,46 +84,30 @@ export const PERSONAL_EXPENSE: ExpenseDef[] = [
   { name: 'Lab tests', color: '#e879f9', group: 'Health' },
   { name: 'Other health', color: '#a8a29e', group: 'Health' },
 
+  // Personal care & hygiene
   { name: 'Personal care', color: '#ec4899' },
   { name: 'Beauty', color: '#d946ef', group: 'Personal care' },
   { name: 'Haircut', color: '#c026d3', group: 'Personal care' },
+  { name: 'Cleaning', color: '#0ea5e9', group: 'Personal care' },
   { name: 'Other care', color: '#a8a29e', group: 'Personal care' },
 
-  { name: 'Social occasions', color: '#e11d48' },
+  // Family
+  { name: 'Family', color: '#f59e0b' },
+  { name: 'Pocket money', color: '#fbbf24', group: 'Family' },
+  { name: 'School needs', color: '#d97706', group: 'Family' },
+  { name: 'Education', color: '#2563eb', group: 'Family' },
+  { name: 'Family support', color: '#be185d', group: 'Family' },
+  { name: 'Social occasions', color: '#e11d48', group: 'Family' },
+  { name: 'Other family', color: '#a8a29e', group: 'Family' },
 
-  { name: 'Charity & sadaqah', color: '#0f766e' },
-  { name: 'Ongoing sadaqah', color: '#15803d', group: 'Charity & sadaqah' },
-  { name: 'Zakat', color: '#b45309', group: 'Charity & sadaqah' },
-  { name: 'Sadaqah', color: '#0f766e', group: 'Charity & sadaqah' },
-  { name: 'Other charity', color: '#a8a29e', group: 'Charity & sadaqah' },
+  // Lifestyle
+  { name: 'Lifestyle', color: '#c026d3' },
+  { name: 'Entertainment', color: '#a855f7', group: 'Lifestyle' },
+  { name: 'Sports', color: '#059669', group: 'Lifestyle' },
+  { name: 'Subscriptions', color: '#4f46e5', group: 'Lifestyle' },
+  { name: 'Other lifestyle', color: '#a8a29e', group: 'Lifestyle' },
 
-  { name: 'Debts', color: '#b91c1c' },
-  { name: 'Debt repayment', color: '#dc2626', group: 'Debts' },
-  { name: 'Other debts', color: '#a8a29e', group: 'Debts' },
-
-  { name: 'Installments', color: '#9333ea' },
-  { name: 'Apartment installments', color: '#7c3aed', group: 'Installments' },
-  { name: 'Car installments', color: '#6d28d9', group: 'Installments' },
-  { name: 'Other installments', color: '#a8a29e', group: 'Installments' },
-
-  { name: 'Government fees', color: '#0891b2' },
-  { name: 'Licenses', color: '#65a30d', group: 'Government fees' },
-  { name: 'Traffic fines', color: '#ef4444', group: 'Government fees' },
-
-  { name: 'Dining & cafés', color: '#f97316' },
-  { name: 'Entertainment', color: '#c026d3' },
-  { name: 'Sports', color: '#059669' },
-  { name: 'Subscriptions', color: '#4f46e5' },
-  { name: 'Rent', color: '#7c3aed' },
-  { name: 'Insurance', color: '#0369a1' },
-  { name: 'Family support', color: '#be185d' },
-  { name: 'Education', color: '#2563eb' },
-
-  { name: 'Children', color: '#f59e0b' },
-  { name: 'Pocket money', color: '#fbbf24', group: 'Children' },
-  { name: 'School needs', color: '#d97706', group: 'Children' },
-  { name: 'Other children', color: '#a8a29e', group: 'Children' },
-
+  // Travel
   { name: 'Travel & trips', color: '#0d9488' },
   { name: 'Travel tickets', color: '#2dd4bf', group: 'Travel & trips' },
   { name: 'Travel procedures', color: '#14b8a6', group: 'Travel & trips' },
@@ -120,6 +115,32 @@ export const PERSONAL_EXPENSE: ExpenseDef[] = [
   { name: 'Summer resort', color: '#0f766e', group: 'Travel & trips' },
   { name: 'Other travel', color: '#a8a29e', group: 'Travel & trips' },
 
+  // Charity
+  { name: 'Charity & sadaqah', color: '#0f766e' },
+  { name: 'Mosque', color: '#0f766e', group: 'Charity & sadaqah' },
+  { name: 'Ongoing sadaqah', color: '#15803d', group: 'Charity & sadaqah' },
+  { name: 'Zakat', color: '#b45309', group: 'Charity & sadaqah' },
+  { name: 'Sadaqah', color: '#0f766e', group: 'Charity & sadaqah' },
+  { name: 'Help someone', color: '#0369a1', group: 'Charity & sadaqah' },
+  { name: 'Other charity', color: '#a8a29e', group: 'Charity & sadaqah' },
+
+  // Debts
+  { name: 'Debts', color: '#b91c1c' },
+  { name: 'Debt repayment', color: '#dc2626', group: 'Debts' },
+  { name: 'Other debts', color: '#a8a29e', group: 'Debts' },
+
+  // Installments (non-car)
+  { name: 'Installments', color: '#9333ea' },
+  { name: 'Apartment installments', color: '#7c3aed', group: 'Installments' },
+  { name: 'Other installments', color: '#a8a29e', group: 'Installments' },
+
+  // Government
+  { name: 'Government fees', color: '#0891b2' },
+  { name: 'Licenses', color: '#65a30d', group: 'Government fees' },
+  { name: 'Traffic fines', color: '#ef4444', group: 'Government fees' },
+  { name: 'Other government', color: '#a8a29e', group: 'Government fees' },
+
+  // Trousseau
   { name: "Daughters' trousseau", color: '#be123c' },
   { name: 'Kitchen supplies', color: '#fb7185', group: "Daughters' trousseau" },
   { name: 'Kitchen appliances', color: '#f43f5e', group: "Daughters' trousseau" },

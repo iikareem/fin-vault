@@ -14,16 +14,13 @@ export type CategoryItem = {
 function ColorDot({
   color,
   active = false,
-  size = "md",
 }: {
   color?: string | null;
   active?: boolean;
-  size?: "sm" | "md";
 }) {
-  const dim = size === "sm" ? "h-2.5 w-2.5" : "h-3.5 w-3.5";
   return (
     <span
-      className={`${dim} shrink-0 rounded-full ${active ? "ring-2 ring-white/80" : ""}`}
+      className={`h-2.5 w-2.5 shrink-0 rounded-full ${active ? "ring-2 ring-white/70" : ""}`}
       style={{ backgroundColor: color || "var(--muted)" }}
       aria-hidden
     />
@@ -43,7 +40,9 @@ export function CategoryPicker({
 }) {
   const { t } = useI18n();
   const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
   const activeGroupRef = useRef<HTMLButtonElement | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
 
   const parents = useMemo(
     () => categories.filter((c) => !c.parentId),
@@ -93,12 +92,19 @@ export function CategoryPicker({
   }, [groupChildren, hasSubs, q, t]);
 
   useEffect(() => {
+    if (!open) return;
     activeGroupRef.current?.scrollIntoView({
       block: "nearest",
-      inline: "nearest",
+      inline: "center",
       behavior: "smooth",
     });
-  }, [groupId]);
+  }, [groupId, open]);
+
+  useEffect(() => {
+    if (open && parents.length > 6) {
+      searchRef.current?.focus();
+    }
+  }, [open, parents.length]);
 
   function pickGroup(id: string) {
     const kids = childrenByParent.get(id);
@@ -111,172 +117,127 @@ export function CategoryPicker({
               return q && (label.includes(q) || k.name.toLowerCase().includes(q));
             })?.id ?? kids[0].id;
       onChange(keep);
-    } else {
-      onChange(id);
+      return;
     }
+    onChange(id);
+    setQuery("");
+    setOpen(false);
+  }
+
+  function pickSub(id: string) {
+    onChange(id);
+    setQuery("");
+    setOpen(false);
   }
 
   const selectedLabel = selected
     ? hasSubs && selected.parentId
       ? `${labelFor(group?.name ?? "", t)} · ${labelFor(selected.name, t)}`
       : labelFor(selected.name, t)
-    : "";
-
-  const showSearch = parents.length > 8;
+    : t("catPickGroup");
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="font-medium">{groupLabel ?? t("forWhat")}</p>
-        {hasSubs ? (
-          <span className="text-xs font-semibold text-[var(--muted)]">
-            {t("catStepSub")}
-          </span>
-        ) : (
-          <span className="text-xs font-semibold text-[var(--muted)]">
-            {t("catStepGroup")}
-          </span>
-        )}
-      </div>
+    <div className="space-y-2">
+      <p className="font-medium">{groupLabel ?? t("forWhat")}</p>
 
-      {selectedLabel ? (
-        <div className="soft-card flex items-center gap-2">
-          <ColorDot color={selected?.color || group?.color} />
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-medium text-[var(--muted)]">
-              {t("catSelected")}
-            </p>
-            <p className="truncate font-semibold" dir="auto">
-              {selectedLabel}
-            </p>
-          </div>
-          {hasSubs ? (
-            <span className="shrink-0 rounded-full bg-[var(--surface-bg)] px-2 py-1 text-xs font-semibold text-[var(--muted)] ring-1 ring-[var(--input-border)]">
-              {groupChildren.length}
-            </span>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full min-h-12 items-center gap-2 rounded-2xl bg-[var(--panel-soft)] px-3 py-2.5 text-start ring-1 ring-[var(--input-border)]"
+      >
+        <ColorDot color={selected?.color || group?.color} />
+        <span className="min-w-0 flex-1 truncate font-semibold" dir="auto">
+          {selectedLabel}
+        </span>
+        <span className="shrink-0 text-sm font-bold text-[var(--muted)]">
+          {open ? t("catDone") : t("catChange")}
+        </span>
+      </button>
+
+      {open ? (
+        <div className="space-y-2 rounded-2xl bg-[var(--panel-soft)] p-2.5 ring-1 ring-[var(--input-border)]">
+          {parents.length > 6 ? (
+            <input
+              ref={searchRef}
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={t("catSearch")}
+              className="field !rounded-xl !py-2 text-sm"
+              enterKeyHint="search"
+              autoComplete="off"
+            />
           ) : null}
-        </div>
-      ) : null}
 
-      {showSearch ? (
-        <label className="block">
-          <span className="sr-only">{t("catSearch")}</span>
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder={t("catSearch")}
-            className="field text-base"
-            enterKeyHint="search"
-            autoComplete="off"
-          />
-        </label>
-      ) : null}
-
-      <div>
-        <p className="mb-2 text-sm font-medium text-[var(--muted)]">
-          {t("catPickGroup")}
-        </p>
-        {filteredParents.length === 0 ? (
-          <p className="rounded-2xl bg-[var(--panel-soft)] px-4 py-3 text-sm text-[var(--muted)]">
-            {t("catNoMatch")}
-          </p>
-        ) : (
-          <div
-            className="grid grid-cols-2 gap-2"
-            role="listbox"
-            aria-label={groupLabel ?? t("forWhat")}
-          >
-            {filteredParents.map((p) => {
-              const active = groupId === p.id;
-              const kids = childrenByParent.get(p.id) ?? [];
-              return (
-                <button
-                  key={p.id}
-                  ref={active ? activeGroupRef : undefined}
-                  type="button"
-                  role="option"
-                  aria-selected={active}
-                  onClick={() => pickGroup(p.id)}
-                  className={`flex min-h-[3.5rem] flex-col items-stretch justify-center gap-1 rounded-2xl px-3 py-2.5 text-start transition ${
-                    active
-                      ? "bg-[var(--cta-bg)] text-[var(--cta-fg)] shadow-md"
-                      : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
-                  }`}
-                >
-                  <span className="flex items-center gap-2">
+          {filteredParents.length === 0 ? (
+            <p className="px-2 py-2 text-sm text-[var(--muted)]">
+              {t("catNoMatch")}
+            </p>
+          ) : (
+            <div
+              className="chip-rail -mx-0.5 px-0.5"
+              role="listbox"
+              aria-label={groupLabel ?? t("forWhat")}
+            >
+              {filteredParents.map((p) => {
+                const active = groupId === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    ref={active ? activeGroupRef : undefined}
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    onClick={() => pickGroup(p.id)}
+                    className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold ${
+                      active
+                        ? "bg-[var(--cta-bg)] text-[var(--cta-fg)]"
+                        : "bg-[var(--surface-bg)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
+                    }`}
+                  >
                     <ColorDot color={p.color} active={active} />
-                    <span className="min-w-0 flex-1 truncate text-sm font-bold leading-tight">
-                      {labelFor(p.name, t)}
-                    </span>
-                  </span>
-                  {kids.length > 0 ? (
-                    <span
-                      className={`ps-5 text-[0.7rem] font-medium ${
-                        active ? "opacity-80" : "text-[var(--muted)]"
+                    {labelFor(p.name, t)}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          {hasSubs ? (
+            <div
+              className="max-h-36 overflow-y-auto overscroll-contain rounded-xl bg-[var(--surface-bg)] p-1.5"
+              role="listbox"
+              aria-label={t("pickSubCategory")}
+            >
+              <div className="flex flex-wrap gap-1.5">
+                {filteredChildren.map((c) => {
+                  const active = selected?.parentId ? value === c.id : false;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      role="option"
+                      aria-selected={active}
+                      onClick={() => pickSub(c.id)}
+                      className={`inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-semibold ${
+                        active
+                          ? "bg-[var(--cta-bg)] text-[var(--cta-fg)]"
+                          : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
                       }`}
                     >
-                      {t("catSubCount", { n: String(kids.length) })}
-                    </span>
-                  ) : null}
-                </button>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {hasSubs ? (
-        <div className="rounded-[1.25rem] bg-[var(--panel-soft)] p-3 ring-1 ring-[var(--input-border)]">
-          <p className="mb-2 text-sm font-medium">
-            {t("pickSubCategory")}
-            {group ? (
-              <span className="ms-1 text-[var(--muted)]">
-                · {labelFor(group.name, t)}
-              </span>
-            ) : null}
-          </p>
-          <div
-            className="grid grid-cols-1 gap-1.5"
-            role="listbox"
-            aria-label={t("pickSubCategory")}
-          >
-            {filteredChildren.map((c) => {
-              const active = selected?.parentId ? value === c.id : false;
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  role="option"
-                  aria-selected={active}
-                  onClick={() => onChange(c.id)}
-                  className={`flex min-h-12 items-center gap-3 rounded-xl px-3 py-2.5 text-start transition ${
-                    active
-                      ? "bg-[var(--cta-bg)] text-[var(--cta-fg)] shadow-sm"
-                      : "bg-[var(--surface-bg)] text-[var(--foreground)]"
-                  }`}
-                >
-                  <ColorDot color={c.color || group?.color} active={active} size="sm" />
-                  <span className="min-w-0 flex-1 truncate font-semibold">
-                    {labelFor(c.name, t)}
-                  </span>
-                  {active ? (
-                    <span
-                      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/20 text-sm font-bold"
-                      aria-hidden
-                    >
-                      ✓
-                    </span>
-                  ) : (
-                    <span
-                      className="h-6 w-6 shrink-0 rounded-full ring-1 ring-[var(--input-border)]"
-                      aria-hidden
-                    />
-                  )}
-                </button>
-              );
-            })}
-          </div>
+                      <ColorDot
+                        color={c.color || group?.color}
+                        active={active}
+                      />
+                      {labelFor(c.name, t)}
+                      {active ? <span aria-hidden>✓</span> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
     </div>
