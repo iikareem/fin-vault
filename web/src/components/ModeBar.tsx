@@ -14,9 +14,9 @@ export function ModeBar() {
   const kind = active?.kind ?? "HOUSE";
 
   return (
-    <div className="sticky top-0 z-30 bg-[#edf4f0]/92 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
+    <div className="chrome-bar sticky top-0 z-30 pt-[env(safe-area-inset-top)] backdrop-blur-xl">
       <div className="mx-auto flex max-w-lg items-center gap-2 px-3 py-2 sm:px-4">
-        <div className="grid min-w-0 flex-1 grid-cols-2 gap-1 rounded-full bg-white p-1 shadow-sm">
+        <div className="grid min-w-0 flex-1 grid-cols-2 gap-1 rounded-full bg-[var(--surface-bg)] p-1 shadow-sm">
           <button
             type="button"
             onClick={() => setKind("HOUSE")}

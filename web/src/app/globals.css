@@ -30,30 +30,57 @@
 :root {
   --background: #edf4f0;
   --foreground: #1c1917;
-  --surface-bg: rgb(255 255 255 / 0.9);
+  --chrome-bg: rgb(237 244 240 / 0.92);
+  --surface-bg: rgb(255 255 255 / 0.92);
   --surface-border: rgb(255 255 255 / 0.95);
   --surface-shadow: 0 10px 28px rgb(15 59 42 / 0.08);
+  --nav-bg: rgb(255 255 255 / 0.82);
+  --nav-border: rgb(255 255 255 / 0.7);
+  --nav-shadow: 0 8px 24px rgb(15 59 42 / 0.06);
   --input-bg: #ffffff;
   --input-border: #d6d3d1;
   --muted: #78716c;
   --panel-soft: #fafaf9;
+  --soft-emerald: #ecfdf5;
+  --soft-sky: #f0f9ff;
+  --soft-amber: #fffbeb;
+  --soft-indigo: #eef2ff;
+  --soft-red: #fef2f2;
+  --cta-bg: #1c1917;
+  --cta-fg: #ffffff;
+  --grad-a: rgba(16, 185, 129, 0.18);
+  --grad-b: rgba(14, 165, 233, 0.12);
 }
 
 html.dark {
   color-scheme: dark;
-  --background: #101614;
-  --foreground: #f5f5f4;
-  --surface-bg: rgb(28 35 32 / 0.94);
-  --surface-border: rgb(68 75 70 / 0.9);
-  --surface-shadow: 0 10px 28px rgb(0 0 0 / 0.35);
-  --input-bg: #1a221f;
-  --input-border: #44403c;
+  --background: #0b110f;
+  --foreground: #eef2f0;
+  --chrome-bg: rgb(11 17 15 / 0.94);
+  --surface-bg: #1c2522;
+  --surface-border: #33403b;
+  --surface-shadow: 0 8px 22px rgb(0 0 0 / 0.35);
+  --nav-bg: rgb(18 24 22 / 0.92);
+  --nav-border: #2a3330;
+  --nav-shadow: 0 8px 24px rgb(0 0 0 / 0.4);
+  --input-bg: #121916;
+  --input-border: #3a433f;
   --muted: #a8a29e;
-  --panel-soft: #1c2421;
+  --panel-soft: #252e2a;
+  --soft-emerald: #123028;
+  --soft-sky: #102a36;
+  --soft-amber: #322714;
+  --soft-indigo: #1d1a36;
+  --soft-red: #321818;
+  --cta-bg: #e7e5e4;
+  --cta-fg: #1c1917;
+  --grad-a: rgba(16, 185, 129, 0.1);
+  --grad-b: rgba(14, 165, 233, 0.07);
 }
 
 html {
   overflow-x: hidden;
+  background-color: var(--background);
 }
 
 html,
@@ -64,33 +91,29 @@ body {
 }
 
 body {
-  background-image:
-    radial-gradient(
-      ellipse 90% 48% at 50% -8%,
-      rgba(16, 185, 129, 0.18),
-      transparent 58%
-    ),
-    radial-gradient(
-      ellipse 70% 42% at 108% 108%,
-      rgba(14, 165, 233, 0.12),
-      transparent 52%
-    );
-  background-attachment: scroll;
+  position: relative;
   color: var(--foreground);
   font-family: var(--font-arabic), system-ui, sans-serif;
   -webkit-tap-highlight-color: transparent;
 }
 
-html.dark body {
+/* Full-viewport wash so scroll/overscroll never shows a light strip. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: var(--background);
   background-image:
     radial-gradient(
       ellipse 90% 48% at 50% -8%,
-      rgba(16, 185, 129, 0.12),
+      var(--grad-a),
       transparent 58%
     ),
     radial-gradient(
       ellipse 70% 42% at 108% 108%,
-      rgba(14, 165, 233, 0.08),
+      var(--grad-b),
       transparent 52%
     );
 }
@@ -121,6 +144,17 @@ textarea {
   box-shadow: var(--surface-shadow);
 }
 
+@utility chrome-bar {
+  background-color: var(--chrome-bg);
+}
+
+@utility nav-shell {
+  background-color: var(--nav-bg);
+  border: 1px solid var(--nav-border);
+  box-shadow: var(--nav-shadow);
+}
+
+/* Dark: remap light-only utility colors used across pages. */
 html.dark .text-stone-900 {
   color: #f5f5f4;
 }
@@ -131,39 +165,94 @@ html.dark .text-stone-700,
 html.dark .text-stone-600 {
   color: #d6d3d1;
 }
-html.dark .text-stone-500 {
+html.dark .text-stone-500,
+html.dark .text-stone-400 {
   color: var(--muted);
 }
-html.dark .bg-white,
-html.dark .bg-white\/70,
-html.dark .bg-white\/90 {
+
+html.dark .bg-white {
   background-color: var(--surface-bg);
 }
+html.dark .bg-white\/70 {
+  background-color: rgb(23 30 28 / 0.7);
+}
+html.dark .bg-white\/80 {
+  background-color: rgb(23 30 28 / 0.82);
+}
+html.dark .bg-white\/90 {
+  background-color: rgb(23 30 28 / 0.9);
+}
+
 html.dark .bg-stone-50,
-html.dark .bg-stone-100 {
+html.dark .bg-stone-100,
+html.dark .bg-stone-100\/90 {
   background-color: var(--panel-soft);
 }
+
+html.dark .bg-stone-700 {
+  background-color: #3f4a45;
+  color: #f5f5f4;
+}
+
 html.dark .border-stone-200,
-html.dark .border-stone-300 {
+html.dark .border-stone-300,
+html.dark .border-white\/70 {
   border-color: var(--input-border);
 }
-html.dark .bg-stone-900 {
-  background-color: #e7e5e4;
-  color: #1c1917;
+
+html.dark .bg-emerald-50,
+html.dark .bg-emerald-50\/60 {
+  background-color: var(--soft-emerald);
 }
-html.dark .text-white {
-  color: #fafaf9;
+html.dark .bg-sky-50 {
+  background-color: var(--soft-sky);
 }
-html.dark .bg-stone-900.text-white,
-html.dark button.bg-stone-900 {
-  color: #1c1917;
+html.dark .bg-amber-50,
+html.dark .bg-amber-50\/60 {
+  background-color: var(--soft-amber);
+}
+html.dark .bg-indigo-50 {
+  background-color: var(--soft-indigo);
+}
+html.dark .bg-red-50 {
+  background-color: var(--soft-red);
+}
+
+html.dark .text-emerald-900,
+html.dark .text-emerald-950 {
+  color: #a7f3d0;
 }
 html.dark .text-emerald-800 {
   color: #6ee7b7;
 }
+html.dark .text-sky-900,
+html.dark .text-sky-950 {
+  color: #bae6fd;
+}
+html.dark .text-sky-800 {
+  color: #7dd3fc;
+}
+html.dark .text-amber-800,
+html.dark .text-amber-900 {
+  color: #fcd34d;
+}
+html.dark .text-indigo-800,
+html.dark .text-indigo-900 {
+  color: #c7d2fe;
+}
 html.dark .text-red-700,
 html.dark .text-red-800 {
   color: #fca5a5;
+}
+
+/* Neutral CTAs stay high-contrast on dark pages. */
+html.dark .bg-stone-900 {
+  background-color: var(--cta-bg);
+  color: var(--cta-fg);
+}
+
+html.dark .border-amber-100\/80 {
+  border-color: #4a3b1c;
 }
 
 @utility page-shell {

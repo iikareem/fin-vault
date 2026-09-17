@@ -37,9 +37,24 @@ const BooksContext = createContext<BooksValue | null>(null);
 const HOUSE_ONLY = ["/between", "/family", "/charity", "/more", "/with-house"];
 const PERSONAL_ONLY = ["/gold", "/outside-loans"];
 
+const THEME_KEY = "fb_theme";
+
 function applyTheme(theme: ThemeMode) {
   if (typeof document === "undefined") return;
   document.documentElement.classList.toggle("dark", theme === "dark");
+  try {
+    localStorage.setItem(THEME_KEY, theme);
+  } catch {
+    /* ignore */
+  }
+  const color = theme === "dark" ? "#0b110f" : "#edf4f0";
+  let meta = document.querySelector('meta[name="theme-color"]');
+  if (!meta) {
+    meta = document.createElement("meta");
+    meta.setAttribute("name", "theme-color");
+    document.head.appendChild(meta);
+  }
+  meta.setAttribute("content", color);
 }
 
 export function BooksProvider({ children }: { children: ReactNode }) {

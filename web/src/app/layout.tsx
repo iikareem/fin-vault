@@ -45,7 +45,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ar" dir="rtl" className={`${arabic.variable} h-full`}>
-      <body className="min-h-full text-stone-900 antialiased">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(localStorage.getItem("fb_theme")==="dark"){document.documentElement.classList.add("dark");var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute("content","#0b110f");}}catch(e){}`,
+          }}
+        />
+      </head>
+      <body className="min-h-full antialiased text-[var(--foreground)]">
         <noscript>
           هذا الموقع يحتاج جافاسكريبت. لو الآيفون قديم، حدّثي النظام أو جرّبي كروم.
         </noscript>

@@ -6,7 +6,7 @@ export function LanguageSwitch({ compact = false }: { compact?: boolean }) {
   const { locale, setLocale, t } = useI18n();
   const pad = compact ? "min-h-11 px-2.5 py-1" : "px-3 py-1";
   return (
-    <div className="inline-flex shrink-0 rounded-full bg-white p-1 text-sm font-semibold shadow-sm">
+    <div className="inline-flex shrink-0 rounded-full bg-[var(--surface-bg)] p-1 text-sm font-semibold shadow-sm">
       <button
         type="button"
         onClick={() => setLocale("ar")}

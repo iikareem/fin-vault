@@ -168,7 +168,7 @@ export function BottomNav() {
   return (
     <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-20 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-4">
       <div className="pointer-events-auto relative mx-auto max-w-lg">
-        <ul className="grid grid-cols-5 items-end gap-0.5 rounded-2xl border border-white/70 bg-white/80 px-1.5 pb-1.5 pt-1.5 shadow-[0_8px_24px_rgb(15_59_42/0.06)] backdrop-blur-xl">
+        <ul className="nav-shell grid grid-cols-5 items-end gap-0.5 rounded-2xl px-1.5 pb-1.5 pt-1.5 backdrop-blur-xl">
           {left.map(sideLink)}
           <li className="relative flex min-h-12 items-end justify-center pb-0.5">
             <Link
@@ -177,7 +177,7 @@ export function BottomNav() {
               aria-label={t("navAdd")}
               className={`-mt-8 mb-0.5 flex h-14 w-14 shrink-0 items-center justify-center rounded-full transition-transform ${
                 addActive ? accent.fab : accent.fabIdle
-              } ${addActive ? "scale-105 ring-4 ring-white" : "hover:scale-105"}`}
+              } ${addActive ? "scale-105 ring-4 ring-[var(--background)]" : "hover:scale-105"}`}
             >
               <NavGlyph name="add" />
             </Link>

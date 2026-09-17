@@ -1513,13 +1513,16 @@ export default function HomePage() {
           <Hint>{t("latestHint")}</Hint>
           <ul className="mt-3 space-y-2">
             {txs.map((tx) => (
-              <li key={tx.id} className="surface rounded-2xl px-4 py-3">
+              <li
+                key={tx.id}
+                className="surface rounded-2xl px-4 py-3 text-[var(--foreground)]"
+              >
                 <div className="money-row min-w-0">
                   <div className="min-w-0 text-right" dir="auto">
                     <span className="font-medium">
                       {labelFor(tx.category.name, t)}
                       {tx.type === "TRACK" ? (
-                        <span className="ms-2 text-sm font-normal text-stone-500">
+                        <span className="ms-2 text-sm font-normal text-[var(--muted)]">
                           ({t("trackOnlyBadge")})
                         </span>
                       ) : null}
@@ -1535,7 +1538,7 @@ export default function HomePage() {
                       tx.type === "INCOME"
                         ? "text-emerald-800"
                         : tx.type === "TRACK"
-                          ? "text-stone-700"
+                          ? "text-[var(--muted)]"
                           : "text-red-800"
                     }`}
                   >
@@ -1554,7 +1557,7 @@ export default function HomePage() {
                   </span>
                 </div>
                 {tx.user.name !== "House" || tx.note ? (
-                  <p className="text-sm text-stone-500">
+                  <p className="mt-1 text-sm text-[var(--muted)]">
                     {[
                       tx.user.name === "House" ? null : labelFor(tx.user.name, t),
                       tx.type === "TRACK"
