@@ -85,6 +85,7 @@ export default function AnalyticsPage() {
   const [days, setDays] = useState<DayRow[]>([]);
   const [cats, setCats] = useState<CatRow[]>([]);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+  const [selectedOnly, setSelectedOnly] = useState(true);
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [savingsMonths, setSavingsMonths] = useState<SavingsMonth[]>([]);
   const [savingsOpening, setSavingsOpening] = useState(0);
@@ -113,6 +114,7 @@ export default function AnalyticsPage() {
         setDays(d);
         setCats(c.filter((x) => x.type === "EXPENSE"));
         setSelectedGroups([]);
+        setSelectedOnly(true);
         setMembers(m);
         setSavingsOpening(s.opening);
         setSavingsMonths(s.months);
@@ -120,26 +122,47 @@ export default function AnalyticsPage() {
       .catch((e) => setError(e.message));
   }, [active?.householdId, from, to]);
 
-  const visibleCats = useMemo(() => {
-    if (selectedGroups.length === 0) return cats;
-    const picked = new Set(selectedGroups);
-    return cats.filter((c) => picked.has(c.categoryId ?? c.name));
-  }, [cats, selectedGroups]);
-
-  const selectedTotal = useMemo(
-    () => visibleCats.reduce((s, c) => s + c.total, 0),
-    [visibleCats],
-  );
-
   function catKey(c: CatRow) {
     return c.categoryId ?? c.name;
   }
+
+  const selectedSet = useMemo(() => new Set(selectedGroups), [selectedGroups]);
+  const selectionActive = selectedGroups.length > 0;
+
+  const selectedCats = useMemo(() => {
+    if (!selectionActive) return [];
+    return cats.filter((c) => selectedSet.has(catKey(c)));
+  }, [cats, selectedSet, selectionActive]);
+
+  const otherCats = useMemo(() => {
+    if (!selectionActive) return [];
+    return cats.filter((c) => !selectedSet.has(catKey(c)));
+  }, [cats, selectedSet, selectionActive]);
+
+  const selectedTotal = useMemo(
+    () => selectedCats.reduce((s, c) => s + c.total, 0),
+    [selectedCats],
+  );
+
+  const listCats = useMemo(() => {
+    if (!selectionActive) return cats;
+    if (selectedOnly) return selectedCats;
+    return [...selectedCats, ...otherCats];
+  }, [selectionActive, selectedOnly, cats, selectedCats, otherCats]);
+
+  const maxCat = Math.max(1, ...listCats.map((c) => c.total));
 
   function toggleGroup(key: string) {
     setSelectedGroups((prev) =>
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
     );
   }
+
+  function pickTop(n: number) {
+    setSelectedGroups(cats.slice(0, n).map(catKey));
+    setSelectedOnly(true);
+  }
+
   const months = useMemo(() => {
     const map = new Map<string, { key: string; income: number; expense: number }>();
     for (const d of days) {
@@ -159,8 +182,6 @@ export default function AnalyticsPage() {
   const bars =
     period === "year" ? months.map((m) => ({ key: m.key, expense: m.expense, label: monthLabel(m.key, locale) })) : period === "month" ? days.map((d) => ({ key: d.day, expense: d.expense, label: d.day })) : [];
   const maxBar = Math.max(1, ...bars.map((b) => b.expense));
-  const maxCat = Math.max(1, ...visibleCats.map((c) => c.total));
-  const selectionActive = selectedGroups.length > 0;
   const monthKey = `${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}`;
   const yearKey = String(cursor.getFullYear());
   const yearSavings = savingsMonths.filter((m) => m.month.startsWith(yearKey));
@@ -182,14 +203,16 @@ export default function AnalyticsPage() {
     <PageShell>
       <h1 className="text-2xl font-bold leading-tight sm:text-3xl">📊 {t("navCharts")}</h1>
       <Hint>{t("chartsHint")}</Hint>
-      <div className="mt-4 grid grid-cols-3 gap-2 rounded-3xl bg-stone-200 p-1.5">
+      <div className="mt-4 grid grid-cols-3 gap-2 rounded-3xl bg-[var(--panel-soft)] p-1.5">
         {(["day", "month", "year"] as Period[]).map((p) => (
           <button
             key={p}
             type="button"
             onClick={() => setPeriod(p)}
-            className={`rounded-2xl py-3 text-lg font-bold ${
-              period === p ? "bg-white text-stone-900 shadow" : "text-stone-500"
+            className={`rounded-2xl py-3 text-lg font-bold transition ${
+              period === p
+                ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
+                : "text-[var(--muted)]"
             }`}
           >
             {p === "day" ? t("periodDay") : p === "month" ? t("periodMonth") : t("periodYear")}
@@ -200,7 +223,7 @@ export default function AnalyticsPage() {
       <div className="mt-4 flex items-center justify-between gap-3">
         <button
           type="button"
-          className="rounded-2xl bg-white px-4 py-3 text-xl font-bold shadow-sm"
+          className="surface rounded-2xl px-4 py-3 text-xl font-bold"
           onClick={() => setCursor((c) => shift(period, c, -1))}
         >
           ‹
@@ -213,7 +236,7 @@ export default function AnalyticsPage() {
               onChange={(e) => {
                 if (e.target.value) setCursor(new Date(`${e.target.value}T12:00:00`));
               }}
-              className="w-full rounded-2xl border border-stone-200 bg-white px-3 py-2 text-center text-lg font-semibold"
+              className="w-full rounded-2xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-center text-lg font-semibold"
             />
           ) : period === "month" ? (
             <input
@@ -222,7 +245,7 @@ export default function AnalyticsPage() {
               onChange={(e) => {
                 if (e.target.value) setCursor(new Date(`${e.target.value}-01T12:00:00`));
               }}
-              className="w-full rounded-2xl border border-stone-200 bg-white px-3 py-2 text-center text-lg font-semibold"
+              className="w-full rounded-2xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-center text-lg font-semibold"
             />
           ) : (
             <input
@@ -234,13 +257,13 @@ export default function AnalyticsPage() {
                 const y = Number(e.target.value);
                 if (y) setCursor(new Date(y, 0, 1));
               }}
-              className="w-full rounded-2xl border border-stone-200 bg-white px-3 py-2 text-center text-lg font-semibold"
+              className="w-full rounded-2xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-center text-lg font-semibold"
             />
           )}
         </div>
         <button
           type="button"
-          className="rounded-2xl bg-white px-4 py-3 text-xl font-bold shadow-sm"
+          className="surface rounded-2xl px-4 py-3 text-xl font-bold"
           onClick={() => setCursor((c) => shift(period, c, 1))}
         >
           ›
@@ -363,8 +386,8 @@ export default function AnalyticsPage() {
       ) : null}
 
       <div className="mt-5 grid grid-cols-2 gap-3">
-        <div className="rounded-2xl bg-white p-4 shadow-sm">
-          <p className="text-stone-500">{t("periodTotalIn")}</p>
+        <div className="surface rounded-2xl p-4">
+          <p className="text-[var(--muted)]">{t("periodTotalIn")}</p>
           <p className="text-xl font-semibold text-emerald-800">
             {hideAggregates ? (
               "••••"
@@ -373,8 +396,8 @@ export default function AnalyticsPage() {
             )}
           </p>
         </div>
-        <div className="rounded-2xl bg-white p-4 shadow-sm">
-          <p className="text-stone-500">{t("periodTotalOut")}</p>
+        <div className="surface rounded-2xl p-4">
+          <p className="text-[var(--muted)]">{t("periodTotalOut")}</p>
           <p className="text-xl font-semibold text-red-800">
             {hideAggregates ? (
               "••••"
@@ -430,110 +453,240 @@ export default function AnalyticsPage() {
         </>
       ) : null}
 
-      <h2 className="mt-8 text-xl font-semibold">{t("whereMoneyWent")}</h2>
+      <h2 className="mt-8 text-xl font-semibold">{t("spendExplorer")}</h2>
       <Hint>{t("pickGroupsHint")}</Hint>
 
       {cats.length > 0 ? (
-        <section className="surface mt-3 rounded-[1.75rem] p-4">
-          <div className="flex items-center justify-between gap-2">
-            <p className="font-semibold">{t("pickGroups")}</p>
-            <div className="flex shrink-0 gap-2">
-              {selectionActive ? (
+        <section className="surface mt-3 overflow-hidden rounded-[1.75rem]">
+          <div className="border-b border-[var(--surface-border)] px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-semibold">{t("pickGroups")}</p>
+              <div className="flex flex-wrap gap-1.5">
                 <button
                   type="button"
-                  onClick={() => setSelectedGroups([])}
-                  className="rounded-full border border-[var(--input-border)] bg-[var(--panel-soft)] px-3 py-1.5 text-sm font-semibold"
+                  onClick={() => pickTop(3)}
+                  disabled={cats.length === 0}
+                  className="rounded-full bg-[var(--panel-soft)] px-3 py-1.5 text-sm font-semibold"
                 >
-                  {t("clearSelection")}
+                  {t("topThreeGroups")}
                 </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => setSelectedGroups(cats.map(catKey))}
-                className="rounded-full border border-[var(--input-border)] bg-[var(--panel-soft)] px-3 py-1.5 text-sm font-semibold"
-              >
-                {t("selectAllGroups")}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => pickTop(5)}
+                  disabled={cats.length < 2}
+                  className="rounded-full bg-[var(--panel-soft)] px-3 py-1.5 text-sm font-semibold"
+                >
+                  {t("topFiveGroups")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedGroups(cats.map(catKey));
+                    setSelectedOnly(true);
+                  }}
+                  className="rounded-full bg-[var(--panel-soft)] px-3 py-1.5 text-sm font-semibold"
+                >
+                  {t("selectAllGroups")}
+                </button>
+                {selectionActive ? (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedGroups([])}
+                    className="rounded-full bg-[var(--panel-soft)] px-3 py-1.5 text-sm font-semibold text-red-800"
+                  >
+                    {t("clearSelection")}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {cats.map((c) => {
+                const key = catKey(c);
+                const on = selectedSet.has(key);
+                const pct =
+                  totalOut > 0 ? Math.round((c.total / totalOut) * 100) : 0;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => toggleGroup(key)}
+                    aria-pressed={on}
+                    className={`inline-flex shrink-0 flex-col items-start gap-0.5 rounded-2xl border px-3 py-2 text-start transition ${
+                      on
+                        ? "border-transparent text-white shadow-sm"
+                        : "border-[var(--input-border)] bg-[var(--panel-soft)] text-[var(--foreground)]"
+                    }`}
+                    style={on ? { background: c.color } : undefined}
+                  >
+                    <span className="inline-flex items-center gap-2 text-sm font-semibold">
+                      <span
+                        className="h-2.5 w-2.5 rounded-full"
+                        style={{
+                          background: on ? "rgba(255,255,255,0.95)" : c.color,
+                        }}
+                        aria-hidden
+                      />
+                      {labelFor(c.name, t)}
+                    </span>
+                    {!hideAggregates ? (
+                      <span
+                        className={`text-xs ${on ? "text-white/90" : "text-[var(--muted)]"}`}
+                      >
+                        <Money
+                          amount={c.total}
+                          currency={currency}
+                          locale={locale}
+                        />
+                        {pct > 0 ? ` · ${pct}%` : ""}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          <div className="mt-3 flex flex-wrap gap-2">
-            {cats.map((c) => {
-              const key = catKey(c);
-              const on = selectedGroups.includes(key);
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => toggleGroup(key)}
-                  aria-pressed={on}
-                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-semibold transition ${
-                    on
-                      ? "border-transparent text-white shadow-sm"
-                      : "border-[var(--input-border)] bg-[var(--panel-soft)] text-[var(--foreground)]"
-                  }`}
-                  style={on ? { background: c.color } : undefined}
-                >
-                  <span
-                    className="h-2.5 w-2.5 rounded-full"
-                    style={{
-                      background: on ? "rgba(255,255,255,0.9)" : c.color,
-                    }}
-                    aria-hidden
-                  />
-                  {labelFor(c.name, t)}
-                </button>
-              );
-            })}
-          </div>
+          <div className="px-4 py-4">
+            {selectionActive ? (
+              <>
+                <div className="rounded-2xl bg-[var(--panel-soft)] px-4 py-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm text-[var(--muted)]">
+                        {t("nGroupsSelected", {
+                          n: String(selectedGroups.length),
+                        })}
+                      </p>
+                      <p className="mt-0.5 text-sm font-medium">
+                        {t("selectedSpend")}
+                      </p>
+                      <p className="mt-1 text-3xl font-bold tracking-tight text-red-800">
+                        {hideAggregates ? (
+                          "••••"
+                        ) : (
+                          <Money
+                            amount={selectedTotal}
+                            currency={currency}
+                            locale={locale}
+                          />
+                        )}
+                      </p>
+                    </div>
+                    {!hideAggregates && totalOut > 0 ? (
+                      <div className="rounded-2xl bg-[var(--surface-bg)] px-3 py-2 text-center">
+                        <p className="text-2xl font-bold text-red-800">
+                          {Math.round((selectedTotal / totalOut) * 100)}%
+                        </p>
+                        <p className="text-xs text-[var(--muted)]">
+                          {t("periodShareLabel")}
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
 
-          {selectionActive ? (
-            <div className="mt-4 rounded-2xl bg-[var(--panel-soft)] px-4 py-3">
-              <p className="text-sm text-[var(--muted)]">
-                {t("nGroupsSelected", { n: String(selectedGroups.length) })}
-              </p>
-              <p className="mt-1 text-sm font-medium">{t("selectedSpend")}</p>
-              <p className="mt-1 text-2xl font-bold text-red-800">
-                {hideAggregates ? (
-                  "••••"
-                ) : (
-                  <Money
-                    amount={selectedTotal}
-                    currency={currency}
-                    locale={locale}
-                  />
-                )}
-              </p>
-              {!hideAggregates && totalOut > 0 ? (
-                <p className="mt-1 text-sm text-[var(--muted)]">
-                  {t("selectedShare", {
-                    pct: String(Math.round((selectedTotal / totalOut) * 100)),
-                  })}
-                </p>
-              ) : null}
-            </div>
-          ) : (
-            <p className="mt-3 text-sm text-[var(--muted)]">
-              {t("pickGroupsEmpty")}
-            </p>
-          )}
+                  {!hideAggregates && selectedTotal > 0 ? (
+                    <div className="mt-3">
+                      <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">
+                        {t("spendComposition")}
+                      </p>
+                      <div className="flex h-3 overflow-hidden rounded-full bg-[var(--surface-bg)]">
+                        {selectedCats.map((c) => (
+                          <div
+                            key={catKey(c)}
+                            title={labelFor(c.name, t)}
+                            style={{
+                              width: `${(c.total / selectedTotal) * 100}%`,
+                              background: c.color,
+                            }}
+                          />
+                        ))}
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                        {selectedCats.slice(0, 4).map((c) => (
+                          <span
+                            key={catKey(c)}
+                            className="inline-flex items-center gap-1.5 text-xs text-[var(--muted)]"
+                          >
+                            <span
+                              className="h-2 w-2 rounded-full"
+                              style={{ background: c.color }}
+                            />
+                            {labelFor(c.name, t)}{" "}
+                            {Math.round((c.total / selectedTotal) * 100)}%
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOnly(true)}
+                    className={`rounded-2xl px-3 py-2.5 text-sm font-semibold ${
+                      selectedOnly
+                        ? "bg-[var(--cta-bg)] text-[var(--cta-fg)]"
+                        : "bg-[var(--panel-soft)]"
+                    }`}
+                  >
+                    {t("showSelectedOnly")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedOnly(false)}
+                    className={`rounded-2xl px-3 py-2.5 text-sm font-semibold ${
+                      !selectedOnly
+                        ? "bg-[var(--cta-bg)] text-[var(--cta-fg)]"
+                        : "bg-[var(--panel-soft)]"
+                    }`}
+                  >
+                    {t("showAllGroups")}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-[var(--muted)]">{t("pickGroupsEmpty")}</p>
+            )}
+          </div>
         </section>
       ) : null}
 
-      <ul className="mt-4 space-y-3">
-        {visibleCats.length === 0 ? (
+      <ul className="mt-4 space-y-2">
+        {listCats.length === 0 ? (
           <li className="text-[var(--muted)]">{t("noPeriodData")}</li>
         ) : (
-          visibleCats.map((c) => {
+          listCats.map((c, i) => {
             const key = catKey(c);
-            const on = selectedGroups.includes(key);
+            const on = selectedSet.has(key);
+            const dim = selectionActive && !on;
+            const shareBase = selectionActive && on && selectedTotal > 0
+              ? selectedTotal
+              : totalOut;
+            const pct =
+              shareBase > 0 ? Math.round((c.total / shareBase) * 100) : 0;
+            const showOtherHeader =
+              selectionActive &&
+              !selectedOnly &&
+              i === selectedCats.length &&
+              otherCats.length > 0;
             return (
               <li key={key}>
+                {showOtherHeader ? (
+                  <p className="mb-2 mt-3 text-sm font-semibold text-[var(--muted)]">
+                    {t("compareOthers")}
+                  </p>
+                ) : null}
                 <button
                   type="button"
                   onClick={() => toggleGroup(key)}
-                  className={`w-full rounded-2xl px-1 py-1 text-start transition ${
-                    on ? "bg-[var(--panel-soft)]" : ""
+                  className={`w-full rounded-2xl px-3 py-2.5 text-start transition ${
+                    on
+                      ? "bg-[var(--panel-soft)] ring-1 ring-[var(--input-border)]"
+                      : dim
+                        ? "opacity-45"
+                        : "hover:bg-[var(--panel-soft)]"
                   }`}
                 >
                   <div className="flex justify-between gap-3">
@@ -551,21 +704,30 @@ export default function AnalyticsPage() {
                       </span>
                       <span className="truncate">{labelFor(c.name, t)}</span>
                     </span>
-                    <span className="shrink-0 font-semibold">
-                      {hideAggregates ? (
-                        "••••"
-                      ) : (
-                        <Money
-                          amount={c.total}
-                          currency={currency}
-                          locale={locale}
-                        />
-                      )}
+                    <span className="shrink-0 text-end">
+                      <span className="block font-semibold">
+                        {hideAggregates ? (
+                          "••••"
+                        ) : (
+                          <Money
+                            amount={c.total}
+                            currency={currency}
+                            locale={locale}
+                          />
+                        )}
+                      </span>
+                      {!hideAggregates && pct > 0 ? (
+                        <span className="text-xs text-[var(--muted)]">
+                          {selectionActive && on
+                            ? t("ofSelection", { pct: String(pct) })
+                            : t("ofPeriod", { pct: String(pct) })}
+                        </span>
+                      ) : null}
                     </span>
                   </div>
-                  <div className="mt-1 h-3 overflow-hidden rounded-full bg-stone-200">
+                  <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-stone-200">
                     <div
-                      className="h-full rounded-full"
+                      className="h-full rounded-full transition-[width]"
                       style={{
                         width: hideAggregates
                           ? "0%"
