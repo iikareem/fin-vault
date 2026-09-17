@@ -45,9 +45,9 @@ export const THEME_OPTIONS: ThemeOption[] = [
   },
   {
     id: "rose",
-    themeColor: "#fceef3",
-    /** page · house (pink) · personal (purple) */
-    swatch: ["#fceef3", "#be185d", "#a21caf"],
+    themeColor: "#fff5f8",
+    /** page · house (soft pink) · personal (lilac) */
+    swatch: ["#fff5f8", "#f472b6", "#c084fc"],
   },
 ];
 
