@@ -21,27 +21,32 @@ export const THEME_OPTIONS: ThemeOption[] = [
   {
     id: "light",
     themeColor: "#edf4f0",
+    /** page · house (green) · personal (blue) */
     swatch: ["#edf4f0", "#065f46", "#075985"],
   },
   {
     id: "dark",
     themeColor: "#0b110f",
-    swatch: ["#0b110f", "#059669", "#0284c7"],
+    /** page · house (mint) · personal (violet) */
+    swatch: ["#0b110f", "#059669", "#8b5cf6"],
     dark: true,
   },
   {
     id: "blue",
     themeColor: "#e7f1f8",
-    swatch: ["#e7f1f8", "#0369a1", "#075985"],
+    /** page · house (ocean) · personal (indigo) */
+    swatch: ["#e7f1f8", "#0369a1", "#4f46e5"],
   },
   {
     id: "sand",
     themeColor: "#f2efe8",
-    swatch: ["#f2efe8", "#a16207", "#b45309"],
+    /** page · house (olive) · personal (terracotta) */
+    swatch: ["#f2efe8", "#4d7c0f", "#c2410c"],
   },
   {
     id: "rose",
     themeColor: "#fceef3",
+    /** page · house (pink) · personal (purple) */
     swatch: ["#fceef3", "#be185d", "#a21caf"],
   },
 ];
