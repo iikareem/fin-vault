@@ -50,7 +50,7 @@ type DayLog = {
   claims: Claim[];
   gifts: Gift[];
 };
-type Category = { id: string; name: string; kind: string; parentId?: string | null };
+type Category = { id: string; name: string; kind: string; parentId?: string | null; color?: string | null };
 
 function shiftDay(day: string, dir: number) {
   const d = new Date(`${day}T12:00:00`);

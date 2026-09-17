@@ -23,6 +23,7 @@ type Category = {
   name: string;
   kind: "EXPENSE" | "INCOME" | "PEER";
   parentId?: string | null;
+  color?: string | null;
 };
 type Person = { id: string; name: string };
 type WalletKind = "EXPENSE" | "INCOME" | "GIVE";

@@ -27,7 +27,8 @@
   --color-teal-800: #115e59;
 }
 
-:root {
+:root,
+html[data-theme="light"] {
   --background: #edf4f0;
   --foreground: #1c1917;
   --chrome-bg: rgb(237 244 240 / 0.92);
@@ -55,7 +56,8 @@
   --press: rgb(15 23 42 / 0.04);
 }
 
-html.dark {
+html.dark,
+html[data-theme="dark"] {
   color-scheme: dark;
   --background: #0b110f;
   --foreground: #eef2f0;
@@ -82,6 +84,93 @@ html.dark {
   --grad-b: rgba(14, 165, 233, 0.07);
   --ring: rgb(52 211 153 / 0.35);
   --press: rgb(255 255 255 / 0.05);
+}
+
+html[data-theme="ocean"] {
+  color-scheme: light;
+  --background: #e7f1f8;
+  --foreground: #0f172a;
+  --chrome-bg: rgb(231 241 248 / 0.94);
+  --surface-bg: rgb(255 255 255 / 0.94);
+  --surface-border: rgb(255 255 255 / 0.95);
+  --surface-shadow: 0 10px 28px rgb(12 74 110 / 0.1);
+  --nav-bg: rgb(255 255 255 / 0.88);
+  --nav-border: rgb(186 230 253 / 0.7);
+  --nav-shadow: 0 8px 24px rgb(12 74 110 / 0.08);
+  --input-bg: #ffffff;
+  --input-border: #bae6fd;
+  --input-focus: #0284c7;
+  --muted: #64748b;
+  --panel-soft: #eef6fb;
+  --soft-emerald: #ecfeff;
+  --soft-sky: #e0f2fe;
+  --soft-amber: #fff7ed;
+  --soft-indigo: #eef2ff;
+  --soft-red: #fef2f2;
+  --cta-bg: #0c4a6e;
+  --cta-fg: #ffffff;
+  --grad-a: rgba(14, 165, 233, 0.2);
+  --grad-b: rgba(56, 189, 248, 0.14);
+  --ring: rgb(2 132 199 / 0.35);
+  --press: rgb(12 74 110 / 0.05);
+}
+
+html[data-theme="sand"] {
+  color-scheme: light;
+  --background: #f2efe8;
+  --foreground: #1c1917;
+  --chrome-bg: rgb(242 239 232 / 0.94);
+  --surface-bg: rgb(255 255 255 / 0.94);
+  --surface-border: rgb(255 255 255 / 0.95);
+  --surface-shadow: 0 10px 28px rgb(68 64 60 / 0.08);
+  --nav-bg: rgb(255 255 255 / 0.88);
+  --nav-border: rgb(231 229 228 / 0.8);
+  --nav-shadow: 0 8px 24px rgb(68 64 60 / 0.07);
+  --input-bg: #ffffff;
+  --input-border: #d6d3d1;
+  --input-focus: #0f766e;
+  --muted: #78716c;
+  --panel-soft: #f7f4ee;
+  --soft-emerald: #ecfdf5;
+  --soft-sky: #f0f9ff;
+  --soft-amber: #fef3c7;
+  --soft-indigo: #f5f3ff;
+  --soft-red: #fef2f2;
+  --cta-bg: #134e4a;
+  --cta-fg: #ffffff;
+  --grad-a: rgba(15, 118, 110, 0.14);
+  --grad-b: rgba(245, 158, 11, 0.1);
+  --ring: rgb(15 118 110 / 0.35);
+  --press: rgb(68 64 60 / 0.05);
+}
+
+html[data-theme="rose"] {
+  color-scheme: light;
+  --background: #fceef3;
+  --foreground: #4a044e;
+  --chrome-bg: rgb(252 238 243 / 0.94);
+  --surface-bg: rgb(255 255 255 / 0.94);
+  --surface-border: rgb(255 255 255 / 0.96);
+  --surface-shadow: 0 10px 28px rgb(190 24 93 / 0.1);
+  --nav-bg: rgb(255 255 255 / 0.9);
+  --nav-border: rgb(251 207 232 / 0.75);
+  --nav-shadow: 0 8px 24px rgb(190 24 93 / 0.08);
+  --input-bg: #ffffff;
+  --input-border: #f9a8d4;
+  --input-focus: #db2777;
+  --muted: #9d174d;
+  --panel-soft: #fff1f7;
+  --soft-emerald: #fdf2f8;
+  --soft-sky: #fce7f3;
+  --soft-amber: #fff7ed;
+  --soft-indigo: #fae8ff;
+  --soft-red: #ffe4e6;
+  --cta-bg: #be185d;
+  --cta-fg: #ffffff;
+  --grad-a: rgba(244, 114, 182, 0.22);
+  --grad-b: rgba(232, 121, 249, 0.14);
+  --ring: rgb(219 39 119 / 0.35);
+  --press: rgb(190 24 93 / 0.06);
 }
 
 html {
@@ -152,15 +241,9 @@ textarea {
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible,
-button:focus-visible,
-a:focus-visible {
+button:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px var(--ring);
-}
-
-button:active:not(:disabled),
-a:active {
-  transform: translateY(0.5px);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -170,11 +253,6 @@ a:active {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-  }
-
-  button:active:not(:disabled),
-  a:active {
-    transform: none;
   }
 }
 
@@ -222,11 +300,6 @@ a:active {
   padding: 0.4rem 0.9rem;
   font-weight: 600;
   color: var(--foreground);
-  transition:
-    background-color 160ms ease,
-    border-color 160ms ease,
-    color 160ms ease,
-    transform 120ms ease;
 }
 
 @utility chip-active {
@@ -299,9 +372,6 @@ a:active {
   border: 1px solid var(--surface-border);
   box-shadow: var(--surface-shadow);
   padding: 0.85rem 1rem;
-  transition:
-    background-color 160ms ease,
-    transform 120ms ease;
 }
 
 /* Dark: remap light-only utility colors used across pages. */
@@ -426,18 +496,6 @@ html.dark .shadow-lg {
   padding-inline: max(1rem, env(safe-area-inset-left), env(safe-area-inset-right));
   padding-top: 0.75rem;
   padding-bottom: calc(7.25rem + env(safe-area-inset-bottom, 0px));
-  animation: page-in 280ms ease-out;
-}
-
-@keyframes page-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
 }
 
 @utility amount {

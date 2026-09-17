@@ -12,8 +12,13 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import { AUTH_REQUIRED, api } from "@/lib/api";
 import { loadSpace, setActiveSpace, type Space } from "@/lib/space";
+import {
+  normalizeTheme,
+  themeMetaColor,
+  type ThemeId,
+} from "@/lib/themes";
 
-export type ThemeMode = "light" | "dark";
+export type ThemeMode = ThemeId;
 
 type BooksValue = {
   userId: string;
@@ -41,13 +46,15 @@ const THEME_KEY = "fb_theme";
 
 function applyTheme(theme: ThemeMode) {
   if (typeof document === "undefined") return;
-  document.documentElement.classList.toggle("dark", theme === "dark");
+  const root = document.documentElement;
+  root.setAttribute("data-theme", theme);
+  root.classList.toggle("dark", theme === "dark");
   try {
     localStorage.setItem(THEME_KEY, theme);
   } catch {
     /* ignore */
   }
-  const color = theme === "dark" ? "#0b110f" : "#edf4f0";
+  const color = themeMetaColor(theme);
   let meta = document.querySelector('meta[name="theme-color"]');
   if (!meta) {
     meta = document.createElement("meta");
@@ -86,7 +93,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       setHouse(h);
       setPersonal(p);
       setActive(me.space ?? h ?? p);
-      const nextTheme: ThemeMode = me.theme === "dark" ? "dark" : "light";
+      const nextTheme = normalizeTheme(me.theme);
       setTheme(nextTheme);
       applyTheme(nextTheme);
       setPreferredCurrency(me.preferredCurrency ?? p?.currency ?? "EGP");
@@ -151,7 +158,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
           body: JSON.stringify(prefs),
         },
       );
-      const nextTheme: ThemeMode = res.theme === "dark" ? "dark" : "light";
+      const nextTheme = normalizeTheme(res.theme);
       setTheme(nextTheme);
       applyTheme(nextTheme);
       setPreferredCurrency(res.preferredCurrency);

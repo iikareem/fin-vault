@@ -9,6 +9,16 @@ import { useBooks, type ThemeMode } from "@/components/BooksProvider";
 import { useI18n } from "@/components/I18nProvider";
 import { api } from "@/lib/api";
 import { CURRENCY_OPTIONS } from "@/lib/currencies";
+import { THEME_OPTIONS } from "@/lib/themes";
+import type { MessageKey } from "@/lib/i18n";
+
+const THEME_LABEL: Record<ThemeMode, MessageKey> = {
+  light: "themeLight",
+  dark: "themeDark",
+  ocean: "themeOcean",
+  sand: "themeSand",
+  rose: "themeRose",
+};
 
 export default function ProfilePage() {
   const { t, locale, setLocale } = useI18n();
@@ -91,31 +101,37 @@ export default function ProfilePage() {
 
         <div>
           <span className="mb-2 block font-medium">{t("themePref")}</span>
-          <div className="seg grid-cols-2">
-            <button
-              type="button"
-              disabled={themeBusy}
-              onClick={() => onTheme("light")}
-              className={`min-h-12 rounded-2xl px-3 py-2 font-semibold transition ${
-                theme === "light"
-                  ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
-                  : "text-[var(--muted)]"
-              }`}
-            >
-              ☀️ {t("themeLight")}
-            </button>
-            <button
-              type="button"
-              disabled={themeBusy}
-              onClick={() => onTheme("dark")}
-              className={`min-h-12 rounded-2xl px-3 py-2 font-semibold transition ${
-                theme === "dark"
-                  ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
-                  : "text-[var(--muted)]"
-              }`}
-            >
-              🌙 {t("themeDark")}
-            </button>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {THEME_OPTIONS.map((opt) => {
+              const active = theme === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  disabled={themeBusy}
+                  onClick={() => onTheme(opt.id)}
+                  className={`flex min-h-16 flex-col items-start gap-2 rounded-2xl px-3 py-2.5 text-start ${
+                    active
+                      ? "bg-[var(--cta-bg)] text-[var(--cta-fg)] shadow-md"
+                      : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5" aria-hidden>
+                    <span
+                      className="h-5 w-5 rounded-full ring-1 ring-black/10"
+                      style={{ backgroundColor: opt.swatch[0] }}
+                    />
+                    <span
+                      className="h-5 w-5 rounded-full ring-1 ring-black/10"
+                      style={{ backgroundColor: opt.swatch[1] }}
+                    />
+                  </span>
+                  <span className="text-sm font-bold leading-tight">
+                    {t(THEME_LABEL[opt.id])}
+                  </span>
+                </button>
+              );
+            })}
           </div>
           <Hint>{t("themePrefHint")}</Hint>
         </div>

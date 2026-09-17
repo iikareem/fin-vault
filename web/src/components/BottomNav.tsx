@@ -148,10 +148,10 @@ export function BottomNav() {
           href={item.href}
           aria-current={current ? "page" : undefined}
           aria-label={label}
-          className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-center transition-all duration-200 ${
+          className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-center ${
             current
               ? `${accent.soft} ${accent.text}`
-              : "text-stone-400 hover:bg-[var(--panel-soft)] hover:text-stone-600"
+              : "text-stone-400"
           }`}
         >
           <NavGlyph name={item.icon} />
@@ -159,16 +159,14 @@ export function BottomNav() {
             <span className="max-w-full truncate text-[0.65rem] font-semibold leading-none tracking-tight">
               {label}
             </span>
-          ) : (
-            <span className="h-1 w-1 rounded-full bg-transparent" aria-hidden />
-          )}
+          ) : null}
         </Link>
       </li>
     );
   }
 
   return (
-    <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-20 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-4">
+    <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] sm:px-4">
       <div className="pointer-events-auto relative mx-auto max-w-lg">
         <ul className="nav-shell grid grid-cols-5 items-end gap-0.5 rounded-2xl px-1.5 pb-1.5 pt-1.5 backdrop-blur-xl">
           {left.map(sideLink)}
@@ -177,9 +175,11 @@ export function BottomNav() {
               href="/add"
               aria-current={addActive ? "page" : undefined}
               aria-label={t("navAdd")}
-              className={`-mt-8 mb-0.5 flex h-14 w-14 shrink-0 items-center justify-center rounded-full transition-all duration-200 ${
-                addActive ? accent.fab : accent.fabIdle
-              } ${addActive ? "scale-105 ring-4 ring-[var(--background)]" : "hover:scale-105 active:scale-95"}`}
+              className={`-mt-8 mb-0.5 flex h-14 w-14 shrink-0 items-center justify-center rounded-full ${
+                addActive
+                  ? `${accent.fab} scale-105 ring-4 ring-[var(--background)]`
+                  : accent.fabIdle
+              }`}
             >
               <NavGlyph name="add" />
             </Link>

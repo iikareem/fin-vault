@@ -410,8 +410,8 @@ export default function HomePage() {
       {error ? <p className="mt-2 text-red-700">{error}</p> : null}
 
       <section
-        className={`mt-3 rounded-[1.75rem] p-5 shadow-lg transition-transform duration-200 ${
-          canToggleMoney ? "cursor-pointer select-none active:scale-[0.99]" : ""
+        className={`mt-3 rounded-[1.75rem] p-5 shadow-lg ${
+          canToggleMoney ? "cursor-pointer select-none" : ""
         }`}
         style={{
           color: "#fff",
