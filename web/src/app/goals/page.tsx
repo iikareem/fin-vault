@@ -31,7 +31,7 @@ type GoalsSummary = {
   goals: Goal[];
 };
 
-type ActionMode = "allocate" | "release" | "toCurrent" | null;
+type ActionMode = "allocate" | "release" | null;
 
 const ACCENT_COLORS = [
   "#0f766e",
@@ -45,7 +45,7 @@ const ACCENT_COLORS = [
 function ProgressBar({ pct, color }: { pct: number; color: string }) {
   const width = Math.min(100, Math.max(0, pct));
   return (
-    <div className="h-2.5 w-full overflow-hidden rounded-full bg-stone-100">
+    <div className="h-2.5 w-full overflow-hidden rounded-full bg-[var(--panel-soft)]">
       <div
         className="h-full rounded-full transition-[width] duration-500 ease-out"
         style={{
@@ -70,6 +70,8 @@ export default function GoalsPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [deletingId, setDeletingId] = useState("");
+  const [buyingId, setBuyingId] = useState("");
+  const [confirmBuyId, setConfirmBuyId] = useState("");
   const [actionId, setActionId] = useState("");
   const [actionMode, setActionMode] = useState<ActionMode>(null);
   const [actionAmount, setActionAmount] = useState("");
@@ -156,10 +158,30 @@ export default function GoalsPage() {
       );
       setData(next);
       if (actionId === id) closeAction();
+      if (confirmBuyId === id) setConfirmBuyId("");
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
       setDeletingId("");
+    }
+  }
+
+  async function onBuy(id: string) {
+    if (!personal) return;
+    setBuyingId(id);
+    setError("");
+    try {
+      const next = await api<GoalsSummary>(
+        householdPath(personal.householdId, `/savings-goals/${id}/buy`),
+        { method: "POST", body: JSON.stringify({}) },
+      );
+      setData(next);
+      setConfirmBuyId("");
+      if (actionId === id) closeAction();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("couldNotSave"));
+    } finally {
+      setBuyingId("");
     }
   }
 
@@ -177,9 +199,7 @@ export default function GoalsPage() {
       const path =
         actionMode === "allocate"
           ? `/savings-goals/${actionId}/allocate`
-          : actionMode === "release"
-            ? `/savings-goals/${actionId}/release`
-            : `/savings-goals/${actionId}/to-current`;
+          : `/savings-goals/${actionId}/release`;
       const body =
         actionMode === "allocate"
           ? { amount, from: fromSource }
@@ -200,7 +220,7 @@ export default function GoalsPage() {
   if (active?.kind === "HOUSE" && !personal) {
     return (
       <PageShell>
-        <p className="text-stone-600">{t("goalsHint")}</p>
+        <p className="text-[var(--muted)]">{t("goalsHint")}</p>
         <BottomNav />
       </PageShell>
     );
@@ -281,7 +301,7 @@ export default function GoalsPage() {
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-lg"
+            className="field w-full rounded-2xl px-4 py-3 text-lg"
             placeholder={t("goalsNamePlaceholder")}
             dir="auto"
           />
@@ -295,13 +315,13 @@ export default function GoalsPage() {
             required
             value={target}
             onChange={(e) => setTarget(e.target.value)}
-            className="amount-input w-full rounded-2xl border border-stone-300 bg-white px-4 py-4 text-2xl"
+            className="field amount-input w-full rounded-2xl px-4 py-4 text-2xl"
             placeholder="50000"
           />
           <Hint>{t("goalsTargetHint")}</Hint>
         </label>
         <div>
-          <p className="mb-2 text-sm font-medium text-stone-600">
+          <p className="mb-2 text-sm font-medium text-[var(--muted)]">
             {t("goalsColor")}
           </p>
           <div className="flex flex-wrap gap-2">
@@ -313,7 +333,7 @@ export default function GoalsPage() {
                 onClick={() => setColor(c)}
                 className={`h-9 w-9 rounded-full transition ${
                   color === c
-                    ? "ring-2 ring-stone-900 ring-offset-2"
+                    ? "ring-2 ring-[var(--foreground)] ring-offset-2 ring-offset-[var(--surface-bg)]"
                     : "opacity-80"
                 }`}
                 style={{ background: c }}
@@ -326,7 +346,7 @@ export default function GoalsPage() {
           <input
             value={note}
             onChange={(e) => setNote(e.target.value)}
-            className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-lg"
+            className="field w-full rounded-2xl px-4 py-3 text-lg"
             dir="auto"
           />
         </label>
@@ -340,11 +360,11 @@ export default function GoalsPage() {
       </form>
 
       <section className="surface mt-6 overflow-hidden rounded-[1.75rem]">
-        <div className="border-b border-teal-100/80 bg-teal-50/50 px-4 py-3">
+        <div className="border-b border-[var(--surface-border)] bg-[var(--soft-emerald)] px-4 py-3">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="text-xl font-semibold">{t("goalsList")}</h2>
             {data && data.goals.length > 0 ? (
-              <span className="text-sm font-medium text-stone-500">
+              <span className="text-sm font-medium text-[var(--muted)]">
                 {data.goals.length === 1
                   ? t("goalsCountOne")
                   : fill(t("goalsCount"), {
@@ -357,11 +377,11 @@ export default function GoalsPage() {
         </div>
 
         {!data ? (
-          <p className="px-4 py-5 text-stone-500">…</p>
+          <p className="px-4 py-5 text-[var(--muted)]">…</p>
         ) : data.goals.length === 0 ? (
-          <p className="px-4 py-5 text-stone-500">{t("goalsEmpty")}</p>
+          <p className="px-4 py-5 text-[var(--muted)]">{t("goalsEmpty")}</p>
         ) : (
-          <ul className="divide-y divide-stone-100">
+          <ul className="divide-y divide-[var(--surface-border)]">
             {data.goals.map((g) => {
               const done = g.savedAmount + 0.001 >= g.targetAmount;
               const isOpen = actionId === g.id;
@@ -376,19 +396,22 @@ export default function GoalsPage() {
                           aria-hidden
                         />
                         <p
-                          className="truncate text-lg font-semibold text-stone-900"
+                          className="truncate text-lg font-semibold"
                           dir="auto"
                         >
                           {g.name}
                         </p>
                       </div>
                       {g.note ? (
-                        <p className="mt-1 text-sm text-stone-500" dir="auto">
+                        <p
+                          className="mt-1 text-sm text-[var(--muted)]"
+                          dir="auto"
+                        >
                           {g.note}
                         </p>
                       ) : null}
                     </div>
-                    <p className="shrink-0 text-sm font-bold text-stone-700">
+                    <p className="shrink-0 text-sm font-bold text-[var(--accent-a-text)]">
                       {fill(t("goalsProgress"), { pct: String(g.pct) })}
                     </p>
                   </div>
@@ -396,13 +419,13 @@ export default function GoalsPage() {
                   <div className="mt-3">
                     <ProgressBar pct={g.pct} color={g.color} />
                     <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm">
-                      <span className="font-medium text-stone-700">
+                      <span className="font-medium">
                         <Money
                           amount={g.savedAmount}
                           currency={currency}
                           locale={locale}
                         />
-                        <span className="text-stone-400"> / </span>
+                        <span className="text-[var(--muted)]"> / </span>
                         <Money
                           amount={g.targetAmount}
                           currency={currency}
@@ -410,11 +433,11 @@ export default function GoalsPage() {
                         />
                       </span>
                       {done ? (
-                        <span className="font-semibold text-emerald-800">
+                        <span className="font-semibold text-[var(--accent-a-text)]">
                           {t("goalsDone")}
                         </span>
                       ) : (
-                        <span className="text-stone-500">
+                        <span className="text-[var(--muted)]">
                           {fill(t("goalsRemaining"), {
                             amount: money(g.remaining, currency, locale),
                           })}
@@ -424,59 +447,96 @@ export default function GoalsPage() {
                   </div>
 
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      onClick={() => openAction(g.id, "allocate")}
-                      className="rounded-xl bg-teal-800 px-3 py-2 text-sm font-semibold text-white"
-                    >
-                      ＋ {t("goalsAddMoney")}
-                    </button>
-                    {g.savedAmount > 0.001 ? (
-                      <>
+                    {done ? (
+                      <button
+                        type="button"
+                        disabled={!!buyingId}
+                        onClick={() => {
+                          setConfirmBuyId(g.id);
+                          setError("");
+                        }}
+                        className="rounded-xl bg-emerald-700 px-3 py-2 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
+                      >
+                        🛍 {t("goalsBuy")}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => openAction(g.id, "allocate")}
+                        className="rounded-xl bg-teal-800 px-3 py-2 text-sm font-semibold text-white"
+                      >
+                        ＋ {t("goalsAddMoney")}
+                      </button>
+                    )}
+                    {!done ? (
+                      g.savedAmount > 0.001 ? (
                         <button
                           type="button"
                           onClick={() => openAction(g.id, "release")}
-                          className="rounded-xl bg-stone-100 px-3 py-2 text-sm font-semibold text-stone-700"
+                          className="rounded-xl bg-[var(--panel-soft)] px-3 py-2 text-sm font-semibold"
                         >
                           {t("goalsRelease")}
                         </button>
-                        <button
-                          type="button"
-                          onClick={() => openAction(g.id, "toCurrent")}
-                          className="rounded-xl bg-stone-100 px-3 py-2 text-sm font-semibold text-stone-700"
-                        >
-                          {t("goalsToCurrent")}
-                        </button>
-                      </>
-                    ) : null}
+                      ) : null
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => openAction(g.id, "allocate")}
+                        className="rounded-xl bg-[var(--panel-soft)] px-3 py-2 text-sm font-semibold"
+                      >
+                        ＋ {t("goalsAddMoney")}
+                      </button>
+                    )}
                     <button
                       type="button"
                       disabled={!!deletingId}
                       onClick={() => onDelete(g.id)}
-                      className="rounded-xl px-3 py-2 text-sm font-semibold text-red-800 hover:bg-[#fef2f2] disabled:opacity-60"
+                      className="rounded-xl px-3 py-2 text-sm font-semibold text-red-700 hover:bg-[var(--soft-red)] disabled:opacity-60"
                     >
                       {deletingId === g.id ? t("saving") : t("goalsDelete")}
                     </button>
                   </div>
+
+                  {confirmBuyId === g.id ? (
+                    <div className="mt-3 space-y-2 rounded-2xl bg-[var(--soft-emerald)] p-3">
+                      <p className="text-sm font-medium text-[var(--accent-a-text)]">
+                        {t("goalsBuyConfirm")}
+                      </p>
+                      <Hint>{t("goalsBuyHint")}</Hint>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          disabled={!!buyingId}
+                          onClick={() => onBuy(g.id)}
+                          className="flex min-h-12 flex-1 items-center justify-center rounded-2xl bg-emerald-700 font-semibold text-white disabled:opacity-60"
+                        >
+                          {buyingId === g.id ? t("goalsBuying") : t("goalsBuy")}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setConfirmBuyId("")}
+                          className="min-h-12 rounded-2xl bg-[var(--surface-bg)] px-4 font-semibold text-[var(--muted)]"
+                        >
+                          {t("goalsCancel")}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
 
                   {isOpen && actionMode ? (
                     <form
                       onSubmit={submitAction}
                       className="mt-3 space-y-3 rounded-2xl bg-[var(--panel-soft)] p-3"
                     >
-                      <p className="text-sm font-medium text-stone-700">
+                      <p className="text-sm font-medium">
                         {actionMode === "allocate"
                           ? t("goalsAddMoney")
-                          : actionMode === "release"
-                            ? t("goalsRelease")
-                            : t("goalsToCurrent")}
+                          : t("goalsRelease")}
                       </p>
                       <Hint>
                         {actionMode === "allocate"
                           ? t("goalsAddMoneyHint")
-                          : actionMode === "release"
-                            ? t("goalsReleaseHint")
-                            : t("goalsToCurrentHint")}
+                          : t("goalsReleaseHint")}
                       </Hint>
                       {actionMode === "allocate" ? (
                         <div className="grid grid-cols-2 gap-2">
@@ -486,7 +546,7 @@ export default function GoalsPage() {
                             className={`rounded-2xl px-2 py-3 text-sm font-bold ${
                               fromSource === "CURRENT"
                                 ? "bg-teal-800 text-white shadow"
-                                : "bg-white text-stone-700"
+                                : "bg-[var(--surface-bg)]"
                             }`}
                           >
                             💵 {t("goalsFromCurrent")}
@@ -497,7 +557,7 @@ export default function GoalsPage() {
                             className={`rounded-2xl px-2 py-3 text-sm font-bold ${
                               fromSource === "SAVINGS"
                                 ? "bg-teal-800 text-white shadow"
-                                : "bg-white text-stone-700"
+                                : "bg-[var(--surface-bg)]"
                             }`}
                           >
                             💰 {t("goalsFromSavings")}
@@ -515,7 +575,7 @@ export default function GoalsPage() {
                           autoFocus
                           value={actionAmount}
                           onChange={(e) => setActionAmount(e.target.value)}
-                          className="amount-input w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-xl"
+                          className="field amount-input w-full rounded-2xl px-4 py-3 text-xl"
                           placeholder="1000"
                         />
                       </label>
@@ -530,7 +590,7 @@ export default function GoalsPage() {
                         <button
                           type="button"
                           onClick={closeAction}
-                          className="min-h-12 rounded-2xl bg-white px-4 font-semibold text-stone-600"
+                          className="min-h-12 rounded-2xl bg-[var(--surface-bg)] px-4 font-semibold text-[var(--muted)]"
                         >
                           {t("goalsCancel")}
                         </button>

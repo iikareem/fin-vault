@@ -11,6 +11,7 @@ import { CreateSavingsGoalDto } from './dto/create-savings-goal.dto';
 import { UpdateSavingsGoalDto } from './dto/update-savings-goal.dto';
 import { AllocateSavingsGoalDto } from './dto/allocate-savings-goal.dto';
 import { MoveSavingsGoalDto } from './dto/move-savings-goal.dto';
+import { BuySavingsGoalDto } from './dto/buy-savings-goal.dto';
 
 const GOAL_COLORS = [
   '#0f766e',
@@ -227,6 +228,91 @@ export class SavingsGoalsService {
       },
     });
     return this.summary(householdId);
+  }
+
+  /**
+   * Goal finished: spend labeled cash from Savings as an expense whose
+   * category name matches the goal, then close the goal.
+   */
+  async buy(
+    householdId: string,
+    userId: string,
+    id: string,
+    dto: BuySavingsGoalDto,
+  ) {
+    const goal = await this.requireOwnGoal(householdId, userId, id);
+    const saved = Math.round(Number(goal.savedAmount) * 100) / 100;
+    const target = Math.round(Number(goal.targetAmount) * 100) / 100;
+    if (saved < 0.01) {
+      throw new BadRequestException('Nothing saved on this goal yet');
+    }
+    if (saved + 0.001 < target) {
+      throw new BadRequestException('Reach 100% before marking as bought');
+    }
+
+    const snap = await this.summary(householdId);
+    if (!snap.savingsAccountId) {
+      throw new BadRequestException('Savings wallet missing');
+    }
+    if (saved > snap.savingsBalance + 0.001) {
+      throw new BadRequestException('Not enough money in savings');
+    }
+
+    const category = await this.ensureGoalExpenseCategory(
+      householdId,
+      goal.name,
+      goal.color,
+    );
+    const occurredOn =
+      dto.occurredOn ?? new Date().toISOString().slice(0, 10);
+    const note =
+      dto.note?.trim() ||
+      `Bought · savings goal · ${goal.name}`;
+
+    await this.prisma.$transaction([
+      this.prisma.transaction.create({
+        data: {
+          householdId,
+          userId,
+          accountId: snap.savingsAccountId,
+          categoryId: category.id,
+          type: 'EXPENSE',
+          amount: new Prisma.Decimal(saved),
+          occurredOn: new Date(occurredOn),
+          note,
+        },
+      }),
+      this.prisma.savingsGoal.delete({ where: { id } }),
+    ]);
+
+    return this.summary(householdId);
+  }
+
+  private async ensureGoalExpenseCategory(
+    householdId: string,
+    name: string,
+    color: string,
+  ) {
+    const existing = await this.prisma.category.findFirst({
+      where: { householdId, name, kind: 'EXPENSE' },
+    });
+    if (existing) {
+      if (existing.color !== color) {
+        return this.prisma.category.update({
+          where: { id: existing.id },
+          data: { color },
+        });
+      }
+      return existing;
+    }
+    return this.prisma.category.create({
+      data: {
+        householdId,
+        name,
+        kind: 'EXPENSE',
+        color: color || '#0f766e',
+      },
+    });
   }
 
   private mapGoal(g: {

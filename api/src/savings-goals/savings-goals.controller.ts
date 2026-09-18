@@ -20,6 +20,7 @@ import { CreateSavingsGoalDto } from './dto/create-savings-goal.dto';
 import { UpdateSavingsGoalDto } from './dto/update-savings-goal.dto';
 import { AllocateSavingsGoalDto } from './dto/allocate-savings-goal.dto';
 import { MoveSavingsGoalDto } from './dto/move-savings-goal.dto';
+import { BuySavingsGoalDto } from './dto/buy-savings-goal.dto';
 
 @Controller('households/:householdId/savings-goals')
 @UseGuards(JwtAuthGuard, HouseholdGuard, PersonalKindGuard)
@@ -87,5 +88,15 @@ export class SavingsGoalsController {
     @Body() dto: MoveSavingsGoalDto,
   ) {
     return this.goals.toCurrent(membership.householdId, user.id, id, dto);
+  }
+
+  @Post(':id/buy')
+  buy(
+    @CurrentMembership() membership: MembershipContext,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: BuySavingsGoalDto,
+  ) {
+    return this.goals.buy(membership.householdId, user.id, id, dto);
   }
 }

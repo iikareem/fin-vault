@@ -621,6 +621,11 @@ const ar = {
   goalsActionAmount: "كام؟",
   goalsCancel: "إلغاء",
   goalsColor: "لون الهدف",
+  goalsBuy: "اشتريتوه",
+  goalsBuyHint:
+    "هيتخصم المبلغ من التوفير، ويتسجّل صرف باسم الهدف في الأيام والتقارير، والهدف يتقفل.",
+  goalsBuying: "جاري التسجيل…",
+  goalsBuyConfirm: "أكيد اشتريتوه؟ هيتخصم من التوفير ويتقفل الهدف.",
 };
 
 const en = {
@@ -1250,6 +1255,11 @@ const en = {
   goalsActionAmount: "How much?",
   goalsCancel: "Cancel",
   goalsColor: "Goal color",
+  goalsBuy: "Bought it",
+  goalsBuyHint:
+    "Spends the saved amount from Savings, logs an expense named after the goal in history and analytics, and closes the goal.",
+  goalsBuying: "Recording…",
+  goalsBuyConfirm: "Mark as bought? This leaves Savings and closes the goal.",
 };
 
 export const messages = { ar, en } as const;
