@@ -87,11 +87,9 @@ export class SavingsGoalsService {
     id: string,
     dto: UpdateSavingsGoalDto,
   ) {
-    const row = await this.requireOwnGoal(householdId, userId, id);
-    if (dto.targetAmount != null && dto.targetAmount < Number(row.savedAmount)) {
-      throw new BadRequestException(
-        'Target cannot be less than what you already saved for this goal',
-      );
+    await this.requireOwnGoal(householdId, userId, id);
+    if (dto.name !== undefined && !dto.name.trim()) {
+      throw new BadRequestException('Name is required');
     }
     await this.prisma.savingsGoal.update({
       where: { id },

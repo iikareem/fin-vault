@@ -31,7 +31,7 @@ type GoalsSummary = {
   goals: Goal[];
 };
 
-type ActionMode = "allocate" | "release" | null;
+type ActionMode = "allocate" | "release" | "edit" | null;
 
 const ACCENT_COLORS = [
   "#0f766e",
@@ -75,6 +75,8 @@ export default function GoalsPage() {
   const [actionId, setActionId] = useState("");
   const [actionMode, setActionMode] = useState<ActionMode>(null);
   const [actionAmount, setActionAmount] = useState("");
+  const [editName, setEditName] = useState("");
+  const [editTarget, setEditTarget] = useState("");
   const [fromSource, setFromSource] = useState<"CURRENT" | "SAVINGS">(
     "CURRENT",
   );
@@ -93,12 +95,25 @@ export default function GoalsPage() {
   }, [personal?.householdId]);
 
   function openAction(id: string, mode: Exclude<ActionMode, null>) {
+    const goal = data?.goals.find((g) => g.id === id);
     setActionId(id);
     setActionMode(mode);
     setActionAmount("");
-    setFromSource(
-      data && data.free > 0.001 && mode === "allocate" ? "SAVINGS" : "CURRENT",
-    );
+    setConfirmBuyId("");
+    if (mode === "edit" && goal) {
+      setEditName(goal.name);
+      setEditTarget(String(goal.targetAmount));
+    } else if (mode === "release" && goal) {
+      setActionAmount(
+        goal.savedAmount > 0 ? String(goal.savedAmount) : "",
+      );
+    } else {
+      setFromSource(
+        data && data.free > 0.001 && mode === "allocate"
+          ? "SAVINGS"
+          : "CURRENT",
+      );
+    }
     setError("");
   }
 
@@ -106,6 +121,8 @@ export default function GoalsPage() {
     setActionId("");
     setActionMode(null);
     setActionAmount("");
+    setEditName("");
+    setEditTarget("");
   }
 
   async function onAdd(e: FormEvent) {
@@ -188,6 +205,40 @@ export default function GoalsPage() {
   async function submitAction(e: FormEvent) {
     e.preventDefault();
     if (!personal || !actionId || !actionMode) return;
+
+    if (actionMode === "edit") {
+      const targetAmt = parseAmount(editTarget);
+      if (!editName.trim()) {
+        setError(t("goalsNameHint"));
+        return;
+      }
+      if (!(targetAmt > 0)) {
+        setError(t("goalsTargetHint"));
+        return;
+      }
+      setActionBusy(true);
+      setError("");
+      try {
+        const next = await api<GoalsSummary>(
+          householdPath(personal.householdId, `/savings-goals/${actionId}`),
+          {
+            method: "PATCH",
+            body: JSON.stringify({
+              name: editName.trim(),
+              targetAmount: targetAmt,
+            }),
+          },
+        );
+        setData(next);
+        closeAction();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : t("couldNotSave"));
+      } finally {
+        setActionBusy(false);
+      }
+      return;
+    }
+
     const amount = parseAmount(actionAmount);
     if (!(amount > 0)) {
       setError(t("goalsActionAmount"));
@@ -452,6 +503,7 @@ export default function GoalsPage() {
                         type="button"
                         disabled={!!buyingId}
                         onClick={() => {
+                          closeAction();
                           setConfirmBuyId(g.id);
                           setError("");
                         }}
@@ -468,17 +520,7 @@ export default function GoalsPage() {
                         ＋ {t("goalsAddMoney")}
                       </button>
                     )}
-                    {!done ? (
-                      g.savedAmount > 0.001 ? (
-                        <button
-                          type="button"
-                          onClick={() => openAction(g.id, "release")}
-                          className="rounded-xl bg-[var(--panel-soft)] px-3 py-2 text-sm font-semibold"
-                        >
-                          {t("goalsRelease")}
-                        </button>
-                      ) : null
-                    ) : (
+                    {done ? (
                       <button
                         type="button"
                         onClick={() => openAction(g.id, "allocate")}
@@ -486,7 +528,23 @@ export default function GoalsPage() {
                       >
                         ＋ {t("goalsAddMoney")}
                       </button>
-                    )}
+                    ) : null}
+                    {g.savedAmount > 0.001 ? (
+                      <button
+                        type="button"
+                        onClick={() => openAction(g.id, "release")}
+                        className="rounded-xl bg-[var(--panel-soft)] px-3 py-2 text-sm font-semibold"
+                      >
+                        ↩ {t("goalsRelease")}
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => openAction(g.id, "edit")}
+                      className="rounded-xl bg-[var(--panel-soft)] px-3 py-2 text-sm font-semibold"
+                    >
+                      ✎ {t("goalsEdit")}
+                    </button>
                     <button
                       type="button"
                       disabled={!!deletingId}
@@ -531,13 +589,50 @@ export default function GoalsPage() {
                       <p className="text-sm font-medium">
                         {actionMode === "allocate"
                           ? t("goalsAddMoney")
-                          : t("goalsRelease")}
+                          : actionMode === "release"
+                            ? t("goalsRelease")
+                            : t("goalsEditTitle")}
                       </p>
                       <Hint>
                         {actionMode === "allocate"
                           ? t("goalsAddMoneyHint")
-                          : t("goalsReleaseHint")}
+                          : actionMode === "release"
+                            ? t("goalsReleaseHint")
+                            : t("goalsEditHint")}
                       </Hint>
+
+                      {actionMode === "edit" ? (
+                        <>
+                          <label className="block">
+                            <span className="mb-1 block text-sm font-medium">
+                              {t("goalsName")}
+                            </span>
+                            <input
+                              required
+                              autoFocus
+                              value={editName}
+                              onChange={(e) => setEditName(e.target.value)}
+                              className="field w-full rounded-2xl px-4 py-3 text-lg"
+                              dir="auto"
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="mb-1 block text-sm font-medium">
+                              {t("goalsTarget")}
+                            </span>
+                            <input
+                              inputMode="decimal"
+                              dir="ltr"
+                              required
+                              value={editTarget}
+                              onChange={(e) => setEditTarget(e.target.value)}
+                              className="field amount-input w-full rounded-2xl px-4 py-3 text-xl"
+                            />
+                            <Hint>{t("goalsTargetHint")}</Hint>
+                          </label>
+                        </>
+                      ) : null}
+
                       {actionMode === "allocate" ? (
                         <div className="grid grid-cols-2 gap-2">
                           <button
@@ -564,28 +659,49 @@ export default function GoalsPage() {
                           </button>
                         </div>
                       ) : null}
-                      <label className="block">
-                        <span className="mb-1 block text-sm font-medium">
-                          {t("goalsActionAmount")}
-                        </span>
-                        <input
-                          inputMode="decimal"
-                          dir="ltr"
-                          required
-                          autoFocus
-                          value={actionAmount}
-                          onChange={(e) => setActionAmount(e.target.value)}
-                          className="field amount-input w-full rounded-2xl px-4 py-3 text-xl"
-                          placeholder="1000"
-                        />
-                      </label>
+
+                      {actionMode === "allocate" ||
+                      actionMode === "release" ? (
+                        <label className="block">
+                          <span className="mb-1 block text-sm font-medium">
+                            {t("goalsActionAmount")}
+                          </span>
+                          <input
+                            inputMode="decimal"
+                            dir="ltr"
+                            required
+                            autoFocus
+                            value={actionAmount}
+                            onChange={(e) => setActionAmount(e.target.value)}
+                            className="field amount-input w-full rounded-2xl px-4 py-3 text-xl"
+                            placeholder="1000"
+                          />
+                          {actionMode === "release" ? (
+                            <button
+                              type="button"
+                              className="mt-2 text-sm font-semibold text-[var(--accent-a-text)]"
+                              onClick={() =>
+                                setActionAmount(String(g.savedAmount))
+                              }
+                            >
+                              {t("goalsReclaimAll")} ·{" "}
+                              {money(g.savedAmount, currency, locale)}
+                            </button>
+                          ) : null}
+                        </label>
+                      ) : null}
+
                       <div className="flex gap-2">
                         <button
                           type="submit"
                           disabled={actionBusy}
                           className="flex min-h-12 flex-1 items-center justify-center rounded-2xl bg-teal-800 font-semibold text-white disabled:opacity-60"
                         >
-                          {actionBusy ? t("saving") : t("save")}
+                          {actionBusy
+                            ? t("saving")
+                            : actionMode === "edit"
+                              ? t("goalsEditSave")
+                              : t("save")}
                         </button>
                         <button
                           type="button"
