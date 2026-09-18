@@ -90,6 +90,7 @@ model Household {
   payouts      HousePayout[]
   goldHoldings GoldHolding[]
   outsideLoans OutsideLoan[]
+  savingsGoals SavingsGoal[]
 }
 
 model User {
@@ -116,6 +117,7 @@ model User {
   payoutsRecorded   HousePayout[]   @relation("PayoutsRecorded")
   goldHoldings      GoldHolding[]
   outsideLoans      OutsideLoan[]
+  savingsGoals      SavingsGoal[]
 }
 
 model Membership {
@@ -429,4 +431,24 @@ model OutsideLoanCollection {
   createdAt   DateTime    @default(now())
 
   @@index([loanId])
+}
+
+/** Named buckets inside the personal Savings wallet (labels, not extra cash). */
+model SavingsGoal {
+  id          String    @id @default(cuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  targetAmount Decimal  @db.Decimal(14, 2)
+  savedAmount  Decimal  @default(0) @db.Decimal(14, 2)
+  note        String    @default("")
+  color       String    @default("#0f766e")
+  archived    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([householdId, archived])
+  @@index([userId])
 }

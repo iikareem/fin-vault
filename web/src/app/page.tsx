@@ -55,6 +55,12 @@ type GoldHome = {
   totalGainLoss: number | null;
   totalGainLossPct: number | null;
 };
+type GoalsHome = {
+  allocated: number;
+  free: number;
+  savingsBalance: number;
+  goals: { id: string }[];
+};
 type Tx = {
   id: string;
   type: "INCOME" | "EXPENSE" | "REIMBURSEMENT" | "TRACK";
@@ -103,6 +109,7 @@ export default function HomePage() {
   const [txs, setTxs] = useState<Tx[]>([]);
   const [charity, setCharity] = useState<CharityMonth | null>(null);
   const [gold, setGold] = useState<GoldHome | null>(null);
+  const [goals, setGoals] = useState<GoalsHome | null>(null);
   const [claims, setClaims] = useState<Claim[]>([]);
   const [covers, setCovers] = useState<Cover[]>([]);
   const [payingId, setPayingId] = useState("");
@@ -162,7 +169,10 @@ export default function HomePage() {
       setCharity(null);
       setClaims([]);
       setCovers([]);
-      jobs.push(api<GoldHome>(householdPath(active.householdId, "/gold")));
+      jobs.push(
+        api<GoldHome>(householdPath(active.householdId, "/gold")),
+        api<GoalsHome>(householdPath(active.householdId, "/savings-goals")),
+      );
     }
     Promise.all(jobs)
       .then((result) => {
@@ -180,8 +190,10 @@ export default function HomePage() {
           setClaims(sortByOccurredOnDesc(result[4] as Claim[]));
           setCovers(sortByOccurredOnDesc(result[5] as Cover[]));
           setGold(null);
+          setGoals(null);
         } else {
           setGold(result[3] as GoldHome);
+          setGoals(result[4] as GoalsHome);
         }
       })
       .catch((e) => setError(e.message));
@@ -1392,8 +1404,46 @@ export default function HomePage() {
       ) : (
         <>
         <Link
-          href="/gold"
+          href="/goals"
           className="surface mt-4 flex flex-col rounded-[1.75rem] p-4"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xl font-semibold">🎯 {t("navGoals")}</span>
+            <span className="font-semibold">
+              {goals ? (
+                <PrivateMoney
+                  amount={goals.allocated}
+                  currency={currency}
+                  locale={locale}
+                  visible={moneyVisible}
+                />
+              ) : (
+                ""
+              )}
+            </span>
+          </div>
+          {goals && goals.goals.length > 0 ? (
+            <p className="mt-1 text-sm text-stone-500">
+              {goals.goals.length === 1
+                ? t("goalsCountOne")
+                : fill(t("goalsCount"), {
+                    n: String(goals.goals.length),
+                  })}
+              {" · "}
+              {t("goalsFree")}:{" "}
+              <PrivateMoney
+                amount={goals.free}
+                currency={currency}
+                locale={locale}
+                visible={moneyVisible}
+              />
+            </p>
+          ) : null}
+          <Hint>{t("goalsHomeHint")}</Hint>
+        </Link>
+        <Link
+          href="/gold"
+          className="surface mt-3 flex flex-col rounded-[1.75rem] p-4"
         >
           <div className="flex items-center justify-between">
             <span className="text-xl font-semibold">🥇 {t("navGold")}</span>

@@ -16,6 +16,7 @@ import { CoversModule } from './covers/covers.module';
 import { HistoryModule } from './history/history.module';
 import { GoldModule } from './gold/gold.module';
 import { OutsideLoansModule } from './outside-loans/outside-loans.module';
+import { SavingsGoalsModule } from './savings-goals/savings-goals.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -37,6 +38,7 @@ import { HealthController } from './health.controller';
     HistoryModule,
     GoldModule,
     OutsideLoansModule,
+    SavingsGoalsModule,
   ],
   controllers: [HealthController],
 })
