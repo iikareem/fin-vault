@@ -327,6 +327,16 @@ button:focus-visible {
   box-shadow: var(--nav-shadow);
 }
 
+.nav-tab {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+}
+
+.nav-tab:active {
+  opacity: 0.72;
+}
+
 @utility field {
   width: 100%;
   border-radius: 1rem;

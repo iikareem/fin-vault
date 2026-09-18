@@ -124,21 +124,12 @@ export function BottomNav() {
   const left = side.slice(0, 2);
   const right = side.slice(2);
   const addActive = isCurrent(path, "/add");
-  const accent = personal
-    ? {
-        text: "text-[var(--accent-b-text)]",
-        soft: "bg-[var(--accent-b-soft)]",
-        fab: "bg-[var(--accent-b)] text-[var(--accent-b-fg)] shadow-[0_10px_24px_color-mix(in_srgb,var(--accent-b)_40%,transparent)]",
-        fabIdle:
-          "bg-[var(--accent-b)] text-[var(--accent-b-fg)] shadow-[0_10px_24px_color-mix(in_srgb,var(--accent-b)_28%,transparent)]",
-      }
-    : {
-        text: "text-[var(--accent-a-text)]",
-        soft: "bg-[var(--accent-a-soft)]",
-        fab: "bg-[var(--accent-a)] text-[var(--accent-a-fg)] shadow-[0_10px_24px_color-mix(in_srgb,var(--accent-a)_40%,transparent)]",
-        fabIdle:
-          "bg-[var(--accent-a)] text-[var(--accent-a-fg)] shadow-[0_10px_24px_color-mix(in_srgb,var(--accent-a)_28%,transparent)]",
-      };
+  const accentText = personal
+    ? "text-[var(--accent-b-text)]"
+    : "text-[var(--accent-a-text)]";
+  const fab = personal
+    ? "bg-[var(--accent-b)] text-[var(--accent-b-fg)]"
+    : "bg-[var(--accent-a)] text-[var(--accent-a-fg)]";
 
   function sideLink(item: SideItem) {
     const current = isCurrent(path, item.href);
@@ -149,18 +140,31 @@ export function BottomNav() {
           href={item.href}
           aria-current={current ? "page" : undefined}
           aria-label={label}
-          className={`flex min-h-12 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-center ${
-            current
-              ? `${accent.soft} ${accent.text}`
-              : "text-stone-400"
+          className={`nav-tab flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl px-1 text-center transition-colors duration-150 ${
+            current ? accentText : "text-[var(--muted)]"
           }`}
         >
-          <NavGlyph name={item.icon} />
-          {current ? (
-            <span className="max-w-full truncate text-[0.65rem] font-semibold leading-none tracking-tight">
-              {label}
-            </span>
-          ) : null}
+          <span className="relative flex h-6 w-6 items-center justify-center">
+            <NavGlyph
+              name={item.icon}
+              className={current ? "opacity-100" : "opacity-80"}
+            />
+            <span
+              aria-hidden
+              className={`absolute -bottom-1 h-1 w-1 rounded-full transition-opacity duration-150 ${
+                current
+                  ? "bg-current opacity-100"
+                  : "opacity-0"
+              }`}
+            />
+          </span>
+          <span
+            className={`max-w-full truncate text-[0.65rem] leading-none tracking-tight ${
+              current ? "font-semibold" : "font-medium opacity-80"
+            }`}
+          >
+            {label}
+          </span>
         </Link>
       </li>
     );
@@ -176,10 +180,10 @@ export function BottomNav() {
               href="/add"
               aria-current={addActive ? "page" : undefined}
               aria-label={t("navAdd")}
-              className={`-mt-8 mb-0.5 flex h-14 w-14 shrink-0 items-center justify-center rounded-full ${
+              className={`nav-tab -mt-7 mb-0.5 flex h-14 w-14 shrink-0 items-center justify-center rounded-full shadow-md transition-[box-shadow,opacity] duration-150 ${fab} ${
                 addActive
-                  ? `${accent.fab} scale-105 ring-4 ring-[var(--background)]`
-                  : accent.fabIdle
+                  ? "opacity-100 shadow-lg"
+                  : "opacity-95"
               }`}
             >
               <NavGlyph name="add" />
