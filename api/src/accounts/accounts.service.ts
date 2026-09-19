@@ -7,8 +7,11 @@ import { HouseholdKind, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { TransferAccountsDto } from './dto/transfer-accounts.dto';
+import { CashWithdrawDto } from './dto/cash-withdraw.dto';
+import { nameArFor } from '../categories/category-labels';
 
 export const WALLET_TRANSFER_CATEGORY = 'Wallet transfer';
+export const CASH_WITHDRAWAL_CATEGORY = 'Cash withdrawal';
 
 @Injectable()
 export class AccountsService {
@@ -95,6 +98,7 @@ export class AccountsService {
         data: {
           householdId,
           name: WALLET_TRANSFER_CATEGORY,
+          nameAr: nameArFor(WALLET_TRANSFER_CATEGORY),
           kind,
           color: '#57534e',
         },
@@ -167,7 +171,7 @@ export class AccountsService {
         include: {
           account: { select: { id: true, name: true, type: true } },
           category: {
-            select: { id: true, name: true, color: true, kind: true },
+            select: { id: true, name: true, nameAr: true, color: true, kind: true },
           },
         },
       }),
@@ -185,7 +189,7 @@ export class AccountsService {
         include: {
           account: { select: { id: true, name: true, type: true } },
           category: {
-            select: { id: true, name: true, color: true, kind: true },
+            select: { id: true, name: true, nameAr: true, color: true, kind: true },
           },
         },
       }),
@@ -198,5 +202,67 @@ export class AccountsService {
       out: outTx,
       in: inTx,
     };
+  }
+
+  private async ensureCashWithdrawalCategory(householdId: string) {
+    const existing = await this.prisma.category.findFirst({
+      where: {
+        householdId,
+        name: CASH_WITHDRAWAL_CATEGORY,
+        kind: 'EXPENSE',
+      },
+    });
+    if (existing) return existing;
+    return this.prisma.category.create({
+      data: {
+        householdId,
+        name: CASH_WITHDRAWAL_CATEGORY,
+        nameAr: nameArFor(CASH_WITHDRAWAL_CATEGORY),
+        kind: 'EXPENSE',
+        color: '#0f766e',
+      },
+    });
+  }
+
+  async withdrawCash(
+    householdId: string,
+    kind: HouseholdKind,
+    userId: string,
+    dto: CashWithdrawDto,
+  ) {
+    if (kind !== 'PERSONAL') {
+      throw new ForbiddenException('Cash withdraw is only for your own money');
+    }
+    await this.ensureCashPots(householdId);
+    const balances = await this.list(householdId);
+    const current = balances.find((a) => a.name === 'Current' && !a.archived);
+    if (!current) {
+      throw new BadRequestException('Current wallet missing');
+    }
+    if (dto.amount > current.balance + 0.001) {
+      throw new BadRequestException('Not enough money in current');
+    }
+
+    const category = await this.ensureCashWithdrawalCategory(householdId);
+    const note = dto.note?.trim() || 'Cash withdrawal';
+
+    return this.prisma.transaction.create({
+      data: {
+        householdId,
+        userId,
+        accountId: current.id,
+        categoryId: category.id,
+        type: 'EXPENSE',
+        amount: new Prisma.Decimal(dto.amount),
+        occurredOn: new Date(dto.occurredOn),
+        note,
+      },
+      include: {
+        account: { select: { id: true, name: true, type: true } },
+        category: {
+          select: { id: true, name: true, nameAr: true, color: true, kind: true },
+        },
+      },
+    });
   }
 }

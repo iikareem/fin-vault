@@ -11,6 +11,7 @@ import { UpdateCharityTypeDto } from './dto/update-charity-type.dto';
 import { dateOnlyUtc, daysInMonth } from '../common/calendar';
 import { CreateCharityGiftDto } from './dto/create-charity-gift.dto';
 import { UpdateCharityGiftDto } from './dto/update-charity-gift.dto';
+import { nameArFor } from '../categories/category-labels';
 
 const DEFAULT_TYPES = [
   { name: 'Mosque', color: '#0f766e' },
@@ -414,6 +415,7 @@ export class CharityService {
       data: {
         householdId,
         name: 'Charity',
+        nameAr: nameArFor('Charity'),
         kind: 'EXPENSE',
         color: '#0f766e',
       },

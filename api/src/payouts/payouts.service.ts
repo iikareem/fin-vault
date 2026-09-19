@@ -6,6 +6,7 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePayoutDto } from './dto/create-payout.dto';
+import { nameArFor } from '../categories/category-labels';
 
 const GIVE_KINDS = {
   Allowance: { house: 'Allowance', personal: 'Allowance', color: '#0284c7' },
@@ -128,7 +129,7 @@ export class PayoutsService {
     });
     if (existing) return existing;
     return this.prisma.category.create({
-      data: { householdId, name, kind, color },
+      data: { householdId, name, nameAr: nameArFor(name), kind, color },
     });
   }
 }

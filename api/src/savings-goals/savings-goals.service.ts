@@ -12,6 +12,7 @@ import { UpdateSavingsGoalDto } from './dto/update-savings-goal.dto';
 import { AllocateSavingsGoalDto } from './dto/allocate-savings-goal.dto';
 import { MoveSavingsGoalDto } from './dto/move-savings-goal.dto';
 import { BuySavingsGoalDto } from './dto/buy-savings-goal.dto';
+import { nameArFor } from '../categories/category-labels';
 
 const GOAL_COLORS = [
   '#0f766e',
@@ -307,6 +308,7 @@ export class SavingsGoalsService {
       data: {
         householdId,
         name,
+        nameAr: nameArFor(name),
         kind: 'EXPENSE',
         color: color || '#0f766e',
       },

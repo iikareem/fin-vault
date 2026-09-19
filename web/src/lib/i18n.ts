@@ -230,6 +230,11 @@ const ar = {
   transferTo: "لأنهي محفظة",
   transferSaved: "اتحوّل المبلغ بين المحافظ",
   walletTransfer: "تحويل بين المحافظ",
+  cashWithdraw: "سحب كاش",
+  cashWithdrawHint:
+    "بتطلع من الجاري مرة واحدة. بتتسجل في التاريخ والتحليلات. مفيش محفظة تانية. بعد كده الصرف بالكاش استخدموا «من غير خصم».",
+  cashWithdrawSaved: "اتسحب الكاش من الجاري",
+  cashWithdrawal: "سحب كاش",
   currentHint: "الفلوس اليومية: أكل، فواتير، مصروف.",
   savingsHint: "فلوس متتحط على جنب. مش للصرف اليومي.",
   bothHint: "مجموع الجاري والتوفير.",
@@ -867,6 +872,11 @@ const en = {
   transferTo: "To which wallet",
   transferSaved: "Moved between your wallets",
   walletTransfer: "Wallet transfer",
+  cashWithdraw: "Withdraw cash",
+  cashWithdrawHint:
+    "Takes from Current once. Logged in history and analytics. No extra wallet. Later physical cash spends: use Track only.",
+  cashWithdrawSaved: "Cash withdrawn from Current",
+  cashWithdrawal: "Cash withdrawal",
   currentHint: "Everyday money: food, bills, allowance.",
   savingsHint: "Money set aside. Not for daily spending.",
   bothHint: "Current plus savings.",
@@ -1279,6 +1289,7 @@ export type MessageKey = keyof typeof ar;
 
 const nameEmojis: Record<string, string> = {
   "Wallet transfer": "🔁",
+  "Cash withdrawal": "💵",
   Cash: "💵",
   Current: "💵",
   Savings: "💰",
@@ -1431,6 +1442,7 @@ const nameKeys: Record<string, MessageKey> = {
   Current: "currentWallet",
   Savings: "savingsWallet",
   "Wallet transfer": "walletTransfer",
+  "Cash withdrawal": "cashWithdrawal",
   Bank: "bank",
   Groceries: "groceries",
   Food: "food",
@@ -1581,9 +1593,42 @@ export function fill(template: string, vars?: Record<string, string>) {
   return template.replace(/\{(\w+)\}/g, (_, k) => vars[k] ?? "");
 }
 
-export function labelFor(name: string, t: (key: MessageKey) => string) {
-  const key = nameKeys[name];
-  const label = key ? t(key) : name;
+type LabelOpts = {
+  /** Arabic label from DB. Used when locale is `ar`. */
+  nameAr?: string | null;
+  locale?: string;
+};
+
+/**
+ * Display label for a stored English `name`.
+ * - English UI: always the DB English `name` (not the i18n rewrite table).
+ * - Arabic UI: `nameAr` from DB when present, else the code map / raw name.
+ */
+export function labelFor(
+  name: string,
+  t: (key: MessageKey) => string,
+  opts?: LabelOpts,
+) {
+  const nameAr = opts?.nameAr?.trim();
+  const locale = opts?.locale;
+  let label: string;
+  if (locale === "en") {
+    label = name;
+  } else if (locale === "ar" && nameAr) {
+    label = nameAr;
+  } else {
+    const key = nameKeys[name];
+    label = key ? t(key) : name;
+  }
   const emoji = nameEmojis[name];
   return emoji ? `${emoji} ${label}` : label;
+}
+
+/** Category row from API — prefers DB bilingual fields by locale. */
+export function categoryLabel(
+  cat: { name: string; nameAr?: string | null },
+  locale: string,
+  t: (key: MessageKey) => string,
+) {
+  return labelFor(cat.name, t, { nameAr: cat.nameAr, locale });
 }

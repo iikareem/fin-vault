@@ -10,6 +10,7 @@ import { HouseholdAccessService } from '../households/household-access.service';
 import { CreateClaimDto } from './dto/create-claim.dto';
 import { CreateReimbursementDto } from './dto/create-reimbursement.dto';
 import { UpdateClaimDto } from './dto/update-claim.dto';
+import { nameArFor } from '../categories/category-labels';
 
 @Injectable()
 export class ClaimsService {
@@ -70,7 +71,7 @@ export class ClaimsService {
       where: { householdId },
       include: {
         member: { select: { id: true, name: true } },
-        category: { select: { id: true, name: true, color: true } },
+        category: { select: { id: true, name: true, nameAr: true, color: true } },
         reimbursements: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -109,7 +110,7 @@ export class ClaimsService {
         },
         include: {
           member: { select: { id: true, name: true } },
-          category: { select: { id: true, name: true, color: true } },
+          category: { select: { id: true, name: true, nameAr: true, color: true } },
           reimbursements: true,
         },
       });
@@ -180,7 +181,7 @@ export class ClaimsService {
         where: { id: claimId },
         include: {
           member: { select: { id: true, name: true } },
-          category: { select: { id: true, name: true, color: true } },
+          category: { select: { id: true, name: true, nameAr: true, color: true } },
           reimbursements: true,
         },
       });
@@ -217,7 +218,7 @@ export class ClaimsService {
     });
     if (existing) return existing;
     return tx.category.create({
-      data: { householdId, name, kind, color },
+      data: { householdId, name, nameAr: nameArFor(name), kind, color },
     });
   }
 
@@ -332,7 +333,7 @@ export class ClaimsService {
         where: { id: claimId },
         include: {
           member: { select: { id: true, name: true } },
-          category: { select: { id: true, name: true, color: true } },
+          category: { select: { id: true, name: true, nameAr: true, color: true } },
           reimbursements: true,
         },
       });

@@ -11,6 +11,10 @@ export class CreateCategoryDto {
 
   @IsOptional()
   @IsString()
+  nameAr?: string;
+
+  @IsOptional()
+  @IsString()
   color?: string;
 
   @IsOptional()

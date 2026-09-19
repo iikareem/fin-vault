@@ -7,7 +7,7 @@ import { PageShell } from "@/components/PageShell";
 import { Money } from "@/components/Money";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
-import { labelFor } from "@/lib/i18n";
+import { labelFor, categoryLabel } from "@/lib/i18n";
 import { useCalendarClock } from "@/hooks/useCalendarClock";
 import { isoLocal } from "@/lib/calendar";
 import { householdPath } from "@/lib/space";
@@ -18,6 +18,7 @@ type DayRow = { day: string; income: number; expense: number };
 type CatRow = {
   categoryId?: string;
   name: string;
+  nameAr?: string;
   color: string;
   type: string;
   total: number;
@@ -534,7 +535,7 @@ export default function AnalyticsPage() {
                       />
                       <span className="mt-1.5 flex items-start justify-between gap-1.5">
                         <span className="line-clamp-2 min-w-0 text-sm font-bold leading-snug">
-                          {labelFor(c.name, t)}
+                          {categoryLabel(c, locale, t)}
                         </span>
                         <span
                           className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
@@ -621,7 +622,7 @@ export default function AnalyticsPage() {
                         {selectedCats.map((c) => (
                           <div
                             key={catKey(c)}
-                            title={labelFor(c.name, t)}
+                            title={categoryLabel(c, locale, t)}
                             style={{
                               width: `${(c.total / selectedTotal) * 100}%`,
                               background: c.color,
@@ -642,7 +643,7 @@ export default function AnalyticsPage() {
                               style={{ background: c.color }}
                             />
                             <span className="min-w-0 truncate">
-                              {labelFor(c.name, t)}
+                              {categoryLabel(c, locale, t)}
                             </span>
                             <span className="shrink-0 text-[var(--muted)]">
                               {Math.round((c.total / selectedTotal) * 100)}%

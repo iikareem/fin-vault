@@ -7,14 +7,14 @@ import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
-import { labelFor, fill } from "@/lib/i18n";
+import { labelFor, categoryLabel, fill } from "@/lib/i18n";
 import { householdPath } from "@/lib/space";
 import { Money } from "@/components/Money";
 import { ItemDate } from "@/components/ItemDate";
 import { sortByOccurredOnDesc } from "@/lib/calendar";
 
 type Person = { id: string; name: string };
-type Category = { id: string; name: string; kind: string };
+type Category = { id: string; name: string; nameAr?: string | null; kind: string };
 type Loan = {
   id: string;
   fromUserId: string;
@@ -29,7 +29,7 @@ type Loan = {
   occurredOn?: string;
   fromUser: { id: string; name: string };
   toUser: { id: string; name: string };
-  category: { id: string; name: string; color: string };
+  category: { id: string; name: string; nameAr?: string | null; color: string };
 };
 
 export default function BetweenPage() {
@@ -199,7 +199,7 @@ export default function BetweenPage() {
           </span>
         </div>
         <p className="text-sm text-stone-500">
-          {labelFor(loan.category.name, t)} · {t("remaining")} ·{" "}
+          {categoryLabel(loan.category, locale, t)} · {t("remaining")} ·{" "}
           {t("ofOriginal", {
             amount: money(loan.originalAmount, currency, locale),
           })}
@@ -413,7 +413,7 @@ export default function BetweenPage() {
           >
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
-                {labelFor(c.name, t)}
+                {categoryLabel(c, locale, t)}
               </option>
             ))}
           </select>

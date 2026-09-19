@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCoverDto } from './dto/create-cover.dto';
 import { CreateCoverRepaymentDto } from './dto/create-cover-repayment.dto';
+import { nameArFor } from '../categories/category-labels';
 
 @Injectable()
 export class CoversService {
@@ -65,7 +66,7 @@ export class CoversService {
       where: { householdId },
       include: {
         member: { select: { id: true, name: true } },
-        category: { select: { id: true, name: true, color: true } },
+        category: { select: { id: true, name: true, nameAr: true, color: true } },
         repayments: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -129,7 +130,7 @@ export class CoversService {
         },
         include: {
           member: { select: { id: true, name: true } },
-          category: { select: { id: true, name: true, color: true } },
+          category: { select: { id: true, name: true, nameAr: true, color: true } },
           repayments: true,
         },
       });
@@ -239,7 +240,7 @@ export class CoversService {
         where: { id: coverId },
         include: {
           member: { select: { id: true, name: true } },
-          category: { select: { id: true, name: true, color: true } },
+          category: { select: { id: true, name: true, nameAr: true, color: true } },
           repayments: true,
         },
       });
@@ -259,7 +260,7 @@ export class CoversService {
     });
     if (existing) return existing;
     return tx.category.create({
-      data: { householdId, name, kind, color },
+      data: { householdId, name, nameAr: nameArFor(name), kind, color },
     });
   }
 
@@ -437,7 +438,7 @@ export class CoversService {
         where: { id: coverId },
         include: {
           member: { select: { id: true, name: true } },
-          category: { select: { id: true, name: true, color: true } },
+          category: { select: { id: true, name: true, nameAr: true, color: true } },
           repayments: true,
         },
       });

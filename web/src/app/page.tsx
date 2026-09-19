@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api, money, parseAmount, todayISO } from "@/lib/api";
-import { fill, labelFor } from "@/lib/i18n";
+import { fill, labelFor, categoryLabel } from "@/lib/i18n";
 import { useCalendarClock } from "@/hooks/useCalendarClock";
 import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
@@ -67,7 +67,7 @@ type Tx = {
   amount: string | number;
   note: string;
   occurredOn?: string;
-  category: { name: string };
+  category: { name: string; nameAr?: string | null };
   user: { name: string };
   account?: { name: string; type?: string };
 };
@@ -84,7 +84,7 @@ type Claim = {
   note: string;
   occurredOn: string;
   member: { id: string; name: string };
-  category: { name: string };
+  category: { name: string; nameAr?: string | null };
 };
 type Cover = {
   id: string;
@@ -95,7 +95,7 @@ type Cover = {
   note: string;
   occurredOn: string;
   member: { id: string; name: string };
-  category: { name: string };
+  category: { name: string; nameAr?: string | null };
 };
 
 export default function HomePage() {
@@ -145,6 +145,9 @@ export default function HomePage() {
     } else if (key === "transferSaved") {
       sessionStorage.removeItem("fb_flash");
       setFlash(t("transferSaved"));
+    } else if (key === "cashWithdrawSaved") {
+      sessionStorage.removeItem("fb_flash");
+      setFlash(t("cashWithdrawSaved"));
     }
   }, [t]);
 
@@ -783,7 +786,7 @@ export default function HomePage() {
                           <div className="min-w-0 text-right" dir="auto">
                             <p className="font-semibold">{c.member.name}</p>
                             <p className="text-stone-600">
-                              {labelFor(c.category.name, t)}
+                              {categoryLabel(c.category, locale, t)}
                               {c.note ? ` · ${c.note}` : ""}
                             </p>
                             <p className="mt-1 text-sm text-stone-500">
@@ -928,7 +931,7 @@ export default function HomePage() {
                           <div className="min-w-0 text-right" dir="auto">
                             <p className="font-semibold">{c.member.name}</p>
                             <p className="text-stone-600">
-                              {labelFor(c.category.name, t)}
+                              {categoryLabel(c.category, locale, t)}
                               {c.note ? ` · ${c.note}` : ""}
                             </p>
                             <p className="mt-1 text-sm text-stone-500">
@@ -1109,7 +1112,7 @@ export default function HomePage() {
                   <div className="min-w-0 text-right" dir="auto">
                     <p className="font-semibold">{c.member.name}</p>
                     <p className="text-stone-600">
-                      {labelFor(c.category.name, t)}
+                      {categoryLabel(c.category, locale, t)}
                       {c.note ? ` · ${c.note}` : ""}
                     </p>
                     <p className="mt-1 text-sm font-medium text-amber-900">
@@ -1253,7 +1256,7 @@ export default function HomePage() {
                     <div className="min-w-0 text-right" dir="auto">
                       <p className="font-semibold">{c.member.name}</p>
                       <p className="text-stone-600">
-                        {labelFor(c.category.name, t)}
+                        {categoryLabel(c.category, locale, t)}
                         {c.note ? ` · ${c.note}` : ""}
                       </p>
                       <p className="mt-1 text-sm font-medium text-indigo-900">
@@ -1561,9 +1564,9 @@ export default function HomePage() {
             {txs.map((tx) => (
               <li key={tx.id} className="list-row text-[var(--foreground)]">
                 <div className="money-row min-w-0">
-                  <div className="min-w-0 text-right" dir="auto">
+                  <div className="min-w-0 text-start" dir="auto">
                     <span className="font-medium">
-                      {labelFor(tx.category.name, t)}
+                      {categoryLabel(tx.category, locale, t)}
                       {tx.type === "TRACK" ? (
                         <span className="ms-2 text-sm font-normal text-[var(--muted)]">
                           ({t("trackOnlyBadge")})
@@ -1599,21 +1602,25 @@ export default function HomePage() {
                     />
                   </span>
                 </div>
-                {tx.user.name !== "House" || tx.note ? (
-                  <p className="mt-1 text-sm text-[var(--muted)]">
-                    {[
-                      tx.user.name === "House" ? null : labelFor(tx.user.name, t),
-                      tx.type === "TRACK"
-                        ? null
-                        : tx.account
-                          ? labelFor(tx.account.name, t)
-                          : null,
-                      tx.note || null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                ) : null}
+                {(() => {
+                  const parts = [
+                    isHouse && tx.user.name !== "House"
+                      ? labelFor(tx.user.name, t)
+                      : null,
+                    tx.type === "TRACK"
+                      ? null
+                      : tx.account
+                        ? labelFor(tx.account.name, t)
+                        : null,
+                    tx.note || null,
+                  ].filter(Boolean);
+                  if (parts.length === 0) return null;
+                  return (
+                    <p className="mt-1 text-start text-sm text-[var(--muted)]" dir="auto">
+                      {parts.join(" · ")}
+                    </p>
+                  );
+                })()}
               </li>
             ))}
           </ul>

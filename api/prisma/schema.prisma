@@ -155,6 +155,8 @@ model Category {
   parent      Category?     @relation("CategoryChildren", fields: [parentId], references: [id])
   children    Category[]    @relation("CategoryChildren")
   name        String
+  /** Arabic display label. Empty = fall back to `name` (English). */
+  nameAr      String        @default("")
   kind        CategoryKind
   color       String        @default("#2563eb")
   sortOrder   Int           @default(0)

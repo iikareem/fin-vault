@@ -7,7 +7,7 @@ import { PageShell } from "@/components/PageShell";
 import { Money } from "@/components/Money";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
-import { labelFor, type MessageKey } from "@/lib/i18n";
+import { labelFor, categoryLabel, type MessageKey } from "@/lib/i18n";
 import { CategoryPicker } from "@/components/CategoryPicker";
 import { useCalendarClock } from "@/hooks/useCalendarClock";
 import { formatItemDate, isoLocal } from "@/lib/calendar";
@@ -20,7 +20,7 @@ type Tx = {
   type: "INCOME" | "EXPENSE" | "REIMBURSEMENT" | "TRACK";
   amount: number;
   note: string;
-  category: { id?: string; name: string };
+  category: { id?: string; name: string; nameAr?: string | null };
   categoryId?: string;
   user: { name: string };
 };
@@ -32,7 +32,7 @@ type Claim = {
   status: string;
   memberId: string;
   member: { name: string };
-  category: { name: string };
+  category: { name: string; nameAr?: string | null };
   categoryId: string;
 };
 type Gift = {
@@ -293,7 +293,7 @@ export default function HistoryPage() {
                 >
                   <div className="money-row text-xl">
                     <span className="font-bold" dir="auto">
-                      {labelFor(tx.category.name, t)}
+                      {categoryLabel(tx.category, locale, t)}
                       {tx.type === "TRACK" ? (
                         <span className="ms-2 text-sm font-medium text-stone-500">
                           ({t("trackOnlyBadge")})
@@ -323,15 +323,20 @@ export default function HistoryPage() {
                       />
                     </span>
                   </div>
-                  {tx.user.name === "House" && !tx.note ? null : (
-                    <p className="mt-1 text-stone-500">
-                      {tx.user.name === "House"
-                        ? tx.note
-                        : [labelFor(tx.user.name, t), tx.note || null]
-                            .filter(Boolean)
-                            .join(" · ")}
-                    </p>
-                  )}
+                  {(() => {
+                    const showUser =
+                      active?.kind === "HOUSE" && tx.user.name !== "House";
+                    const parts = [
+                      showUser ? labelFor(tx.user.name, t) : null,
+                      tx.note || null,
+                    ].filter(Boolean);
+                    if (parts.length === 0) return null;
+                    return (
+                      <p className="mt-1 text-start text-stone-500" dir="auto">
+                        {parts.join(" · ")}
+                      </p>
+                    );
+                  })()}
                 </button>
                 {editing ? (
                   <EditFields
@@ -381,7 +386,7 @@ export default function HistoryPage() {
                   <p className="text-lg font-bold">{t("pocketThatDay")}</p>
                   <div className="money-row text-xl">
                     <span dir="auto">
-                      {c.member.name} · {labelFor(c.category.name, t)}
+                      {c.member.name} · {categoryLabel(c.category, locale, t)}
                     </span>
                     <span className="font-bold">
                       <Money

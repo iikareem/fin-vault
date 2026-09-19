@@ -7,6 +7,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOutsideLoanDto } from './dto/create-outside-loan.dto';
 import { CollectOutsideLoanDto } from './dto/collect-outside-loan.dto';
+import { nameArFor } from '../categories/category-labels';
 
 const CATS = {
   lend: { name: 'Outside loan', kind: 'EXPENSE' as const, color: '#b91c1c' },
@@ -85,7 +86,7 @@ export class OutsideLoansService {
     });
     if (existing) return existing;
     return tx.category.create({
-      data: { householdId, name, kind, color },
+      data: { householdId, name, nameAr: nameArFor(name), kind, color },
     });
   }
 

@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { HouseholdKind } from '@prisma/client';
 import { PERSONAL_EXPENSE } from '../households/space-defaults';
+import { nameArFor } from './category-labels';
 
 const HOUSE_PAID = [
   { name: 'Family gift', kind: 'EXPENSE' as const, color: '#db2777' },
@@ -139,19 +140,40 @@ export class CategoriesService {
               kind: cat.kind,
             },
           },
-          update: {},
-          create: { householdId, ...cat },
+          update: { nameAr: nameArFor(cat.name) },
+          create: {
+            householdId,
+            ...cat,
+            nameAr: nameArFor(cat.name),
+          },
         });
       }
     }
     if (kind === 'PERSONAL') {
       await this.syncPersonal(householdId);
     }
+    await this.fillMissingNameAr(householdId);
     const cats = await this.prisma.category.findMany({
       where: { householdId },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
     });
     return this.orderByUserUsage(householdId, userId, cats);
+  }
+
+  /** Backfill Arabic labels for known English category names. */
+  private async fillMissingNameAr(householdId: string) {
+    const cats = await this.prisma.category.findMany({
+      where: { householdId, nameAr: '' },
+      select: { id: true, name: true },
+    });
+    for (const cat of cats) {
+      const ar = nameArFor(cat.name);
+      if (!ar) continue;
+      await this.prisma.category.update({
+        where: { id: cat.id },
+        data: { nameAr: ar },
+      });
+    }
   }
 
   /** Most-used categories for this user float to the top (groups and subs). */
@@ -237,10 +259,16 @@ export class CategoriesService {
             kind: 'EXPENSE',
           },
         },
-        update: { color: def.color, sortOrder: i, parentId: null },
+        update: {
+          color: def.color,
+          sortOrder: i,
+          parentId: null,
+          nameAr: nameArFor(def.name),
+        },
         create: {
           householdId,
           name: def.name,
+          nameAr: nameArFor(def.name),
           kind: 'EXPENSE',
           color: def.color,
           sortOrder: i,
@@ -264,10 +292,16 @@ export class CategoriesService {
             kind: 'EXPENSE',
           },
         },
-        update: { color: def.color, parentId, sortOrder: order },
+        update: {
+          color: def.color,
+          parentId,
+          sortOrder: order,
+          nameAr: nameArFor(def.name),
+        },
         create: {
           householdId,
           name: def.name,
+          nameAr: nameArFor(def.name),
           kind: 'EXPENSE',
           color: def.color,
           parentId,
@@ -403,6 +437,7 @@ export class CategoriesService {
       data: {
         householdId,
         name: dto.name,
+        nameAr: dto.nameAr?.trim() || nameArFor(dto.name),
         kind: dto.kind,
         color: dto.color ?? '#2563eb',
         parentId: dto.parentId ?? null,

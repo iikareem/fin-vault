@@ -25,6 +25,7 @@ type Account = { id: string; name: string; type?: string };
 type Category = {
   id: string;
   name: string;
+  nameAr?: string | null;
   kind: "EXPENSE" | "INCOME" | "PEER";
   parentId?: string | null;
   color?: string | null;
@@ -38,9 +39,9 @@ function AddForm() {
   const { t } = useI18n();
   const { active } = useBooks();
   const [space, setSpace] = useState<Space | null>(null);
-  const [mode, setMode] = useState<"wallet" | "claim" | "cover" | "transfer">(
-    "wallet",
-  );
+  const [mode, setMode] = useState<
+    "wallet" | "claim" | "cover" | "transfer" | "withdraw"
+  >("wallet");
   const [type, setType] = useState<WalletKind>("EXPENSE");
   const [amount, setAmount] = useState("");
   const [currentAmt, setCurrentAmt] = useState("");
@@ -64,6 +65,7 @@ function AddForm() {
   const coverMode = mode === "cover";
   const claimMode = mode === "claim";
   const transferMode = mode === "transfer";
+  const withdrawMode = mode === "withdraw";
   const personalPaid =
     personalBooks && mode === "wallet" && type === "EXPENSE";
 
@@ -74,6 +76,7 @@ function AddForm() {
     const wantClaim = search.get("mode") === "claim";
     const wantCover = search.get("mode") === "cover";
     const wantTransfer = search.get("mode") === "transfer";
+    const wantWithdraw = search.get("mode") === "withdraw";
     if (isHouseMember || wantClaim) {
       setMode("claim");
       setType("EXPENSE");
@@ -82,6 +85,9 @@ function AddForm() {
       setType("EXPENSE");
     } else if (wantTransfer && active.kind === "PERSONAL") {
       setMode("transfer");
+      setType("EXPENSE");
+    } else if (wantWithdraw && active.kind === "PERSONAL") {
+      setMode("withdraw");
       setType("EXPENSE");
     } else {
       setMode("wallet");
@@ -135,7 +141,7 @@ function AddForm() {
   );
 
   useEffect(() => {
-    if (transferMode) return;
+    if (transferMode || withdrawMode) return;
     const list =
       mode === "claim" || mode === "cover" ? expenseCats : walletCats;
     const preferred =
@@ -149,7 +155,15 @@ function AddForm() {
       list.find((c) => c.name === "Consumables") ??
       list[0];
     if (pick) setCategoryId(pick.id);
-  }, [mode, type, expenseCats, walletCats, transferMode, personalBooks]);
+  }, [
+    mode,
+    type,
+    expenseCats,
+    walletCats,
+    transferMode,
+    withdrawMode,
+    personalBooks,
+  ]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -176,6 +190,27 @@ function AddForm() {
         });
         if (typeof window !== "undefined") {
           sessionStorage.setItem("fb_flash", "transferSaved");
+        }
+      } else if (withdrawMode) {
+        const value = parseAmount(amount);
+        if (!(value > 0)) {
+          setError(t("amountHint"));
+          setBusy(false);
+          return;
+        }
+        await api(
+          householdPath(space.householdId, "/accounts/cash-withdraw"),
+          {
+            method: "POST",
+            body: JSON.stringify({
+              amount: value,
+              occurredOn,
+              note,
+            }),
+          },
+        );
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("fb_flash", "cashWithdrawSaved");
         }
       } else if (mode === "claim") {
         await api(householdPath(space.householdId, "/claims"), {
@@ -369,7 +404,7 @@ function AddForm() {
               setType("EXPENSE");
             }}
             className={`min-h-16 rounded-3xl text-lg font-semibold transition ${
-              !transferMode && type === "EXPENSE"
+              !transferMode && !withdrawMode && type === "EXPENSE"
                 ? "bg-red-800 text-white shadow-md"
                 : "bg-[var(--surface-bg)] text-stone-700 ring-1 ring-[var(--input-border)]"
             }`}
@@ -384,7 +419,7 @@ function AddForm() {
               setTrackOnly(false);
             }}
             className={`min-h-16 rounded-3xl text-lg font-semibold transition ${
-              !transferMode && type === "INCOME"
+              !transferMode && !withdrawMode && type === "INCOME"
                 ? "bg-emerald-800 text-white shadow-md"
                 : "bg-[var(--surface-bg)] text-stone-700 ring-1 ring-[var(--input-border)]"
             }`}
@@ -392,25 +427,43 @@ function AddForm() {
             📈 {t("moneyIn")}
           </button>
           {personalBooks ? (
-            <button
-              type="button"
-              onClick={() => {
-                setMode("transfer");
-                setTrackOnly(false);
-              }}
-              className={`col-span-2 min-h-14 rounded-3xl text-lg font-semibold transition ${
-                transferMode
-                  ? "bg-stone-800 text-white shadow-md"
-                  : "bg-[var(--surface-bg)] text-stone-700 ring-1 ring-[var(--input-border)]"
-              }`}
-            >
-              🔁 {t("transferWallets")}
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("transfer");
+                  setTrackOnly(false);
+                }}
+                className={`min-h-14 rounded-3xl text-lg font-semibold transition ${
+                  transferMode
+                    ? "bg-stone-800 text-white shadow-md"
+                    : "bg-[var(--surface-bg)] text-stone-700 ring-1 ring-[var(--input-border)]"
+                }`}
+              >
+                🔁 {t("transferWallets")}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("withdraw");
+                  setTrackOnly(false);
+                }}
+                className={`min-h-14 rounded-3xl text-lg font-semibold transition ${
+                  withdrawMode
+                    ? "bg-teal-800 text-white shadow-md"
+                    : "bg-[var(--surface-bg)] text-stone-700 ring-1 ring-[var(--input-border)]"
+                }`}
+              >
+                💵 {t("cashWithdraw")}
+              </button>
+            </>
           ) : null}
         </div>
       )}
       <Hint>
-        {transferMode
+        {withdrawMode
+          ? t("cashWithdrawHint")
+          : transferMode
           ? t("transferWalletsHint")
           : coverMode
           ? t("housePaidForHint")
@@ -495,7 +548,22 @@ function AddForm() {
             </label>
           </>
         ) : null}
-        {!transferMode && (giveMode || coverMode) ? (
+        {withdrawMode ? (
+          <label className="block">
+            <span className="mb-1 block font-medium">{t("amount")}</span>
+            <input
+              inputMode="decimal"
+              dir="ltr"
+              className="amount-input w-full rounded-2xl border border-stone-300 bg-white px-4 py-4 text-2xl"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0"
+              required
+            />
+            <Hint>{t("cashWithdrawHint")}</Hint>
+          </label>
+        ) : null}
+        {!transferMode && !withdrawMode && (giveMode || coverMode) ? (
           <label className="block">
             <span className="mb-1 block font-medium">{t("giveTo")}</span>
             <select
@@ -513,7 +581,9 @@ function AddForm() {
             <Hint>{t("giveToHint")}</Hint>
           </label>
         ) : null}
-        {!transferMode && (claimMode || coverMode || type !== "INCOME") ? (
+        {!transferMode &&
+        !withdrawMode &&
+        (claimMode || coverMode || type !== "INCOME") ? (
           <label className="block">
             <span className="mb-1 block font-medium">{t("amount")}</span>
             <input
@@ -560,7 +630,7 @@ function AddForm() {
             </p>
           </div>
         ) : null}
-        {!transferMode && !claimMode && !coverMode && type === "INCOME" ? (
+        {!transferMode && !withdrawMode && !claimMode && !coverMode && type === "INCOME" ? (
           <div className="space-y-3">
             <Hint>{t("splitIncomeHint")}</Hint>
             <label className="block">
@@ -593,7 +663,7 @@ function AddForm() {
             </label>
           </div>
         ) : null}
-        {!transferMode && !giveMode ? (
+        {!transferMode && !withdrawMode && !giveMode ? (
           <CategoryPicker
             categories={claimMode || coverMode ? expenseCats : walletCats}
             value={categoryId}
@@ -601,6 +671,7 @@ function AddForm() {
           />
         ) : null}
         {!transferMode &&
+        !withdrawMode &&
         !(claimMode || (!coverMode && type === "INCOME")) &&
         !(personalPaid && trackOnly) ? (
           <div>
@@ -654,7 +725,13 @@ function AddForm() {
         >
           {busy ? t("saving") : `✅ ${t("save")}`}
         </button>
-        <Hint>{personalPaid && trackOnly ? t("spendTrackOnlyHint") : t("addSaveHint")}</Hint>
+        <Hint>
+          {withdrawMode
+            ? t("cashWithdrawHint")
+            : personalPaid && trackOnly
+              ? t("spendTrackOnlyHint")
+              : t("addSaveHint")}
+        </Hint>
       </form>
       <BottomNav />
     </PageShell>

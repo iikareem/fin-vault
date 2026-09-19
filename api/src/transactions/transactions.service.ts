@@ -21,7 +21,7 @@ export class TransactionsService {
       },
       include: {
         account: { select: { id: true, name: true, type: true } },
-        category: { select: { id: true, name: true, color: true, kind: true } },
+        category: { select: { id: true, name: true, nameAr: true, color: true, kind: true } },
         user: { select: { id: true, name: true } },
       },
       orderBy: [{ occurredOn: 'desc' }, { createdAt: 'desc' }],
@@ -88,7 +88,7 @@ export class TransactionsService {
       },
       include: {
         account: { select: { id: true, name: true, type: true } },
-        category: { select: { id: true, name: true, color: true, kind: true } },
+        category: { select: { id: true, name: true, nameAr: true, color: true, kind: true } },
         user: { select: { id: true, name: true } },
       },
     });
@@ -217,7 +217,7 @@ export class TransactionsService {
       where: { id },
       include: {
         account: { select: { id: true, name: true, type: true } },
-        category: { select: { id: true, name: true, color: true, kind: true } },
+        category: { select: { id: true, name: true, nameAr: true, color: true, kind: true } },
         user: { select: { id: true, name: true } },
       },
     });

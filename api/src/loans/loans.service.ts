@@ -10,6 +10,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateLoanDto } from './dto/create-loan.dto';
 import { CreateRepaymentDto } from './dto/create-repayment.dto';
+import { nameArFor } from '../categories/category-labels';
 
 @Injectable()
 export class LoansService implements OnModuleInit {
@@ -52,7 +53,7 @@ export class LoansService implements OnModuleInit {
       include: {
         fromUser: { select: { id: true, name: true } },
         toUser: { select: { id: true, name: true } },
-        category: { select: { id: true, name: true, color: true } },
+        category: { select: { id: true, name: true, nameAr: true, color: true } },
       },
       orderBy: { occurredOn: 'asc' },
     });
@@ -65,7 +66,7 @@ export class LoansService implements OnModuleInit {
           include: {
             fromUser: { select: { id: true, name: true } },
             toUser: { select: { id: true, name: true } },
-            category: { select: { id: true, name: true, color: true } },
+            category: { select: { id: true, name: true, nameAr: true, color: true } },
           },
         },
       },
@@ -249,7 +250,7 @@ export class LoansService implements OnModuleInit {
     });
     if (existing) return existing;
     return tx.category.create({
-      data: { householdId, name, kind, color },
+      data: { householdId, name, nameAr: nameArFor(name), kind, color },
     });
   }
 
@@ -325,7 +326,7 @@ export class LoansService implements OnModuleInit {
       include: {
         fromUser: { select: { id: true, name: true } },
         toUser: { select: { id: true, name: true } },
-        category: { select: { id: true, name: true, color: true } },
+        category: { select: { id: true, name: true, nameAr: true, color: true } },
         repayments: true,
       },
       orderBy: { createdAt: 'desc' },
@@ -416,7 +417,7 @@ export class LoansService implements OnModuleInit {
         include: {
           fromUser: { select: { id: true, name: true } },
           toUser: { select: { id: true, name: true } },
-          category: { select: { id: true, name: true, color: true } },
+          category: { select: { id: true, name: true, nameAr: true, color: true } },
           repayments: true,
         },
       });
@@ -453,7 +454,7 @@ export class LoansService implements OnModuleInit {
         repayments: true,
         fromUser: { select: { id: true, name: true } },
         toUser: { select: { id: true, name: true } },
-        category: { select: { id: true, name: true, color: true } },
+        category: { select: { id: true, name: true, nameAr: true, color: true } },
       },
     });
     if (!loan) throw new NotFoundException();
@@ -541,7 +542,7 @@ export class LoansService implements OnModuleInit {
         include: {
           fromUser: { select: { id: true, name: true } },
           toUser: { select: { id: true, name: true } },
-          category: { select: { id: true, name: true, color: true } },
+          category: { select: { id: true, name: true, nameAr: true, color: true } },
           repayments: true,
         },
       });
@@ -585,7 +586,7 @@ export class LoansService implements OnModuleInit {
         repayments: true,
         fromUser: { select: { id: true, name: true } },
         toUser: { select: { id: true, name: true } },
-        category: { select: { id: true, name: true, color: true } },
+        category: { select: { id: true, name: true, nameAr: true, color: true } },
       },
     });
     if (!loan) throw new NotFoundException();
@@ -648,7 +649,7 @@ export class LoansService implements OnModuleInit {
         include: {
           fromUser: { select: { id: true, name: true } },
           toUser: { select: { id: true, name: true } },
-          category: { select: { id: true, name: true, color: true } },
+          category: { select: { id: true, name: true, nameAr: true, color: true } },
           repayments: true,
         },
       });

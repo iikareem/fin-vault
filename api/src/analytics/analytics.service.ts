@@ -378,7 +378,14 @@ export class AnalyticsService {
     });
     const totals = new Map<
       string,
-      { categoryId: string; name: string; color: string; type: string; total: number }
+      {
+        categoryId: string;
+        name: string;
+        nameAr: string;
+        color: string;
+        type: string;
+        total: number;
+      }
     >();
     for (const r of rows) {
       const cat = cats.find((c) => c.id === r.categoryId);
@@ -391,6 +398,7 @@ export class AnalyticsService {
       const cur = totals.get(key) ?? {
         categoryId: bucket?.id ?? r.categoryId,
         name: bucket?.name ?? 'Unknown',
+        nameAr: bucket?.nameAr ?? '',
         color: bucket?.color ?? '#64748b',
         type,
         total: 0,
@@ -413,6 +421,7 @@ export class AnalyticsService {
         const cur = totals.get(key) ?? {
           categoryId: r.categoryId,
           name: cat?.name ?? 'Unknown',
+          nameAr: cat?.nameAr ?? '',
           color: cat?.color ?? '#64748b',
           type: 'EXPENSE',
           total: 0,
@@ -492,7 +501,7 @@ export class AnalyticsService {
       where: { householdId, occurredOn: day },
       include: {
         account: { select: { id: true, name: true } },
-        category: { select: { id: true, name: true, color: true, kind: true } },
+        category: { select: { id: true, name: true, nameAr: true, color: true, kind: true } },
         user: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: 'asc' },
@@ -503,7 +512,7 @@ export class AnalyticsService {
             where: { householdId, occurredOn: day },
             include: {
               member: { select: { id: true, name: true } },
-              category: { select: { id: true, name: true, color: true } },
+              category: { select: { id: true, name: true, nameAr: true, color: true } },
               reimbursements: true,
             },
             orderBy: { createdAt: 'asc' },

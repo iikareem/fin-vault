@@ -9,6 +9,7 @@ import { AuthUser } from '../auth/auth-user';
 import { MembershipContext } from '../households/membership-context';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { TransferAccountsDto } from './dto/transfer-accounts.dto';
+import { CashWithdrawDto } from './dto/cash-withdraw.dto';
 
 @Controller('households/:householdId/accounts')
 @UseGuards(JwtAuthGuard, HouseholdGuard)
@@ -36,6 +37,20 @@ export class AccountsController {
     @Body() dto: TransferAccountsDto,
   ) {
     return this.accounts.transfer(
+      membership.householdId,
+      membership.kind,
+      user.id,
+      dto,
+    );
+  }
+
+  @Post('cash-withdraw')
+  withdrawCash(
+    @CurrentMembership() membership: MembershipContext,
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CashWithdrawDto,
+  ) {
+    return this.accounts.withdrawCash(
       membership.householdId,
       membership.kind,
       user.id,

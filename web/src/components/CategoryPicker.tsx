@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { labelFor } from "@/lib/i18n";
+import { categoryLabel } from "@/lib/i18n";
 import { useI18n } from "@/components/I18nProvider";
 
 export type CategoryItem = {
   id: string;
   name: string;
+  nameAr?: string | null;
   parentId?: string | null;
   color?: string | null;
 };
@@ -38,7 +39,7 @@ export function CategoryPicker({
   onChange: (id: string) => void;
   groupLabel?: string;
 }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const activeGroupRef = useRef<HTMLButtonElement | null>(null);
@@ -66,20 +67,29 @@ export function CategoryPicker({
   const hasSubs = groupChildren.length > 0;
 
   const q = query.trim().toLowerCase();
+  const catText = (c: CategoryItem) => categoryLabel(c, locale, t);
 
   const filteredParents = useMemo(() => {
     if (!q) return parents;
     return parents.filter((p) => {
-      const parentLabel = labelFor(p.name, t).toLowerCase();
-      if (parentLabel.includes(q) || p.name.toLowerCase().includes(q)) {
+      const parentLabel = catText(p).toLowerCase();
+      if (
+        parentLabel.includes(q) ||
+        p.name.toLowerCase().includes(q) ||
+        (p.nameAr ?? "").toLowerCase().includes(q)
+      ) {
         return true;
       }
       return (childrenByParent.get(p.id) ?? []).some((c) => {
-        const childLabel = labelFor(c.name, t).toLowerCase();
-        return childLabel.includes(q) || c.name.toLowerCase().includes(q);
+        const childLabel = catText(c).toLowerCase();
+        return (
+          childLabel.includes(q) ||
+          c.name.toLowerCase().includes(q) ||
+          (c.nameAr ?? "").toLowerCase().includes(q)
+        );
       });
     });
-  }, [parents, childrenByParent, q, t]);
+  }, [parents, childrenByParent, q, locale, t]);
 
   /** When searching, flatten matching leaf categories for one-tap pick. */
   const searchHits = useMemo(() => {
@@ -88,18 +98,23 @@ export function CategoryPicker({
     for (const p of parents) {
       const kids = childrenByParent.get(p.id) ?? [];
       if (kids.length === 0) {
-        const label = labelFor(p.name, t).toLowerCase();
-        if (label.includes(q) || p.name.toLowerCase().includes(q)) {
+        const label = catText(p).toLowerCase();
+        if (
+          label.includes(q) ||
+          p.name.toLowerCase().includes(q) ||
+          (p.nameAr ?? "").toLowerCase().includes(q)
+        ) {
           hits.push(p);
         }
         continue;
       }
       for (const c of kids) {
-        const childLabel = labelFor(c.name, t).toLowerCase();
-        const parentLabel = labelFor(p.name, t).toLowerCase();
+        const childLabel = catText(c).toLowerCase();
+        const parentLabel = catText(p).toLowerCase();
         if (
           childLabel.includes(q) ||
           c.name.toLowerCase().includes(q) ||
+          (c.nameAr ?? "").toLowerCase().includes(q) ||
           parentLabel.includes(q)
         ) {
           hits.push(c);
@@ -107,16 +122,20 @@ export function CategoryPicker({
       }
     }
     return hits.slice(0, 12);
-  }, [parents, childrenByParent, q, t]);
+  }, [parents, childrenByParent, q, locale, t]);
 
   const filteredChildren = useMemo(() => {
     if (!q || !hasSubs) return groupChildren;
     const matched = groupChildren.filter((c) => {
-      const childLabel = labelFor(c.name, t).toLowerCase();
-      return childLabel.includes(q) || c.name.toLowerCase().includes(q);
+      const childLabel = catText(c).toLowerCase();
+      return (
+        childLabel.includes(q) ||
+        c.name.toLowerCase().includes(q) ||
+        (c.nameAr ?? "").toLowerCase().includes(q)
+      );
     });
     return matched.length > 0 ? matched : groupChildren;
-  }, [groupChildren, hasSubs, q, t]);
+  }, [groupChildren, hasSubs, q, locale, t]);
 
   useEffect(() => {
     if (!open) return;
@@ -133,8 +152,13 @@ export function CategoryPicker({
         selected?.parentId === id
           ? value
           : kids.find((k) => {
-              const label = labelFor(k.name, t).toLowerCase();
-              return q && (label.includes(q) || k.name.toLowerCase().includes(q));
+              const label = catText(k).toLowerCase();
+              return (
+                q &&
+                (label.includes(q) ||
+                  k.name.toLowerCase().includes(q) ||
+                  (k.nameAr ?? "").toLowerCase().includes(q))
+              );
             })?.id ?? kids[0].id;
       onChange(keep);
       return;
@@ -152,8 +176,8 @@ export function CategoryPicker({
 
   const selectedLabel = selected
     ? hasSubs && selected.parentId
-      ? `${labelFor(group?.name ?? "", t)} · ${labelFor(selected.name, t)}`
-      : labelFor(selected.name, t)
+      ? `${catText(group ?? selected)} · ${catText(selected)}`
+      : catText(selected)
     : t("catPickGroup");
 
   const showSearchHits = q.length >= 1 && searchHits.length > 0;
@@ -201,8 +225,8 @@ export function CategoryPicker({
                     : null;
                   const active = value === c.id;
                   const title = parent
-                    ? `${labelFor(parent.name, t)} · ${labelFor(c.name, t)}`
-                    : labelFor(c.name, t);
+                    ? `${catText(parent)} · ${catText(c)}`
+                    : catText(c);
                   return (
                     <button
                       key={c.id}
@@ -261,7 +285,7 @@ export function CategoryPicker({
                         >
                           <ColorDot color={p.color} active={active} />
                           <span className="line-clamp-2 text-[0.7rem] font-bold leading-tight">
-                            {labelFor(p.name, t)}
+                            {catText(p)}
                           </span>
                         </button>
                       );
@@ -277,7 +301,7 @@ export function CategoryPicker({
                     {group ? (
                       <span className="font-medium">
                         {" "}
-                        · {labelFor(group.name, t)}
+                        · {catText(group)}
                       </span>
                     ) : null}
                   </p>
@@ -308,7 +332,7 @@ export function CategoryPicker({
                             active={active}
                           />
                           <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-                            {labelFor(c.name, t)}
+                            {catText(c)}
                           </span>
                           {active ? <span aria-hidden>✓</span> : null}
                         </button>

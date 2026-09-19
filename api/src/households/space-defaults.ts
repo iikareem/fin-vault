@@ -1,4 +1,5 @@
 import { Prisma, PrismaClient } from '@prisma/client';
+import { nameArFor } from '../categories/category-labels';
 
 type Db = Prisma.TransactionClient | PrismaClient;
 
@@ -180,10 +181,15 @@ export async function seedPersonalSpace(
 
   await client.category.createMany({
     data: [
-      ...incomeCats.map((c) => ({ householdId: personal.id, ...c })),
+      ...incomeCats.map((c) => ({
+        householdId: personal.id,
+        ...c,
+        nameAr: nameArFor(c.name),
+      })),
       ...parents.map((c, i) => ({
         householdId: personal.id,
         name: c.name,
+        nameAr: nameArFor(c.name),
         kind: 'EXPENSE' as const,
         color: c.color,
         sortOrder: i,
@@ -199,6 +205,7 @@ export async function seedPersonalSpace(
       data: {
         householdId: personal.id,
         name: child.name,
+        nameAr: nameArFor(child.name),
         kind: 'EXPENSE',
         color: child.color,
         parentId: parent.id,
@@ -220,19 +227,45 @@ export async function seedHouseBooks(client: Db, householdId: string) {
       ...HOUSE_EXPENSE.map((c) => ({
         householdId,
         name: c.name,
+        nameAr: nameArFor(c.name),
         kind: 'EXPENSE' as const,
         color: c.color,
       })),
       {
         householdId,
         name: 'Allowance',
+        nameAr: nameArFor('Allowance'),
         kind: 'EXPENSE' as const,
         color: '#0284c7',
       },
-      { householdId, name: 'Salary', kind: 'INCOME', color: '#15803d' },
-      { householdId, name: 'Other income', kind: 'INCOME', color: '#0f766e' },
-      { householdId, name: 'Personal loan', kind: 'PEER', color: '#57534e' },
-      { householdId, name: 'Help with a bill', kind: 'PEER', color: '#a16207' },
+      {
+        householdId,
+        name: 'Salary',
+        nameAr: nameArFor('Salary'),
+        kind: 'INCOME',
+        color: '#15803d',
+      },
+      {
+        householdId,
+        name: 'Other income',
+        nameAr: nameArFor('Other income'),
+        kind: 'INCOME',
+        color: '#0f766e',
+      },
+      {
+        householdId,
+        name: 'Personal loan',
+        nameAr: nameArFor('Personal loan'),
+        kind: 'PEER',
+        color: '#57534e',
+      },
+      {
+        householdId,
+        name: 'Help with a bill',
+        nameAr: nameArFor('Help with a bill'),
+        kind: 'PEER',
+        color: '#a16207',
+      },
     ],
   });
   await client.charityType.createMany({

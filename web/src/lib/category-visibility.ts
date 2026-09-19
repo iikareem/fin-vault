@@ -4,6 +4,7 @@ export const HIDDEN_EXPENSE_CATEGORIES = new Set([
   "Given to member",
   "Allowance",
   "Wallet transfer",
+  "Cash withdrawal",
   /** Owned by سلفة section — picker only shows رد سلفة (Loan repayment). */
   "Outside loan",
   "Loan repaid",
