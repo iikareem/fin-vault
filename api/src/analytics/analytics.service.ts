@@ -3,6 +3,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { MembershipContext } from '../households/membership-context';
 import { actorForSpace, HOUSE_ACTOR } from '../households/house-actor';
 import { dateOnlyUtc, isoFromDbDate, isoLocal } from '../common/calendar';
+import {
+  NON_SPEND_CATEGORY_NAMES,
+  nonSpendCategoryFilter,
+} from '../categories/non-spend-categories';
 
 @Injectable()
 export class AnalyticsService {
@@ -13,6 +17,22 @@ export class AnalyticsService {
     type: string,
   ) {
     return Number(rows.find((r) => r.type === type)?._sum.amount ?? 0);
+  }
+
+  /** True spend (excludes wallet transfer + cash withdrawal). */
+  private isSpendTx(tx: { type: string; category?: { name: string } | null }) {
+    if (
+      tx.type !== 'EXPENSE' &&
+      tx.type !== 'REIMBURSEMENT' &&
+      tx.type !== 'TRACK'
+    ) {
+      return false;
+    }
+    const name = tx.category?.name;
+    if (name && (NON_SPEND_CATEGORY_NAMES as readonly string[]).includes(name)) {
+      return false;
+    }
+    return true;
   }
 
   private async walletTotal(householdId: string) {
@@ -154,13 +174,14 @@ export class AnalyticsService {
             householdId,
             accountId: { in: cashIds },
             occurredOn: today,
-            category: { name: { not: 'Wallet transfer' } },
+            category: nonSpendCategoryFilter,
           },
           _sum: { amount: true },
         })
       : [];
 
     // TRACK still counts as spending for today/month totals; wallets ignore it.
+    // Cash withdrawal is excluded (money left Current, real spend is logged later via TRACK).
     const todayExpense =
       this.pick(todayAgg, 'EXPENSE') + this.pick(todayAgg, 'TRACK');
 
@@ -288,16 +309,17 @@ export class AnalyticsService {
     const monthEnd = dateOnlyUtc(
       `${monthKey}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`,
     );
-    const trackMonth = await this.prisma.transaction.aggregate({
+    // Month "out" = real spend only (EXPENSE + TRACK), not cash withdrawal / transfers.
+    const monthSpendAgg = await this.prisma.transaction.aggregate({
       where: {
         householdId,
-        type: 'TRACK',
+        type: { in: ['EXPENSE', 'TRACK'] },
         occurredOn: { gte: monthStart, lte: monthEnd },
-        category: { name: { not: 'Wallet transfer' } },
+        category: nonSpendCategoryFilter,
       },
       _sum: { amount: true },
     });
-    const trackMonthSpend = Number(trackMonth._sum.amount ?? 0);
+    const monthExpense = Number(monthSpendAgg._sum.amount ?? 0);
 
     return {
       totalMoney,
@@ -305,8 +327,7 @@ export class AnalyticsService {
       broughtForward: cash.current.broughtForward,
       savedThisMonth: cash.current.saved,
       monthIncome: cash.current.income,
-      // Include TRACK so "month out" reflects all personal spending, not only wallet debits.
-      monthExpense: cash.current.expense + trackMonthSpend,
+      monthExpense,
       todayIncome: this.pick(todayAgg, 'INCOME'),
       todayExpense,
       youOwe,
@@ -325,14 +346,16 @@ export class AnalyticsService {
     const rows = await this.prisma.$queryRaw<
       { day: Date; type: string; total: unknown }[]
     >`
-      SELECT "occurredOn" as day, type, SUM(amount) as total
-      FROM "Transaction"
-      WHERE "householdId" = ${householdId}
-        AND "occurredOn" >= ${dateOnlyUtc(from)}
-        AND "occurredOn" <= ${dateOnlyUtc(to)}
-        AND type IN ('INCOME', 'EXPENSE', 'TRACK')
-      GROUP BY "occurredOn", type
-      ORDER BY "occurredOn" ASC
+      SELECT t."occurredOn" as day, t.type, SUM(t.amount) as total
+      FROM "Transaction" t
+      INNER JOIN "Category" c ON c.id = t."categoryId"
+      WHERE t."householdId" = ${householdId}
+        AND t."occurredOn" >= ${dateOnlyUtc(from)}
+        AND t."occurredOn" <= ${dateOnlyUtc(to)}
+        AND t.type IN ('INCOME', 'EXPENSE', 'TRACK')
+        AND c.name NOT IN ('Wallet transfer', 'Cash withdrawal')
+      GROUP BY t."occurredOn", t.type
+      ORDER BY t."occurredOn" ASC
     `;
     const map = new Map<
       string,
@@ -342,7 +365,7 @@ export class AnalyticsService {
       const key = isoFromDbDate(row.day);
       const cur = map.get(key) ?? { day: key, income: 0, expense: 0 };
       if (row.type === 'INCOME') cur.income = Number(row.total);
-      else cur.expense += Number(row.total); // EXPENSE + TRACK
+      else cur.expense += Number(row.total); // EXPENSE + TRACK (not cash withdraw)
       map.set(key, cur);
     }
     if (membership.kind === 'HOUSE') {
@@ -370,6 +393,7 @@ export class AnalyticsService {
         householdId,
         type: { not: 'REIMBURSEMENT' },
         occurredOn: { gte: dateOnlyUtc(from), lte: dateOnlyUtc(to) },
+        category: nonSpendCategoryFilter,
       },
       _sum: { amount: true },
     });
@@ -445,6 +469,7 @@ export class AnalyticsService {
         householdId,
         type: { not: 'REIMBURSEMENT' },
         occurredOn: { gte: dateOnlyUtc(from), lte: dateOnlyUtc(to) },
+        category: nonSpendCategoryFilter,
       },
       _sum: { amount: true },
     });
@@ -533,15 +558,10 @@ export class AnalyticsService {
     const income = txs
       .filter((t) => t.type === 'INCOME')
       .reduce((s, t) => s + Number(t.amount), 0);
-    // TRACK does not change wallets, but still counts as spending for the day.
+    // TRACK counts as spending; cash withdrawal / wallet transfer do not.
     const expense =
       txs
-        .filter(
-          (t) =>
-            t.type === 'EXPENSE' ||
-            t.type === 'REIMBURSEMENT' ||
-            t.type === 'TRACK',
-        )
+        .filter((t) => this.isSpendTx(t))
         .reduce((s, t) => s + Number(t.amount), 0) +
       claims.reduce((s, c) => s + Number(c.amount), 0) +
       gifts.reduce(

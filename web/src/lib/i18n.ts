@@ -232,7 +232,7 @@ const ar = {
   walletTransfer: "تحويل بين المحافظ",
   cashWithdraw: "سحب كاش",
   cashWithdrawHint:
-    "بتطلع من الجاري مرة واحدة. بتتسجل في التاريخ والتحليلات. مفيش محفظة تانية. بعد كده الصرف بالكاش استخدموا «من غير خصم».",
+    "بتطلع من الجاري مرة واحدة وتتسجل في التاريخ. مش هتتحسب صرف — الصرف الحقيقي لما تدفع بالكاش استخدم «من غير خصم».",
   cashWithdrawSaved: "اتسحب الكاش من الجاري",
   cashWithdrawal: "سحب كاش",
   currentHint: "الفلوس اليومية: أكل، فواتير، مصروف.",
@@ -874,7 +874,7 @@ const en = {
   walletTransfer: "Wallet transfer",
   cashWithdraw: "Withdraw cash",
   cashWithdrawHint:
-    "Takes from Current once. Logged in history and analytics. No extra wallet. Later physical cash spends: use Track only.",
+    "Takes from Current once and shows in history. Not counted as spend — real spend is when you pay with cash using Track only.",
   cashWithdrawSaved: "Cash withdrawn from Current",
   cashWithdrawal: "Cash withdrawal",
   currentHint: "Everyday money: food, bills, allowance.",
