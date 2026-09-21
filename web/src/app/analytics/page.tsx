@@ -177,6 +177,8 @@ export default function AnalyticsPage() {
     expense: number;
     label: string;
     detailLabel: string;
+    weekend?: boolean;
+    dayNum?: number;
   };
 
   const chartBars = useMemo((): ChartBar[] => {
@@ -190,6 +192,7 @@ export default function AnalyticsPage() {
         const day = i + 1;
         const key = `${y}-${pad(m + 1)}-${pad(day)}`;
         const date = new Date(y, m, day);
+        const weekday = date.getDay();
         return {
           key,
           expense: byDay.get(key) ?? 0,
@@ -199,6 +202,8 @@ export default function AnalyticsPage() {
             day: "numeric",
             month: "short",
           }),
+          weekend: weekday === 0 || weekday === 5 || weekday === 6,
+          dayNum: day,
         };
       });
     }
@@ -212,6 +217,7 @@ export default function AnalyticsPage() {
           expense: byMonth.get(key) ?? 0,
           label: new Date(y, i, 1).toLocaleDateString(loc, { month: "short" }),
           detailLabel: monthLabel(key, locale),
+          dayNum: i + 1,
         };
       });
     }
@@ -239,6 +245,8 @@ export default function AnalyticsPage() {
     [activeBars],
   );
   const maxBar = Math.max(1, ...chartBars.map((b) => b.expense));
+  const avgLinePct =
+    avgSpend > 0.001 ? Math.min(92, Math.max(10, (avgSpend / maxBar) * 100)) : 0;
 
   useEffect(() => {
     if (chartBars.length === 0) {
@@ -256,6 +264,41 @@ export default function AnalyticsPage() {
 
   const selectedBar =
     chartBars.find((b) => b.key === selectedBarKey) ?? peakBar ?? null;
+  const chartTotal = chartBars.reduce((s, b) => s + b.expense, 0);
+  const selectedShare =
+    selectedBar && chartTotal > 0.001
+      ? Math.round((selectedBar.expense / chartTotal) * 100)
+      : 0;
+  const todayIso = isoLocal(new Date());
+  const selectedIndex = selectedBar
+    ? chartBars.findIndex((b) => b.key === selectedBar.key)
+    : -1;
+
+  function selectChartOffset(dir: number) {
+    if (chartBars.length === 0 || selectedIndex < 0) return;
+    const next = Math.min(
+      chartBars.length - 1,
+      Math.max(0, selectedIndex + dir),
+    );
+    const bar = chartBars[next];
+    if (period === "year") {
+      const [y, m] = bar.key.split("-").map(Number);
+      setCursor(new Date(y, m - 1, 1));
+      setPeriod("month");
+      return;
+    }
+    setSelectedBarKey(bar.key);
+  }
+
+  function onChartBarClick(key: string) {
+    if (period === "year") {
+      const [y, m] = key.split("-").map(Number);
+      setCursor(new Date(y, m - 1, 1));
+      setPeriod("month");
+      return;
+    }
+    setSelectedBarKey(key);
+  }
 
   const monthKey = `${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}`;
   const yearKey = String(cursor.getFullYear());
@@ -491,31 +534,199 @@ export default function AnalyticsPage() {
           <h2 className="mt-8 text-xl font-semibold">
             {period === "year" ? t("spendByMonth") : t("spendByDay")}
           </h2>
-          <Hint>{t("tapSpendBar")}</Hint>
-          <section className="surface mt-3 overflow-hidden rounded-[1.75rem] p-4">
+          <section className="surface spend-chart mt-3 overflow-hidden rounded-[1.75rem] p-4">
             {chartBars.length === 0 ? (
               <p className="text-[var(--muted)]">{t("noPeriodData")}</p>
             ) : (
               <>
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="rounded-2xl bg-[var(--panel-soft)] px-2.5 py-2 text-center">
-                    <p className="text-[11px] text-[var(--muted)]">
-                      {t("avgSpend")}
-                    </p>
-                    <p className="mt-0.5 text-sm font-semibold tabular-nums">
+                <div className="flex items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="truncate text-sm text-[var(--muted)]">
+                        {selectedBar?.detailLabel ??
+                          (period === "year"
+                            ? t("spendByMonth")
+                            : t("spendByDay"))}
+                      </p>
+                      {selectedBar?.key === todayIso ? (
+                        <span className="rounded-full bg-[var(--accent-b-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--accent-b-text)]">
+                          {t("today")}
+                        </span>
+                      ) : null}
+                      {selectedBar &&
+                      peakBar?.key === selectedBar.key &&
+                      selectedBar.expense > 0.001 ? (
+                        <span className="rounded-full bg-[var(--soft-amber)] px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                          {period === "year" ? t("peakMonth") : t("peakSpend")}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p
+                      className={`mt-1 text-[1.75rem] font-bold leading-none tracking-tight tabular-nums ${
+                        (selectedBar?.expense ?? 0) > 0.001
+                          ? "text-red-800"
+                          : "text-[var(--foreground)]"
+                      }`}
+                    >
                       {hideAggregates ? (
                         "••••"
                       ) : (
                         <Money
-                          amount={avgSpend}
+                          amount={selectedBar?.expense ?? 0}
                           currency={currency}
                           locale={locale}
                         />
                       )}
                     </p>
+                    {!hideAggregates &&
+                    selectedBar &&
+                    selectedBar.expense > 0.001 &&
+                    selectedShare > 0 ? (
+                      <p className="mt-1.5 text-xs text-[var(--muted)]">
+                        {t("ofPeriod", { pct: String(selectedShare) })}
+                      </p>
+                    ) : null}
                   </div>
-                  <div className="rounded-2xl bg-[var(--panel-soft)] px-2.5 py-2 text-center">
-                    <p className="text-[11px] text-[var(--muted)]">
+
+                  {period === "month" ? (
+                    <div className="flex shrink-0 gap-1">
+                      <button
+                        type="button"
+                        className="icon-btn px-3 text-lg"
+                        disabled={selectedIndex <= 0}
+                        onClick={() => selectChartOffset(-1)}
+                        aria-label="prev"
+                      >
+                        ‹
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-btn px-3 text-lg"
+                        disabled={
+                          selectedIndex < 0 ||
+                          selectedIndex >= chartBars.length - 1
+                        }
+                        onClick={() => selectChartOffset(1)}
+                        aria-label="next"
+                      >
+                        ›
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="spend-chart-well mt-4 rounded-2xl px-2 pb-2 pt-3">
+                  <div className="relative h-36">
+                    <div className="pointer-events-none absolute inset-x-1 bottom-0 h-px bg-[var(--input-border)] opacity-70" />
+                    {avgLinePct > 0 && !hideAggregates ? (
+                      <div
+                        className="pointer-events-none absolute inset-x-1 z-[1] flex items-center gap-1.5"
+                        style={{ bottom: `${avgLinePct}%` }}
+                      >
+                        <span className="h-px flex-1 border-t border-dashed border-[var(--accent-b)] opacity-40" />
+                        <span className="rounded-full bg-[var(--panel-soft)] px-1.5 py-0.5 text-[9px] font-semibold text-[var(--accent-b-text)]">
+                          {t("avgSpend")}
+                        </span>
+                      </div>
+                    ) : null}
+
+                    <div
+                      className={`absolute inset-0 flex items-end px-0.5 ${
+                        period === "year" ? "gap-1.5" : "gap-[3px]"
+                      }`}
+                    >
+                      {chartBars.map((b) => {
+                        const selected = b.key === selectedBarKey;
+                        const hasSpend = b.expense > 0.001;
+                        const isToday = b.key === todayIso;
+                        const pct = hideAggregates
+                          ? 18
+                          : hasSpend
+                            ? Math.max(12, (b.expense / maxBar) * 100)
+                            : 5;
+                        const isPeak = peakBar?.key === b.key && hasSpend;
+                        return (
+                          <button
+                            key={b.key}
+                            type="button"
+                            aria-pressed={selected}
+                            aria-label={b.detailLabel}
+                            onClick={() => onChartBarClick(b.key)}
+                            className="group relative flex h-full min-w-0 flex-1 items-end justify-center"
+                          >
+                            {isToday ? (
+                              <span className="pointer-events-none absolute inset-x-[15%] bottom-0 top-0 rounded-md bg-[var(--accent-b)] opacity-[0.07]" />
+                            ) : null}
+                            <span
+                              className={`spend-bar relative z-[1] block w-full max-w-[24px] ${
+                                selected
+                                  ? "spend-bar-selected"
+                                  : isPeak
+                                    ? "spend-bar-peak"
+                                    : hasSpend
+                                      ? b.weekend
+                                        ? "spend-bar-weekend"
+                                        : "spend-bar-active"
+                                      : "spend-bar-empty"
+                              }`}
+                              style={{ height: `${pct}%` }}
+                            />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div
+                    className={`mt-2 flex ${
+                      period === "year" ? "gap-1.5" : "gap-[3px]"
+                    }`}
+                  >
+                    {chartBars.map((b) => {
+                      const selected = b.key === selectedBarKey;
+                      const daysInMonth = chartBars.length;
+                      const showLabel =
+                        period === "year" ||
+                        selected ||
+                        b.key === todayIso ||
+                        b.dayNum === 1 ||
+                        b.dayNum === daysInMonth ||
+                        (b.dayNum != null && b.dayNum % 5 === 0);
+                      return (
+                        <button
+                          key={`lbl-${b.key}`}
+                          type="button"
+                          tabIndex={-1}
+                          aria-hidden
+                          onClick={() => onChartBarClick(b.key)}
+                          className={`min-w-0 flex-1 truncate text-center leading-none ${
+                            period === "year" ? "text-[10px]" : "text-[9px]"
+                          } ${
+                            selected
+                              ? "font-bold text-[var(--foreground)]"
+                              : b.key === todayIso
+                                ? "font-semibold text-[var(--accent-b-text)]"
+                                : showLabel
+                                  ? "text-[var(--muted)]"
+                                  : "text-transparent"
+                          }`}
+                        >
+                          {b.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-3 gap-1.5">
+                  <button
+                    type="button"
+                    className="rounded-2xl bg-[var(--panel-soft)] px-2 py-2.5 text-center transition active:scale-[0.98]"
+                    onClick={() => {
+                      if (peakBar) onChartBarClick(peakBar.key);
+                    }}
+                  >
+                    <p className="text-[10px] text-[var(--muted)]">
                       {period === "year" ? t("peakMonth") : t("peakSpend")}
                     </p>
                     <p className="mt-0.5 text-sm font-semibold tabular-nums">
@@ -531,14 +742,25 @@ export default function AnalyticsPage() {
                         "—"
                       )}
                     </p>
-                    {peakBar && !hideAggregates ? (
-                      <p className="mt-0.5 text-[10px] text-[var(--muted)]">
-                        {peakBar.label}
-                      </p>
-                    ) : null}
+                  </button>
+                  <div className="rounded-2xl bg-[var(--panel-soft)] px-2 py-2.5 text-center">
+                    <p className="text-[10px] text-[var(--muted)]">
+                      {t("avgSpend")}
+                    </p>
+                    <p className="mt-0.5 text-sm font-semibold tabular-nums">
+                      {hideAggregates ? (
+                        "••••"
+                      ) : (
+                        <Money
+                          amount={avgSpend}
+                          currency={currency}
+                          locale={locale}
+                        />
+                      )}
+                    </p>
                   </div>
-                  <div className="rounded-2xl bg-[var(--panel-soft)] px-2.5 py-2 text-center">
-                    <p className="text-[11px] text-[var(--muted)]">
+                  <div className="rounded-2xl bg-[var(--panel-soft)] px-2 py-2.5 text-center">
+                    <p className="text-[10px] text-[var(--muted)]">
                       {period === "year"
                         ? t("monthsWithSpend")
                         : t("daysWithSpend")}
@@ -548,102 +770,6 @@ export default function AnalyticsPage() {
                     </p>
                   </div>
                 </div>
-
-                <div
-                  className={`mt-4 flex h-40 items-stretch ${
-                    period === "year" ? "gap-1.5" : "gap-px"
-                  }`}
-                >
-                  {chartBars.map((b) => {
-                    const selected = b.key === selectedBarKey;
-                    const hasSpend = b.expense > 0.001;
-                    const pct = hideAggregates
-                      ? 12
-                      : hasSpend
-                        ? Math.max(8, (b.expense / maxBar) * 100)
-                        : 3;
-                    const isPeak = peakBar?.key === b.key && hasSpend;
-                    return (
-                      <button
-                        key={b.key}
-                        type="button"
-                        aria-pressed={selected}
-                        aria-label={b.detailLabel}
-                        onClick={() => {
-                          if (period === "year") {
-                            const [y, m] = b.key.split("-").map(Number);
-                            setCursor(new Date(y, m - 1, 1));
-                            setPeriod("month");
-                            return;
-                          }
-                          setSelectedBarKey(b.key);
-                        }}
-                        className="group flex min-w-0 flex-1 flex-col items-center justify-end"
-                      >
-                        <div className="relative flex w-full flex-1 items-end justify-center">
-                          <span
-                            className={`block w-[72%] max-w-[18px] rounded-t-md transition duration-200 ${
-                              selected
-                                ? "bg-[var(--accent-b)] shadow-[0_0_0_2px_var(--ring)]"
-                                : isPeak
-                                  ? "bg-[var(--accent-b)] opacity-80"
-                                  : hasSpend
-                                    ? "bg-[var(--accent-b)] opacity-45 group-hover:opacity-70"
-                                    : "bg-[var(--input-border)] opacity-50"
-                            }`}
-                            style={{ height: `${pct}%` }}
-                          />
-                        </div>
-                        <span
-                          className={`mt-1.5 max-w-full truncate text-center leading-none ${
-                            period === "year"
-                              ? "text-[10px]"
-                              : "text-[9px]"
-                          } ${
-                            selected
-                              ? "font-bold text-[var(--foreground)]"
-                              : "text-[var(--muted)]"
-                          }`}
-                        >
-                          {b.label}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {selectedBar && period === "month" ? (
-                  <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-[var(--panel-soft)] px-3.5 py-2.5">
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold">
-                        {selectedBar.detailLabel}
-                      </p>
-                      {peakBar?.key === selectedBar.key &&
-                      selectedBar.expense > 0.001 ? (
-                        <p className="text-xs text-[var(--muted)]">
-                          {t("peakSpend")}
-                        </p>
-                      ) : null}
-                    </div>
-                    <p
-                      className={`shrink-0 text-lg font-semibold tabular-nums ${
-                        selectedBar.expense > 0.001
-                          ? "text-red-800"
-                          : "text-[var(--muted)]"
-                      }`}
-                    >
-                      {hideAggregates ? (
-                        "••••"
-                      ) : (
-                        <Money
-                          amount={selectedBar.expense}
-                          currency={currency}
-                          locale={locale}
-                        />
-                      )}
-                    </p>
-                  </div>
-                ) : null}
               </>
             )}
           </section>
