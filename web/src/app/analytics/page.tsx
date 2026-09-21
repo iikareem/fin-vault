@@ -281,11 +281,10 @@ export default function AnalyticsPage() {
           : eachMonthKey(from, to);
       const byMonth = new Map(months.map((m) => [m.key, m.expense]));
       return monthKeys.map((key, i) => {
-        const [y, m] = key.split("-").map(Number);
+        const [, m] = key.split("-").map(Number);
         return {
           key,
           expense: byMonth.get(key) ?? 0,
-          // Numbers fit all 12 months on mobile; full name shows in the header.
           label: String(m),
           detailLabel: monthLabel(key, locale),
           dayNum: i + 1,
@@ -793,18 +792,24 @@ export default function AnalyticsPage() {
                     {chartBars.map((b, i) => {
                       const selected = b.key === selectedBarKey;
                       const n = chartBars.length;
-                      const labelStep = n > 45 ? 7 : n > 31 ? 5 : 5;
-                      const showLabel =
-                        chartByMonth ||
-                        selected ||
-                        b.key === todayIso ||
-                        i === 0 ||
-                        i === n - 1 ||
-                        (period === "month"
+                      // Fixed ticks only — never reveal extra labels on select
+                      // (that caused flicker / overlap on mobile).
+                      const showLabel = chartByMonth
+                        ? n <= 12
+                          ? true
+                          : i === 0 ||
+                            i === n - 1 ||
+                            (b.dayNum != null && b.dayNum % 2 === 1)
+                        : period === "month"
                           ? b.dayNum === 1 ||
                             b.dayNum === n ||
-                            (b.dayNum != null && b.dayNum % 5 === 0)
-                          : i % labelStep === 0);
+                            (b.dayNum != null &&
+                              (b.dayNum === 8 ||
+                                b.dayNum === 15 ||
+                                b.dayNum === 22))
+                          : i === 0 ||
+                            i === n - 1 ||
+                            i % (n > 45 ? 7 : 5) === 0;
                       return (
                         <button
                           key={`lbl-${b.key}`}
@@ -813,15 +818,13 @@ export default function AnalyticsPage() {
                           aria-hidden
                           onClick={() => onChartBarClick(b.key)}
                           className={`min-w-0 flex-1 text-center leading-none tabular-nums ${
-                            chartByMonth ? "text-[11px]" : "text-[9px]"
+                            chartByMonth ? "text-[10px]" : "text-[9px]"
                           } ${
-                            selected
-                              ? "font-bold text-[var(--foreground)]"
-                              : b.key === todayIso
-                                ? "font-semibold text-[var(--accent-b-text)]"
-                                : showLabel
-                                  ? "text-[var(--muted)]"
-                                  : "text-transparent"
+                            !showLabel
+                              ? "invisible"
+                              : selected
+                                ? "font-semibold text-[var(--foreground)]"
+                                : "text-[var(--muted)]"
                           }`}
                         >
                           {b.label}

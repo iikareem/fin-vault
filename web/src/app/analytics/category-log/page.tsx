@@ -78,14 +78,6 @@ function isExactMonth(from: string, to: string) {
   return to === last;
 }
 
-function monthLabel(from: string, locale: string) {
-  const [y, m] = from.split("-").map(Number);
-  return new Date(y, m - 1, 1).toLocaleDateString(locale === "ar" ? "ar" : "en", {
-    month: "long",
-    year: "numeric",
-  });
-}
-
 function CategoryLogInner() {
   const { t, locale } = useI18n();
   const { active, house } = useBooks();
@@ -319,30 +311,28 @@ function CategoryLogInner() {
             </div>
 
             {rangeMode === "month" ? (
-              <div className="mt-3 flex items-center justify-between gap-3">
+              <div className="mt-3 flex items-center gap-2">
                 <button
                   type="button"
-                  className="icon-btn px-4 text-xl"
+                  className="icon-btn shrink-0 px-3 text-xl sm:px-4"
                   onClick={() => shiftMonth(-1)}
                   aria-label="Previous month"
                 >
                   ‹
                 </button>
-                <div className="min-w-0 flex-1 text-center">
-                  <input
+                <div className="min-w-0 flex-1">
+                  <DateField
                     type="month"
+                    align="center"
                     value={`${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}`}
-                    onChange={(e) => {
-                      if (!e.target.value) return;
-                      setCursor(new Date(`${e.target.value}-01T12:00:00`));
-                    }}
-                    className="field text-center text-lg font-semibold"
-                    aria-label={monthLabel(from, locale)}
+                    onChange={(v) =>
+                      setCursor(new Date(`${v}-01T12:00:00`))
+                    }
                   />
                 </div>
                 <button
                   type="button"
-                  className="icon-btn px-4 text-xl"
+                  className="icon-btn shrink-0 px-3 text-xl sm:px-4"
                   onClick={() => shiftMonth(1)}
                   aria-label="Next month"
                 >
