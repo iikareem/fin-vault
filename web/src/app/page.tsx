@@ -416,10 +416,10 @@ export default function HomePage() {
 
   return (
     <PageShell>
-      <p className="text-lg text-stone-600">
+      <p className="text-lg font-semibold text-[var(--foreground)]">
         👋 {name ? t("helloName", { name }) : t("hello")}
       </p>
-      <p className="mt-1 text-sm leading-relaxed text-stone-500">
+      <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">
         {isHouse ? t("homeHintHouse") : t("homeHintMine")}
       </p>
       {flash ? <p className="flash mt-3">{flash}</p> : null}

@@ -285,9 +285,8 @@ export default function AnalyticsPage() {
         return {
           key,
           expense: byMonth.get(key) ?? 0,
-          label: new Date(y, m - 1, 1).toLocaleDateString(loc, {
-            month: "short",
-          }),
+          // Numbers fit all 12 months on mobile; full name shows in the header.
+          label: String(m),
           detailLabel: monthLabel(key, locale),
           dayNum: i + 1,
         };
@@ -352,23 +351,10 @@ export default function AnalyticsPage() {
       chartBars.length - 1,
       Math.max(0, selectedIndex + dir),
     );
-    const bar = chartBars[next];
-    if (chartByMonth) {
-      const [y, m] = bar.key.split("-").map(Number);
-      setCursor(new Date(y, m - 1, 1));
-      setPeriod("month");
-      return;
-    }
-    setSelectedBarKey(bar.key);
+    setSelectedBarKey(chartBars[next].key);
   }
 
   function onChartBarClick(key: string) {
-    if (chartByMonth) {
-      const [y, m] = key.split("-").map(Number);
-      setCursor(new Date(y, m - 1, 1));
-      setPeriod("month");
-      return;
-    }
     setSelectedBarKey(key);
   }
 
@@ -407,13 +393,13 @@ export default function AnalyticsPage() {
     <PageShell>
       <h1 className="page-title">📊 {t("navCharts")}</h1>
       <Hint>{t("chartsHint")}</Hint>
-      <div className="seg mt-4 grid w-full min-w-0 grid-cols-2 sm:grid-cols-4">
+      <div className="seg mt-4 grid w-full min-w-0 grid-cols-4">
         {(["day", "month", "year", "range"] as Period[]).map((p) => (
           <button
             key={p}
             type="button"
             onClick={() => setPeriodMode(p)}
-            className={`min-w-0 truncate rounded-2xl px-1 py-2.5 text-sm font-bold transition sm:text-base ${
+            className={`min-w-0 rounded-2xl px-0.5 py-2.5 text-center text-xs font-bold transition sm:px-1 sm:text-base ${
               period === p
                 ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
                 : "text-[var(--muted)]"
@@ -449,52 +435,56 @@ export default function AnalyticsPage() {
           />
         </div>
       ) : (
-        <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="mt-4 flex items-center gap-2">
           <button
             type="button"
-            className="icon-btn px-4 text-xl"
+            className="icon-btn shrink-0 px-3 text-xl sm:px-4"
             onClick={() => setCursor((c) => shift(period, c, -1))}
           >
             ‹
           </button>
-          <div className="min-w-0 flex-1 text-center">
+          <div className="min-w-0 flex-1">
             {period === "day" ? (
-              <input
-                type="date"
+              <DateField
+                align="center"
                 value={iso(cursor)}
-                onChange={(e) => {
-                  if (e.target.value)
-                    setCursor(new Date(`${e.target.value}T12:00:00`));
-                }}
-                className="field text-center text-lg font-semibold"
+                onChange={(v) => setCursor(new Date(`${v}T12:00:00`))}
               />
             ) : period === "month" ? (
-              <input
+              <DateField
                 type="month"
+                align="center"
                 value={`${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}`}
-                onChange={(e) => {
-                  if (e.target.value)
-                    setCursor(new Date(`${e.target.value}-01T12:00:00`));
-                }}
-                className="field text-center text-lg font-semibold"
+                onChange={(v) => setCursor(new Date(`${v}-01T12:00:00`))}
               />
             ) : (
-              <input
-                type="number"
-                value={cursor.getFullYear()}
-                min={2000}
-                max={2100}
-                onChange={(e) => {
-                  const y = Number(e.target.value);
-                  if (y) setCursor(new Date(y, 0, 1));
-                }}
-                className="field text-center text-lg font-semibold"
-              />
+              <label className="block min-w-0">
+                <span className="field relative flex min-h-[3.25rem] w-full items-center justify-center overflow-hidden !py-0">
+                  <span
+                    className="px-2 text-center text-lg font-semibold tabular-nums"
+                    dir="ltr"
+                  >
+                    {cursor.getFullYear()}
+                  </span>
+                  <input
+                    type="number"
+                    value={cursor.getFullYear()}
+                    min={2000}
+                    max={2100}
+                    onChange={(e) => {
+                      const y = Number(e.target.value);
+                      if (y) setCursor(new Date(y, 0, 1));
+                    }}
+                    className="absolute inset-0 z-10 cursor-pointer opacity-0"
+                    aria-label={t("periodYear")}
+                  />
+                </span>
+              </label>
             )}
           </div>
           <button
             type="button"
-            className="icon-btn px-4 text-xl"
+            className="icon-btn shrink-0 px-3 text-xl sm:px-4"
             onClick={() => setCursor((c) => shift(period, c, 1))}
           >
             ›
@@ -702,7 +692,7 @@ export default function AnalyticsPage() {
                     ) : null}
                   </div>
 
-                  {!chartByMonth ? (
+                  {!hideAggregates ? (
                     <div className="flex shrink-0 gap-1">
                       <button
                         type="button"
@@ -772,7 +762,11 @@ export default function AnalyticsPage() {
                               <span className="pointer-events-none absolute inset-x-[15%] bottom-0 top-0 rounded-md bg-[var(--accent-b)] opacity-[0.07]" />
                             ) : null}
                             <span
-                              className={`spend-bar relative z-[1] block w-full max-w-[24px] ${
+                              className={`spend-bar relative z-[1] block w-full ${
+                                chartByMonth
+                                  ? "max-w-[2rem]"
+                                  : "max-w-[24px]"
+                              } ${
                                 selected
                                   ? "spend-bar-selected"
                                   : isPeak
@@ -806,13 +800,11 @@ export default function AnalyticsPage() {
                         b.key === todayIso ||
                         i === 0 ||
                         i === n - 1 ||
-                        (chartByMonth
-                          ? true
-                          : period === "month"
-                            ? b.dayNum === 1 ||
-                              b.dayNum === n ||
-                              (b.dayNum != null && b.dayNum % 5 === 0)
-                            : i % labelStep === 0);
+                        (period === "month"
+                          ? b.dayNum === 1 ||
+                            b.dayNum === n ||
+                            (b.dayNum != null && b.dayNum % 5 === 0)
+                          : i % labelStep === 0);
                       return (
                         <button
                           key={`lbl-${b.key}`}
@@ -820,8 +812,8 @@ export default function AnalyticsPage() {
                           tabIndex={-1}
                           aria-hidden
                           onClick={() => onChartBarClick(b.key)}
-                          className={`min-w-0 flex-1 truncate text-center leading-none ${
-                            chartByMonth ? "text-[10px]" : "text-[9px]"
+                          className={`min-w-0 flex-1 text-center leading-none tabular-nums ${
+                            chartByMonth ? "text-[11px]" : "text-[9px]"
                           } ${
                             selected
                               ? "font-bold text-[var(--foreground)]"
