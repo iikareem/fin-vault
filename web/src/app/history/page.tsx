@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api, parseAmount } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
@@ -59,11 +61,33 @@ function shiftDay(day: string, dir: number) {
   return isoLocal(d);
 }
 
-export default function HistoryPage() {
+function isIsoDay(value: string | null): value is string {
+  return !!value && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+/** Only allow returning to category logs (no open redirects). */
+function safeCategoryLogBack(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const path = decodeURIComponent(raw);
+    if (path.startsWith("/analytics/category-log")) return path;
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
+
+function HistoryInner() {
   const { t, locale } = useI18n();
   const cal = useCalendarClock();
+  const router = useRouter();
+  const search = useSearchParams();
   const { active, userId, house } = useBooks();
-  const [day, setDay] = useState(cal.today);
+  const onParam = search.get("on");
+  const backTo = safeCategoryLogBack(search.get("back"));
+  const [day, setDay] = useState(() =>
+    isIsoDay(onParam) ? onParam : cal.today,
+  );
   const [log, setLog] = useState<DayLog | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [openId, setOpenId] = useState("");
@@ -88,13 +112,27 @@ export default function HistoryPage() {
   }
 
   useEffect(() => {
+    if (isIsoDay(onParam)) {
+      setDay(onParam);
+      return;
+    }
     setDay(cal.today);
-  }, [cal.today]);
+  }, [cal.today, onParam]);
 
   useEffect(() => {
     if (!active) return;
     load(active.householdId, day).catch((e) => setError(e.message));
   }, [active?.householdId, day]);
+
+  function goDay(next: string) {
+    setDay(next);
+    if (backTo || isIsoDay(onParam)) {
+      const params = new URLSearchParams();
+      params.set("on", next);
+      if (backTo) params.set("back", backTo);
+      router.replace(`/history?${params.toString()}`, { scroll: false });
+    }
+  }
 
   function startEdit(
     id: string,
@@ -196,14 +234,22 @@ export default function HistoryPage() {
 
   return (
     <PageShell>
-      <h1 className="page-title">{t("eachDay")}</h1>
+      {backTo ? (
+        <Link
+          href={backTo}
+          className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--muted)]"
+        >
+          ← {t("backToCategoryLogs")}
+        </Link>
+      ) : null}
+      <h1 className={`page-title ${backTo ? "mt-2" : ""}`}>{t("eachDay")}</h1>
       <Hint>{t("daysHint")}</Hint>
       <div className="mt-4 flex items-center gap-2">
         <button
           type="button"
           aria-label={t("pickDayHint")}
           className="icon-btn px-5 text-3xl"
-          onClick={() => setDay((d) => shiftDay(d, -1))}
+          onClick={() => goDay(shiftDay(day, -1))}
         >
           ‹
         </button>
@@ -221,7 +267,9 @@ export default function HistoryPage() {
             type="date"
             className="absolute inset-0 cursor-pointer opacity-0"
             value={day}
-            onChange={(e) => setDay(e.target.value)}
+            onChange={(e) => {
+              if (e.target.value) goDay(e.target.value);
+            }}
             aria-label={t("pickDayHint")}
           />
         </label>
@@ -229,7 +277,7 @@ export default function HistoryPage() {
           type="button"
           aria-label={t("pickDayHint")}
           className="icon-btn px-5 text-3xl"
-          onClick={() => setDay((d) => shiftDay(d, 1))}
+          onClick={() => goDay(shiftDay(day, 1))}
         >
           ›
         </button>
@@ -475,6 +523,14 @@ export default function HistoryPage() {
       )}
       <BottomNav />
     </PageShell>
+  );
+}
+
+export default function HistoryPage() {
+  return (
+    <Suspense fallback={null}>
+      <HistoryInner />
+    </Suspense>
   );
 }
 

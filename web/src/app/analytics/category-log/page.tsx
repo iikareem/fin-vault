@@ -200,6 +200,23 @@ function CategoryLogInner() {
     return labelFor(name, t);
   }
 
+  function categoryLogHref() {
+    const params = new URLSearchParams({
+      cats: catIds.join(","),
+      from,
+      to,
+    });
+    return `/analytics/category-log?${params.toString()}`;
+  }
+
+  function openDay(date: string) {
+    const params = new URLSearchParams({
+      on: date,
+      back: categoryLogHref(),
+    });
+    router.push(`/history?${params.toString()}`);
+  }
+
   return (
     <PageShell>
       <Link
@@ -397,7 +414,11 @@ function CategoryLogInner() {
                   key={day.date}
                   className="cat-log-day surface overflow-hidden rounded-2xl"
                 >
-                  <header className="cat-log-day-head flex items-baseline justify-between gap-3 px-4 py-2.5">
+                  <button
+                    type="button"
+                    onClick={() => openDay(day.date)}
+                    className="cat-log-day-head flex w-full items-baseline justify-between gap-3 px-4 py-2.5 text-start transition active:bg-[var(--panel-soft)]"
+                  >
                     <h2 className="text-sm font-semibold">
                       {formatItemDate(day.date, locale)}
                     </h2>
@@ -412,7 +433,7 @@ function CategoryLogInner() {
                         />
                       )}
                     </p>
-                  </header>
+                  </button>
                   <ul>
                     {day.items.map((item) => {
                       const note = item.note?.trim();
@@ -423,41 +444,44 @@ function CategoryLogInner() {
                         showUser(userName) ? labelFor(userName!, t) : "",
                       ].filter(Boolean);
                       return (
-                        <li
-                          key={`${item.kind}-${item.id}`}
-                          className="cat-log-row flex items-stretch gap-3 px-4 py-3"
-                        >
-                          <span
-                            className="cat-log-tick"
-                            style={{ background: item.category.color }}
-                            aria-hidden
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold leading-snug">
-                              {rowTitle(item)}
+                        <li key={`${item.kind}-${item.id}`}>
+                          <button
+                            type="button"
+                            onClick={() => openDay(day.date)}
+                            className="cat-log-row flex w-full items-stretch gap-3 px-4 py-3 text-start transition active:bg-[var(--panel-soft)]"
+                          >
+                            <span
+                              className="cat-log-tick"
+                              style={{ background: item.category.color }}
+                              aria-hidden
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-semibold leading-snug">
+                                {rowTitle(item)}
+                              </p>
+                              {note ? (
+                                <p className="mt-0.5 text-sm text-[var(--muted)]">
+                                  {note}
+                                </p>
+                              ) : null}
+                              {meta.length > 0 ? (
+                                <p className="mt-0.5 text-[11px] text-[var(--muted)]">
+                                  {meta.join(" · ")}
+                                </p>
+                              ) : null}
+                            </div>
+                            <p className="shrink-0 self-center text-sm font-bold tabular-nums text-red-800">
+                              {hideAggregates ? (
+                                "••••"
+                              ) : (
+                                <Money
+                                  amount={item.amount}
+                                  currency={currency}
+                                  locale={locale}
+                                />
+                              )}
                             </p>
-                            {note ? (
-                              <p className="mt-0.5 text-sm text-[var(--muted)]">
-                                {note}
-                              </p>
-                            ) : null}
-                            {meta.length > 0 ? (
-                              <p className="mt-0.5 text-[11px] text-[var(--muted)]">
-                                {meta.join(" · ")}
-                              </p>
-                            ) : null}
-                          </div>
-                          <p className="shrink-0 text-sm font-bold tabular-nums text-red-800">
-                            {hideAggregates ? (
-                              "••••"
-                            ) : (
-                              <Money
-                                amount={item.amount}
-                                currency={currency}
-                                locale={locale}
-                              />
-                            )}
-                          </p>
+                          </button>
                         </li>
                       );
                     })}
