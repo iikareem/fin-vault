@@ -332,8 +332,8 @@ function CategoryLogInner() {
                 </button>
               </div>
             ) : (
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <label className="block">
+              <div className="period-range mt-3 space-y-2">
+                <label className="block min-w-0">
                   <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
                     {t("fromDate")}
                   </span>
@@ -344,10 +344,13 @@ function CategoryLogInner() {
                     onChange={(e) => {
                       if (e.target.value) setCustomFrom(e.target.value);
                     }}
-                    className="field w-full text-sm font-semibold"
+                    className="field w-full min-w-0 max-w-full text-base font-semibold"
                   />
                 </label>
-                <label className="block">
+                <div className="flex justify-center" aria-hidden>
+                  <span className="text-sm font-semibold text-[var(--muted)]">↓</span>
+                </div>
+                <label className="block min-w-0">
                   <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
                     {t("toDate")}
                   </span>
@@ -358,7 +361,7 @@ function CategoryLogInner() {
                     onChange={(e) => {
                       if (e.target.value) setCustomTo(e.target.value);
                     }}
-                    className="field w-full text-sm font-semibold"
+                    className="field w-full min-w-0 max-w-full text-base font-semibold"
                   />
                 </label>
               </div>

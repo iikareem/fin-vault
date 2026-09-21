@@ -406,7 +406,7 @@ export default function AnalyticsPage() {
     <PageShell>
       <h1 className="page-title">📊 {t("navCharts")}</h1>
       <Hint>{t("chartsHint")}</Hint>
-      <div className="seg mt-4 grid-cols-4">
+      <div className="seg mt-4 grid-cols-2 sm:grid-cols-4">
         {(["day", "month", "year", "range"] as Period[]).map((p) => (
           <button
             key={p}
@@ -430,8 +430,8 @@ export default function AnalyticsPage() {
       </div>
       <Hint>{t("periodHint")}</Hint>
       {period === "range" ? (
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <label className="block">
+        <div className="period-range mt-4 space-y-2">
+          <label className="block min-w-0">
             <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
               {t("fromDate")}
             </span>
@@ -442,10 +442,13 @@ export default function AnalyticsPage() {
               onChange={(e) => {
                 if (e.target.value) setRangeFrom(e.target.value);
               }}
-              className="field w-full text-center text-base font-semibold"
+              className="field w-full min-w-0 max-w-full text-base font-semibold"
             />
           </label>
-          <label className="block">
+          <div className="flex justify-center" aria-hidden>
+            <span className="text-sm font-semibold text-[var(--muted)]">↓</span>
+          </div>
+          <label className="block min-w-0">
             <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
               {t("toDate")}
             </span>
@@ -456,7 +459,7 @@ export default function AnalyticsPage() {
               onChange={(e) => {
                 if (e.target.value) setRangeTo(e.target.value);
               }}
-              className="field w-full text-center text-base font-semibold"
+              className="field w-full min-w-0 max-w-full text-base font-semibold"
             />
           </label>
         </div>
