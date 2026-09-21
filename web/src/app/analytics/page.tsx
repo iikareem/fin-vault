@@ -13,6 +13,7 @@ import { useCalendarClock } from "@/hooks/useCalendarClock";
 import { isoLocal } from "@/lib/calendar";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
+import { DateField } from "@/components/DateField";
 
 type Period = "day" | "month" | "year" | "range";
 type DayRow = { day: string; income: number; expense: number };
@@ -406,13 +407,13 @@ export default function AnalyticsPage() {
     <PageShell>
       <h1 className="page-title">📊 {t("navCharts")}</h1>
       <Hint>{t("chartsHint")}</Hint>
-      <div className="seg mt-4 grid-cols-2 sm:grid-cols-4">
+      <div className="seg mt-4 grid w-full min-w-0 grid-cols-2 sm:grid-cols-4">
         {(["day", "month", "year", "range"] as Period[]).map((p) => (
           <button
             key={p}
             type="button"
             onClick={() => setPeriodMode(p)}
-            className={`rounded-2xl py-2.5 text-sm font-bold transition sm:text-base ${
+            className={`min-w-0 truncate rounded-2xl px-1 py-2.5 text-sm font-bold transition sm:text-base ${
               period === p
                 ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
                 : "text-[var(--muted)]"
@@ -431,37 +432,21 @@ export default function AnalyticsPage() {
       <Hint>{t("periodHint")}</Hint>
       {period === "range" ? (
         <div className="period-range mt-4 space-y-2">
-          <label className="block min-w-0">
-            <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
-              {t("fromDate")}
-            </span>
-            <input
-              type="date"
-              value={rangeFrom}
-              max={rangeTo}
-              onChange={(e) => {
-                if (e.target.value) setRangeFrom(e.target.value);
-              }}
-              className="field w-full min-w-0 max-w-full text-base font-semibold"
-            />
-          </label>
+          <DateField
+            label={t("fromDate")}
+            value={rangeFrom}
+            max={rangeTo}
+            onChange={setRangeFrom}
+          />
           <div className="flex justify-center" aria-hidden>
             <span className="text-sm font-semibold text-[var(--muted)]">↓</span>
           </div>
-          <label className="block min-w-0">
-            <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
-              {t("toDate")}
-            </span>
-            <input
-              type="date"
-              value={rangeTo}
-              min={rangeFrom}
-              onChange={(e) => {
-                if (e.target.value) setRangeTo(e.target.value);
-              }}
-              className="field w-full min-w-0 max-w-full text-base font-semibold"
-            />
-          </label>
+          <DateField
+            label={t("toDate")}
+            value={rangeTo}
+            min={rangeFrom}
+            onChange={setRangeTo}
+          />
         </div>
       ) : (
         <div className="mt-4 flex items-center justify-between gap-3">

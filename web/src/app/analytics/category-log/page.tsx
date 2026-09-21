@@ -13,6 +13,7 @@ import { categoryLabel, labelFor } from "@/lib/i18n";
 import { formatItemDate, isoLocal } from "@/lib/calendar";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
+import { DateField } from "@/components/DateField";
 
 type RangeMode = "month" | "custom";
 
@@ -350,37 +351,21 @@ function CategoryLogInner() {
               </div>
             ) : (
               <div className="period-range mt-3 space-y-2">
-                <label className="block min-w-0">
-                  <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
-                    {t("fromDate")}
-                  </span>
-                  <input
-                    type="date"
-                    value={customFrom}
-                    max={customTo}
-                    onChange={(e) => {
-                      if (e.target.value) setCustomFrom(e.target.value);
-                    }}
-                    className="field w-full min-w-0 max-w-full text-base font-semibold"
-                  />
-                </label>
+                <DateField
+                  label={t("fromDate")}
+                  value={customFrom}
+                  max={customTo}
+                  onChange={setCustomFrom}
+                />
                 <div className="flex justify-center" aria-hidden>
                   <span className="text-sm font-semibold text-[var(--muted)]">↓</span>
                 </div>
-                <label className="block min-w-0">
-                  <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
-                    {t("toDate")}
-                  </span>
-                  <input
-                    type="date"
-                    value={customTo}
-                    min={customFrom}
-                    onChange={(e) => {
-                      if (e.target.value) setCustomTo(e.target.value);
-                    }}
-                    className="field w-full min-w-0 max-w-full text-base font-semibold"
-                  />
-                </label>
+                <DateField
+                  label={t("toDate")}
+                  value={customTo}
+                  min={customFrom}
+                  onChange={setCustomTo}
+                />
               </div>
             )}
           </section>

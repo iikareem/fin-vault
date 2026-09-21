@@ -356,7 +356,15 @@ button:focus-visible {
   box-shadow: 0 0 0 3px var(--ring);
 }
 
-/* Native date/month pickers often force a wide min-width on mobile. */
+/* Native date/month pickers often force a wide min-width on mobile.
+   Prefer DateField (text + transparent overlay). Keep these as a safety net. */
+input[type="date"],
+input[type="month"] {
+  min-width: 0 !important;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
 input[type="date"].field,
 input[type="month"].field {
   min-width: 0;
@@ -368,6 +376,11 @@ input[type="month"].field {
   min-width: 0;
   max-width: 100%;
   overflow-x: clip;
+}
+
+.period-range .field {
+  min-width: 0;
+  max-width: 100%;
 }
 
 @utility chip {
