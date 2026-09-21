@@ -650,6 +650,80 @@ html.dark .shadow-lg {
   transform: scaleX(1.1) scaleY(0.98);
 }
 
+/* Category log timeline */
+.cat-log-hero {
+  background:
+    linear-gradient(
+      165deg,
+      color-mix(in srgb, var(--accent-a-soft) 70%, transparent) 0%,
+      transparent 55%
+    ),
+    var(--surface-bg);
+  border: 1px solid var(--surface-border);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.04) inset;
+}
+.cat-log-day {
+  animation: cat-log-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.cat-log-day:nth-child(1) {
+  animation-delay: 40ms;
+}
+.cat-log-day:nth-child(2) {
+  animation-delay: 80ms;
+}
+.cat-log-day:nth-child(3) {
+  animation-delay: 120ms;
+}
+.cat-log-day:nth-child(n + 4) {
+  animation-delay: 150ms;
+}
+@keyframes cat-log-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.cat-log-day-head {
+  background: color-mix(in srgb, var(--panel-soft) 92%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--surface-border) 80%, transparent);
+}
+.cat-log-row {
+  border-bottom: 1px solid color-mix(in srgb, var(--surface-border) 55%, transparent);
+}
+.cat-log-row:last-child {
+  border-bottom: none;
+}
+.cat-log-tick {
+  width: 3px;
+  border-radius: 999px;
+  align-self: stretch;
+  min-height: 1.75rem;
+  flex-shrink: 0;
+}
+.cat-log-skel {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--panel-soft) 90%, transparent) 0%,
+    color-mix(in srgb, var(--surface-border) 55%, transparent) 50%,
+    color-mix(in srgb, var(--panel-soft) 90%, transparent) 100%
+  );
+  background-size: 200% 100%;
+  animation: cat-log-shimmer 1.2s ease-in-out infinite;
+  border-radius: 0.75rem;
+}
+@keyframes cat-log-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
 /* Hide horizontal scrollbar on chip rails, keep scroll. */
 .chip-rail {
   display: flex;

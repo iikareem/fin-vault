@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MembershipContext } from '../households/membership-context';
 import { actorForSpace, HOUSE_ACTOR } from '../households/house-actor';
@@ -517,6 +517,191 @@ export class AnalyticsService {
       });
     }
     return out;
+  }
+
+  /**
+   * Purchase-by-purchase log for selected category groups over a date range.
+   * Expands each selected id to parent + children (matches byCategory rollup).
+   */
+  async categoryLog(
+    membership: MembershipContext,
+    from: string,
+    to: string,
+    categoryIds: string[],
+  ) {
+    const ids = [...new Set(categoryIds.filter(Boolean))];
+    if (ids.length === 0) {
+      throw new BadRequestException('Pick at least one category');
+    }
+
+    const householdId = membership.householdId;
+    const cats = await this.prisma.category.findMany({
+      where: { householdId },
+    });
+    const selected = new Set(ids);
+    const expanded = new Set<string>();
+    for (const id of ids) expanded.add(id);
+    for (const c of cats) {
+      if (selected.has(c.id) || (c.parentId && selected.has(c.parentId))) {
+        expanded.add(c.id);
+      }
+    }
+    const expandedIds = [...expanded];
+    const selectedCats = cats
+      .filter((c) => selected.has(c.id))
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        nameAr: c.nameAr,
+        color: c.color,
+      }));
+    // Preserve request order for any ids still unknown (deleted)
+    const categories =
+      selectedCats.length > 0
+        ? ids
+            .map((id) => selectedCats.find((c) => c.id === id))
+            .filter((c): c is NonNullable<typeof c> => !!c)
+        : selectedCats;
+
+    const ITEM_CAP = 500;
+    const txs = await this.prisma.transaction.findMany({
+      where: {
+        householdId,
+        type: { in: ['EXPENSE', 'TRACK'] },
+        occurredOn: { gte: dateOnlyUtc(from), lte: dateOnlyUtc(to) },
+        categoryId: { in: expandedIds },
+        category: nonSpendCategoryFilter,
+      },
+      include: {
+        account: { select: { id: true, name: true } },
+        category: {
+          select: {
+            id: true,
+            name: true,
+            nameAr: true,
+            color: true,
+            kind: true,
+            parentId: true,
+          },
+        },
+        user: { select: { id: true, name: true } },
+      },
+      orderBy: [{ occurredOn: 'desc' }, { createdAt: 'desc' }],
+      take: ITEM_CAP,
+    });
+
+    const claims =
+      membership.kind === 'HOUSE'
+        ? await this.prisma.houseClaim.findMany({
+            where: {
+              householdId,
+              occurredOn: { gte: dateOnlyUtc(from), lte: dateOnlyUtc(to) },
+              categoryId: { in: expandedIds },
+            },
+            include: {
+              member: { select: { id: true, name: true } },
+              category: {
+                select: {
+                  id: true,
+                  name: true,
+                  nameAr: true,
+                  color: true,
+                  parentId: true,
+                },
+              },
+            },
+            orderBy: [{ occurredOn: 'desc' }, { createdAt: 'desc' }],
+            take: ITEM_CAP,
+          })
+        : [];
+
+    type LogItem = {
+      id: string;
+      kind: 'tx' | 'claim';
+      amount: number;
+      note: string;
+      type?: string;
+      occurredOn: string;
+      createdAt: number;
+      category: {
+        id: string;
+        name: string;
+        nameAr: string;
+        color: string;
+        parentId?: string | null;
+      };
+      account?: { id: string; name: string };
+      user?: { id: string; name: string };
+    };
+
+    const items: LogItem[] = [
+      ...txs.map((t) => {
+        const withActor = actorForSpace(membership.kind, t);
+        return {
+          id: t.id,
+          kind: 'tx' as const,
+          amount: Number(t.amount),
+          note: t.note,
+          type: t.type,
+          occurredOn: isoFromDbDate(t.occurredOn),
+          createdAt: t.createdAt.getTime(),
+          category: t.category,
+          account: t.account,
+          user: withActor.user,
+        };
+      }),
+      ...claims.map((c) => ({
+        id: c.id,
+        kind: 'claim' as const,
+        amount: Number(c.amount),
+        note: c.note,
+        occurredOn: isoFromDbDate(c.occurredOn),
+        createdAt: c.createdAt.getTime(),
+        category: c.category,
+        user: c.member,
+      })),
+    ];
+
+    items.sort((a, b) => {
+      const d = b.occurredOn.localeCompare(a.occurredOn);
+      if (d !== 0) return d;
+      return b.createdAt - a.createdAt;
+    });
+
+    const truncated = items.length >= ITEM_CAP;
+    const capped = items.slice(0, ITEM_CAP);
+
+    const dayMap = new Map<
+      string,
+      { date: string; total: number; items: Omit<LogItem, 'occurredOn' | 'createdAt'>[] }
+    >();
+    for (const item of capped) {
+      const { occurredOn, createdAt: _c, ...rest } = item;
+      const cur = dayMap.get(occurredOn) ?? {
+        date: occurredOn,
+        total: 0,
+        items: [],
+      };
+      cur.total += item.amount;
+      cur.items.push(rest);
+      dayMap.set(occurredOn, cur);
+    }
+
+    const days = [...dayMap.values()].sort((a, b) =>
+      b.date.localeCompare(a.date),
+    );
+    const total = capped.reduce((s, i) => s + i.amount, 0);
+
+    return {
+      from,
+      to,
+      total,
+      purchaseCount: capped.length,
+      dayCount: days.length,
+      truncated,
+      categories,
+      days,
+    };
   }
 
   async dayLog(membership: MembershipContext, date: string) {

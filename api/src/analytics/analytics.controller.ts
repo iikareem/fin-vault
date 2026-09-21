@@ -79,4 +79,24 @@ export class AnalyticsController {
       to ?? fallback.to,
     );
   }
+
+  @Get('category-log')
+  categoryLog(
+    @CurrentMembership() membership: MembershipContext,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('categoryIds') categoryIds?: string,
+  ) {
+    const fallback = monthRange();
+    const ids = (categoryIds ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return this.analytics.categoryLog(
+      membership,
+      from ?? fallback.from,
+      to ?? fallback.to,
+      ids,
+    );
+  }
 }

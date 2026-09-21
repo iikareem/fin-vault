@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
@@ -13,7 +14,7 @@ import { isoLocal } from "@/lib/calendar";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 
-type Period = "day" | "month" | "year";
+type Period = "day" | "month" | "year" | "range";
 type DayRow = { day: string; income: number; expense: number };
 type CatRow = {
   categoryId?: string;
@@ -41,6 +42,41 @@ function iso(d: Date) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
+function parseIso(day: string) {
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function daysBetween(from: string, to: string) {
+  const a = parseIso(from).getTime();
+  const b = parseIso(to).getTime();
+  return Math.max(0, Math.round((b - a) / 86400000) + 1);
+}
+
+function eachIsoDay(from: string, to: string) {
+  const out: string[] = [];
+  const cur = parseIso(from);
+  const end = parseIso(to);
+  while (cur <= end) {
+    out.push(isoLocal(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return out;
+}
+
+function eachMonthKey(from: string, to: string) {
+  const out: string[] = [];
+  const cur = parseIso(from);
+  cur.setDate(1);
+  const end = parseIso(to);
+  end.setDate(1);
+  while (cur <= end) {
+    out.push(`${cur.getFullYear()}-${pad(cur.getMonth() + 1)}`);
+    cur.setMonth(cur.getMonth() + 1);
+  }
+  return out;
+}
+
 function rangeFor(period: Period, cursor: Date) {
   const y = cursor.getFullYear();
   const m = cursor.getMonth();
@@ -54,10 +90,16 @@ function rangeFor(period: Period, cursor: Date) {
       to: isoLocal(new Date(y, m + 1, 0)),
     };
   }
-  return { from: `${y}-01-01`, to: `${y}-12-31` };
+  if (period === "year") {
+    return { from: `${y}-01-01`, to: `${y}-12-31` };
+  }
+  return {
+    from: isoLocal(new Date(y, m, 1)),
+    to: isoLocal(new Date(y, m + 1, 0)),
+  };
 }
 
-function shift(period: Period, cursor: Date, dir: number) {
+function shift(period: Exclude<Period, "range">, cursor: Date, dir: number) {
   if (period === "day") {
     const next = new Date(cursor);
     next.setDate(next.getDate() + dir);
@@ -83,6 +125,11 @@ export default function AnalyticsPage() {
   const { active, house } = useBooks();
   const [period, setPeriod] = useState<Period>("month");
   const [cursor, setCursor] = useState(() => new Date());
+  const [rangeFrom, setRangeFrom] = useState(() => {
+    const now = new Date();
+    return isoLocal(new Date(now.getFullYear(), now.getMonth(), 1));
+  });
+  const [rangeTo, setRangeTo] = useState(() => isoLocal(new Date()));
   const [days, setDays] = useState<DayRow[]>([]);
   const [cats, setCats] = useState<CatRow[]>([]);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
@@ -93,7 +140,16 @@ export default function AnalyticsPage() {
   const [error, setError] = useState("");
   const currency = active?.currency ?? "EGP";
   const hideAggregates = active?.kind === "HOUSE" && house?.role !== "ADMIN";
-  const { from, to } = rangeFor(period, cursor);
+
+  const { from, to } = useMemo(() => {
+    if (period === "range") {
+      const end = rangeTo >= rangeFrom ? rangeTo : rangeFrom;
+      return { from: rangeFrom, to: end };
+    }
+    return rangeFor(period, cursor);
+  }, [period, cursor, rangeFrom, rangeTo]);
+
+  const chartByMonth = period === "year" || (period === "range" && daysBetween(from, to) > 62);
 
   useEffect(() => {
     setCursor(new Date(cal.year, cal.month - 1, cal.day));
@@ -183,46 +239,61 @@ export default function AnalyticsPage() {
 
   const chartBars = useMemo((): ChartBar[] => {
     const loc = locale === "ar" ? "ar" : "en";
-    if (period === "month") {
-      const y = cursor.getFullYear();
-      const m = cursor.getMonth();
-      const daysInMonth = new Date(y, m + 1, 0).getDate();
+    if (period === "month" || (period === "range" && !chartByMonth)) {
+      const dayKeys =
+        period === "month"
+          ? (() => {
+              const y = cursor.getFullYear();
+              const m = cursor.getMonth();
+              const daysInMonth = new Date(y, m + 1, 0).getDate();
+              return Array.from(
+                { length: daysInMonth },
+                (_, i) => `${y}-${pad(m + 1)}-${pad(i + 1)}`,
+              );
+            })()
+          : eachIsoDay(from, to);
       const byDay = new Map(days.map((d) => [d.day, d.expense]));
-      return Array.from({ length: daysInMonth }, (_, i) => {
-        const day = i + 1;
-        const key = `${y}-${pad(m + 1)}-${pad(day)}`;
-        const date = new Date(y, m, day);
+      return dayKeys.map((key) => {
+        const date = parseIso(key);
         const weekday = date.getDay();
         return {
           key,
           expense: byDay.get(key) ?? 0,
-          label: String(day),
+          label: String(date.getDate()),
           detailLabel: date.toLocaleDateString(loc, {
             weekday: "long",
             day: "numeric",
             month: "short",
           }),
           weekend: weekday === 0 || weekday === 5 || weekday === 6,
-          dayNum: day,
+          dayNum: date.getDate(),
         };
       });
     }
-    if (period === "year") {
-      const y = cursor.getFullYear();
+    if (period === "year" || (period === "range" && chartByMonth)) {
+      const monthKeys =
+        period === "year"
+          ? Array.from(
+              { length: 12 },
+              (_, i) => `${cursor.getFullYear()}-${pad(i + 1)}`,
+            )
+          : eachMonthKey(from, to);
       const byMonth = new Map(months.map((m) => [m.key, m.expense]));
-      return Array.from({ length: 12 }, (_, i) => {
-        const key = `${y}-${pad(i + 1)}`;
+      return monthKeys.map((key, i) => {
+        const [y, m] = key.split("-").map(Number);
         return {
           key,
           expense: byMonth.get(key) ?? 0,
-          label: new Date(y, i, 1).toLocaleDateString(loc, { month: "short" }),
+          label: new Date(y, m - 1, 1).toLocaleDateString(loc, {
+            month: "short",
+          }),
           detailLabel: monthLabel(key, locale),
           dayNum: i + 1,
         };
       });
     }
     return [];
-  }, [period, cursor, days, months, locale]);
+  }, [period, cursor, days, months, locale, from, to, chartByMonth]);
 
   const activeBars = useMemo(
     () => chartBars.filter((b) => b.expense > 0.001),
@@ -281,7 +352,7 @@ export default function AnalyticsPage() {
       Math.max(0, selectedIndex + dir),
     );
     const bar = chartBars[next];
-    if (period === "year") {
+    if (chartByMonth) {
       const [y, m] = bar.key.split("-").map(Number);
       setCursor(new Date(y, m - 1, 1));
       setPeriod("month");
@@ -291,13 +362,27 @@ export default function AnalyticsPage() {
   }
 
   function onChartBarClick(key: string) {
-    if (period === "year") {
+    if (chartByMonth) {
       const [y, m] = key.split("-").map(Number);
       setCursor(new Date(y, m - 1, 1));
       setPeriod("month");
       return;
     }
     setSelectedBarKey(key);
+  }
+
+  function setPeriodMode(next: Period) {
+    if (next === "range") {
+      if (period === "month" || period === "day") {
+        const bounds = rangeFor(period === "day" ? "month" : period, cursor);
+        setRangeFrom(bounds.from);
+        setRangeTo(period === "day" ? iso(cursor) : bounds.to);
+      } else if (period === "year") {
+        setRangeFrom(`${cursor.getFullYear()}-01-01`);
+        setRangeTo(`${cursor.getFullYear()}-12-31`);
+      }
+    }
+    setPeriod(next);
   }
 
   const monthKey = `${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}`;
@@ -321,72 +406,113 @@ export default function AnalyticsPage() {
     <PageShell>
       <h1 className="page-title">📊 {t("navCharts")}</h1>
       <Hint>{t("chartsHint")}</Hint>
-      <div className="seg mt-4 grid-cols-3">
-        {(["day", "month", "year"] as Period[]).map((p) => (
+      <div className="seg mt-4 grid-cols-4">
+        {(["day", "month", "year", "range"] as Period[]).map((p) => (
           <button
             key={p}
             type="button"
-            onClick={() => setPeriod(p)}
-            className={`rounded-2xl py-3 text-lg font-bold transition ${
+            onClick={() => setPeriodMode(p)}
+            className={`rounded-2xl py-2.5 text-sm font-bold transition sm:text-base ${
               period === p
                 ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
                 : "text-[var(--muted)]"
             }`}
           >
-            {p === "day" ? t("periodDay") : p === "month" ? t("periodMonth") : t("periodYear")}
+            {p === "day"
+              ? t("periodDay")
+              : p === "month"
+                ? t("periodMonth")
+                : p === "year"
+                  ? t("periodYear")
+                  : t("customRange")}
           </button>
         ))}
       </div>
       <Hint>{t("periodHint")}</Hint>
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <button
-          type="button"
-          className="icon-btn px-4 text-xl"
-          onClick={() => setCursor((c) => shift(period, c, -1))}
-        >
-          ‹
-        </button>
-        <div className="min-w-0 flex-1 text-center">
-          {period === "day" ? (
+      {period === "range" ? (
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
+              {t("fromDate")}
+            </span>
             <input
               type="date"
-              value={iso(cursor)}
+              value={rangeFrom}
+              max={rangeTo}
               onChange={(e) => {
-                if (e.target.value) setCursor(new Date(`${e.target.value}T12:00:00`));
+                if (e.target.value) setRangeFrom(e.target.value);
               }}
-              className="field text-center text-lg font-semibold"
+              className="field w-full text-center text-base font-semibold"
             />
-          ) : period === "month" ? (
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
+              {t("toDate")}
+            </span>
             <input
-              type="month"
-              value={`${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}`}
+              type="date"
+              value={rangeTo}
+              min={rangeFrom}
               onChange={(e) => {
-                if (e.target.value) setCursor(new Date(`${e.target.value}-01T12:00:00`));
+                if (e.target.value) setRangeTo(e.target.value);
               }}
-              className="field text-center text-lg font-semibold"
+              className="field w-full text-center text-base font-semibold"
             />
-          ) : (
-            <input
-              type="number"
-              value={cursor.getFullYear()}
-              min={2000}
-              max={2100}
-              onChange={(e) => {
-                const y = Number(e.target.value);
-                if (y) setCursor(new Date(y, 0, 1));
-              }}
-              className="field text-center text-lg font-semibold"
-            />
-          )}
+          </label>
         </div>
-        <button
-          type="button"
-          className="icon-btn px-4 text-xl"
-          onClick={() => setCursor((c) => shift(period, c, 1))}
-        >
-          ›
-        </button>
-      </div>
+      ) : (
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            className="icon-btn px-4 text-xl"
+            onClick={() => setCursor((c) => shift(period, c, -1))}
+          >
+            ‹
+          </button>
+          <div className="min-w-0 flex-1 text-center">
+            {period === "day" ? (
+              <input
+                type="date"
+                value={iso(cursor)}
+                onChange={(e) => {
+                  if (e.target.value)
+                    setCursor(new Date(`${e.target.value}T12:00:00`));
+                }}
+                className="field text-center text-lg font-semibold"
+              />
+            ) : period === "month" ? (
+              <input
+                type="month"
+                value={`${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}`}
+                onChange={(e) => {
+                  if (e.target.value)
+                    setCursor(new Date(`${e.target.value}-01T12:00:00`));
+                }}
+                className="field text-center text-lg font-semibold"
+              />
+            ) : (
+              <input
+                type="number"
+                value={cursor.getFullYear()}
+                min={2000}
+                max={2100}
+                onChange={(e) => {
+                  const y = Number(e.target.value);
+                  if (y) setCursor(new Date(y, 0, 1));
+                }}
+                className="field text-center text-lg font-semibold"
+              />
+            )}
+          </div>
+          <button
+            type="button"
+            className="icon-btn px-4 text-xl"
+            onClick={() => setCursor((c) => shift(period, c, 1))}
+          >
+            ›
+          </button>
+        </div>
+      )}
       <Hint>{t("pickPeriodHint")}</Hint>
       {error ? <p className="mt-3 text-red-700">{error}</p> : null}
       {hideAggregates ? (
@@ -532,7 +658,7 @@ export default function AnalyticsPage() {
       {period !== "day" ? (
         <>
           <h2 className="mt-8 text-xl font-semibold">
-            {period === "year" ? t("spendByMonth") : t("spendByDay")}
+            {chartByMonth ? t("spendByMonth") : t("spendByDay")}
           </h2>
           <section className="surface spend-chart mt-3 overflow-hidden rounded-[1.75rem] p-4">
             {chartBars.length === 0 ? (
@@ -544,7 +670,7 @@ export default function AnalyticsPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="truncate text-sm text-[var(--muted)]">
                         {selectedBar?.detailLabel ??
-                          (period === "year"
+                          (chartByMonth
                             ? t("spendByMonth")
                             : t("spendByDay"))}
                       </p>
@@ -557,7 +683,7 @@ export default function AnalyticsPage() {
                       peakBar?.key === selectedBar.key &&
                       selectedBar.expense > 0.001 ? (
                         <span className="rounded-full bg-[var(--soft-amber)] px-2 py-0.5 text-[10px] font-semibold text-amber-800">
-                          {period === "year" ? t("peakMonth") : t("peakSpend")}
+                          {chartByMonth ? t("peakMonth") : t("peakSpend")}
                         </span>
                       ) : null}
                     </div>
@@ -588,7 +714,7 @@ export default function AnalyticsPage() {
                     ) : null}
                   </div>
 
-                  {period === "month" ? (
+                  {!chartByMonth ? (
                     <div className="flex shrink-0 gap-1">
                       <button
                         type="button"
@@ -632,7 +758,7 @@ export default function AnalyticsPage() {
 
                     <div
                       className={`absolute inset-0 flex items-end px-0.5 ${
-                        period === "year" ? "gap-1.5" : "gap-[3px]"
+                        chartByMonth ? "gap-1.5" : "gap-[3px]"
                       }`}
                     >
                       {chartBars.map((b) => {
@@ -679,19 +805,26 @@ export default function AnalyticsPage() {
 
                   <div
                     className={`mt-2 flex ${
-                      period === "year" ? "gap-1.5" : "gap-[3px]"
+                      chartByMonth ? "gap-1.5" : "gap-[3px]"
                     }`}
                   >
-                    {chartBars.map((b) => {
+                    {chartBars.map((b, i) => {
                       const selected = b.key === selectedBarKey;
-                      const daysInMonth = chartBars.length;
+                      const n = chartBars.length;
+                      const labelStep = n > 45 ? 7 : n > 31 ? 5 : 5;
                       const showLabel =
-                        period === "year" ||
+                        chartByMonth ||
                         selected ||
                         b.key === todayIso ||
-                        b.dayNum === 1 ||
-                        b.dayNum === daysInMonth ||
-                        (b.dayNum != null && b.dayNum % 5 === 0);
+                        i === 0 ||
+                        i === n - 1 ||
+                        (chartByMonth
+                          ? true
+                          : period === "month"
+                            ? b.dayNum === 1 ||
+                              b.dayNum === n ||
+                              (b.dayNum != null && b.dayNum % 5 === 0)
+                            : i % labelStep === 0);
                       return (
                         <button
                           key={`lbl-${b.key}`}
@@ -700,7 +833,7 @@ export default function AnalyticsPage() {
                           aria-hidden
                           onClick={() => onChartBarClick(b.key)}
                           className={`min-w-0 flex-1 truncate text-center leading-none ${
-                            period === "year" ? "text-[10px]" : "text-[9px]"
+                            chartByMonth ? "text-[10px]" : "text-[9px]"
                           } ${
                             selected
                               ? "font-bold text-[var(--foreground)]"
@@ -727,7 +860,7 @@ export default function AnalyticsPage() {
                     }}
                   >
                     <p className="text-[10px] text-[var(--muted)]">
-                      {period === "year" ? t("peakMonth") : t("peakSpend")}
+                      {chartByMonth ? t("peakMonth") : t("peakSpend")}
                     </p>
                     <p className="mt-0.5 text-sm font-semibold tabular-nums">
                       {hideAggregates ? (
@@ -761,7 +894,7 @@ export default function AnalyticsPage() {
                   </div>
                   <div className="rounded-2xl bg-[var(--panel-soft)] px-2 py-2.5 text-center">
                     <p className="text-[10px] text-[var(--muted)]">
-                      {period === "year"
+                      {chartByMonth
                         ? t("monthsWithSpend")
                         : t("daysWithSpend")}
                     </p>
@@ -987,6 +1120,22 @@ export default function AnalyticsPage() {
                         ))}
                       </div>
                     </div>
+                  ) : null}
+
+                  {selectedCats.some((c) => c.categoryId) ? (
+                    <Link
+                      href={`/analytics/category-log?${new URLSearchParams({
+                        cats: selectedCats
+                          .map((c) => c.categoryId)
+                          .filter(Boolean)
+                          .join(","),
+                        from,
+                        to,
+                      }).toString()}`}
+                      className="mt-3 flex w-full items-center justify-center rounded-2xl bg-[var(--accent-a)] px-4 py-3 text-base font-bold text-[var(--accent-a-fg)] transition hover:opacity-95 active:scale-[0.99]"
+                    >
+                      {t("seeLogs")}
+                    </Link>
                   ) : null}
               </div>
             ) : (
