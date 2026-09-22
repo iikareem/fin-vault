@@ -169,6 +169,8 @@ model Category {
    * Seeded rows stay so sync does not recreate them; custom rows are hard-deleted.
    */
   hidden      Boolean       @default(false)
+  /** Optional emoji shown next to the category name. */
+  emoji       String        @default("")
   kind        CategoryKind
   color       String        @default("#2563eb")
   sortOrder   Int           @default(0)

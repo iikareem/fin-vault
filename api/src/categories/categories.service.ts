@@ -522,6 +522,7 @@ export class CategoriesService {
         name: true,
         nameAr: true,
         color: true,
+        emoji: true,
         kind: true,
         parentId: true,
         sortOrder: true,
@@ -540,6 +541,7 @@ export class CategoriesService {
         name: c.name,
         nameAr: c.nameAr,
         color: c.color,
+        emoji: c.emoji || '',
         kind: c.kind,
         parentId: c.parentId,
         sortOrder: c.sortOrder,
@@ -591,6 +593,7 @@ export class CategoriesService {
         nameAr,
         kind,
         color,
+        emoji: (dto.emoji ?? '').trim().slice(0, 16),
         parentId,
         sortOrder: (maxSort._max.sortOrder ?? -1) + 1,
         seedKey: null,
@@ -616,6 +619,7 @@ export class CategoriesService {
       name?: string;
       nameAr?: string;
       color?: string;
+      emoji?: string;
       parentId?: string | null;
       isUserManaged: boolean;
     } = { isUserManaged: true };
@@ -650,6 +654,10 @@ export class CategoriesService {
 
     if (dto.color !== undefined) {
       data.color = dto.color;
+    }
+
+    if (dto.emoji !== undefined) {
+      data.emoji = dto.emoji.trim().slice(0, 16);
     }
 
     if (dto.parentId !== undefined) {

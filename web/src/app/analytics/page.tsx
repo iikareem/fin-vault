@@ -22,6 +22,7 @@ type CatRow = {
   name: string;
   nameAr?: string;
   color: string;
+  emoji?: string;
   type: string;
   total: number;
 };
@@ -1087,9 +1088,16 @@ export default function AnalyticsPage() {
                             className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-[var(--surface-bg)] px-2.5 py-1 text-xs font-medium"
                           >
                             <span
-                              className="h-2 w-2 shrink-0 rounded-full"
-                              style={{ background: c.color }}
-                            />
+                              className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-[10px] leading-none"
+                              style={
+                                c.emoji
+                                  ? undefined
+                                  : { background: c.color, borderRadius: 999 }
+                              }
+                              aria-hidden
+                            >
+                              {c.emoji || null}
+                            </span>
                             <span className="min-w-0 truncate">
                               {categoryLabel(c, locale, t)}
                             </span>

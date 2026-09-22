@@ -22,6 +22,7 @@ type CatMeta = {
   name: string;
   nameAr?: string | null;
   color: string;
+  emoji?: string;
 };
 
 type LogItem = {
@@ -35,6 +36,7 @@ type LogItem = {
     name: string;
     nameAr?: string | null;
     color: string;
+    emoji?: string;
     parentId?: string | null;
   };
   account?: { id: string; name: string };
@@ -237,9 +239,16 @@ function CategoryLogInner() {
                       className="inline-flex max-w-[9rem] items-center gap-1.5 rounded-full bg-[var(--panel-soft)] px-2.5 py-1 text-xs font-semibold"
                     >
                       <span
-                        className="h-2 w-2 shrink-0 rounded-full"
-                        style={{ background: c.color }}
-                      />
+                        className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-[10px] leading-none"
+                        style={
+                          c.emoji
+                            ? undefined
+                            : { background: c.color, borderRadius: 999 }
+                        }
+                        aria-hidden
+                      >
+                        {c.emoji || null}
+                      </span>
                       <span className="min-w-0 truncate">
                         {categoryLabel(c, locale, t)}
                       </span>
@@ -426,10 +435,18 @@ function CategoryLogInner() {
                             className="cat-log-row flex w-full items-stretch gap-3 px-4 py-3 text-start transition active:bg-[var(--panel-soft)]"
                           >
                             <span
-                              className="cat-log-tick"
-                              style={{ background: item.category.color }}
+                              className="cat-log-tick inline-flex items-center justify-center text-[11px] leading-none"
+                              style={
+                                item.category.emoji
+                                  ? {
+                                      background: `${item.category.color}33`,
+                                    }
+                                  : { background: item.category.color }
+                              }
                               aria-hidden
-                            />
+                            >
+                              {item.category.emoji || null}
+                            </span>
                             <div className="min-w-0 flex-1">
                               <p className="text-sm font-semibold leading-snug">
                                 {rowTitle(item)}

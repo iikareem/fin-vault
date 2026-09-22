@@ -10,15 +10,31 @@ export type CategoryItem = {
   nameAr?: string | null;
   parentId?: string | null;
   color?: string | null;
+  emoji?: string | null;
 };
 
-function ColorDot({
+function CatIcon({
+  emoji,
   color,
   active = false,
 }: {
+  emoji?: string | null;
   color?: string | null;
   active?: boolean;
 }) {
+  if (emoji) {
+    return (
+      <span
+        className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-sm ${
+          active ? "ring-2 ring-white/70" : ""
+        }`}
+        style={{ backgroundColor: color ? `${color}33` : "transparent" }}
+        aria-hidden
+      >
+        {emoji}
+      </span>
+    );
+  }
   return (
     <span
       className={`h-2.5 w-2.5 shrink-0 rounded-full ${active ? "ring-2 ring-white/70" : ""}`}
@@ -192,7 +208,10 @@ export function CategoryPicker({
         aria-expanded={open}
         className="flex w-full min-h-12 items-center gap-2 rounded-2xl bg-[var(--panel-soft)] px-3 py-2.5 text-start ring-1 ring-[var(--input-border)]"
       >
-        <ColorDot color={selected?.color || group?.color} />
+        <CatIcon
+          emoji={selected?.emoji || group?.emoji}
+          color={selected?.color || group?.color}
+        />
         <span className="min-w-0 flex-1 truncate font-semibold" dir="auto">
           {selectedLabel}
         </span>
@@ -238,7 +257,8 @@ export function CategoryPicker({
                           : "bg-[var(--surface-bg)] text-[var(--foreground)]"
                       }`}
                     >
-                      <ColorDot
+                      <CatIcon
+                        emoji={c.emoji || parent?.emoji}
                         color={c.color || parent?.color}
                         active={active}
                       />
@@ -283,7 +303,11 @@ export function CategoryPicker({
                               : "bg-[var(--surface-bg)] text-[var(--foreground)]"
                           }`}
                         >
-                          <ColorDot color={p.color} active={active} />
+                          <CatIcon
+                            emoji={p.emoji}
+                            color={p.color}
+                            active={active}
+                          />
                           <span className="line-clamp-2 text-[0.7rem] font-bold leading-tight">
                             {catText(p)}
                           </span>
@@ -327,7 +351,8 @@ export function CategoryPicker({
                               : "bg-[var(--surface-bg)] text-[var(--foreground)]"
                           }`}
                         >
-                          <ColorDot
+                          <CatIcon
+                            emoji={c.emoji || group?.emoji}
                             color={c.color || group?.color}
                             active={active}
                           />

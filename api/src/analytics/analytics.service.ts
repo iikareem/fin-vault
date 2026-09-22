@@ -407,6 +407,7 @@ export class AnalyticsService {
         name: string;
         nameAr: string;
         color: string;
+        emoji: string;
         type: string;
         total: number;
       }
@@ -424,6 +425,7 @@ export class AnalyticsService {
         name: bucket?.name ?? 'Unknown',
         nameAr: bucket?.nameAr ?? '',
         color: bucket?.color ?? '#64748b',
+        emoji: bucket?.emoji ?? '',
         type,
         total: 0,
       };
@@ -447,6 +449,7 @@ export class AnalyticsService {
           name: cat?.name ?? 'Unknown',
           nameAr: cat?.nameAr ?? '',
           color: cat?.color ?? '#64748b',
+          emoji: cat?.emoji ?? '',
           type: 'EXPENSE',
           total: 0,
         };
@@ -554,6 +557,7 @@ export class AnalyticsService {
         name: c.name,
         nameAr: c.nameAr,
         color: c.color,
+        emoji: c.emoji,
       }));
     // Preserve request order for any ids still unknown (deleted)
     const categories =
@@ -580,6 +584,7 @@ export class AnalyticsService {
             name: true,
             nameAr: true,
             color: true,
+            emoji: true,
             kind: true,
             parentId: true,
           },
@@ -606,6 +611,7 @@ export class AnalyticsService {
                   name: true,
                   nameAr: true,
                   color: true,
+                  emoji: true,
                   parentId: true,
                 },
               },
@@ -628,6 +634,7 @@ export class AnalyticsService {
         name: string;
         nameAr: string;
         color: string;
+        emoji?: string;
         parentId?: string | null;
       };
       account?: { id: string; name: string };
@@ -711,7 +718,7 @@ export class AnalyticsService {
       where: { householdId, occurredOn: day },
       include: {
         account: { select: { id: true, name: true } },
-        category: { select: { id: true, name: true, nameAr: true, color: true, kind: true } },
+        category: { select: { id: true, name: true, nameAr: true, color: true, emoji: true, kind: true } },
         user: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: 'asc' },
@@ -722,7 +729,7 @@ export class AnalyticsService {
             where: { householdId, occurredOn: day },
             include: {
               member: { select: { id: true, name: true } },
-              category: { select: { id: true, name: true, nameAr: true, color: true } },
+              category: { select: { id: true, name: true, nameAr: true, color: true, emoji: true } },
               reimbursements: true,
             },
             orderBy: { createdAt: 'asc' },

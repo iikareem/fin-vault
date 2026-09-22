@@ -23,6 +23,7 @@ type ManageCat = {
   name: string;
   nameAr: string;
   color: string;
+  emoji: string;
   kind: "EXPENSE" | "INCOME" | "PEER";
   parentId: string | null;
   sortOrder: number;
@@ -54,6 +55,87 @@ const ACCENT_COLORS = [
   "#4338ca",
 ];
 
+const EMOJI_CHOICES = [
+  "🛒",
+  "🍔",
+  "☕",
+  "🍕",
+  "🥗",
+  "🚗",
+  "⛽",
+  "🚌",
+  "🚕",
+  "✈️",
+  "🏠",
+  "💡",
+  "🔑",
+  "📱",
+  "💻",
+  "👕",
+  "👟",
+  "💇",
+  "🎬",
+  "🎮",
+  "🎵",
+  "📚",
+  "🏋️",
+  "💊",
+  "🏥",
+  "🐕",
+  "👶",
+  "🎁",
+  "🎉",
+  "💳",
+  "💰",
+  "🏦",
+  "📈",
+  "💵",
+  "🎯",
+  "🧹",
+  "🧴",
+  "📦",
+  "🛍️",
+  "🧾",
+  "🛠️",
+  "🪴",
+  "⚽",
+  "📷",
+  "🧃",
+];
+
+function CatMark({
+  emoji,
+  color,
+  size = "md",
+}: {
+  emoji?: string | null;
+  color: string;
+  size?: "sm" | "md";
+}) {
+  const box =
+    size === "sm"
+      ? "h-7 w-7 rounded-lg text-sm"
+      : "h-10 w-10 rounded-2xl text-lg";
+  if (emoji) {
+    return (
+      <span
+        className={`inline-flex shrink-0 items-center justify-center ${box}`}
+        style={{ backgroundColor: `${color}22` }}
+        aria-hidden
+      >
+        {emoji}
+      </span>
+    );
+  }
+  return (
+    <span
+      className={`inline-block shrink-0 ${box}`}
+      style={{ backgroundColor: color }}
+      aria-hidden
+    />
+  );
+}
+
 function isHidden(cat: ManageCat) {
   if (cat.kind === "INCOME") return HIDDEN_INCOME_CATEGORIES.has(cat.seedKey ?? cat.name);
   if (cat.kind === "EXPENSE") return HIDDEN_EXPENSE_CATEGORIES.has(cat.seedKey ?? cat.name);
@@ -71,6 +153,7 @@ export default function MyCategoriesPage() {
   const [name, setName] = useState("");
   const [nameAr, setNameAr] = useState("");
   const [color, setColor] = useState(ACCENT_COLORS[0]);
+  const [emoji, setEmoji] = useState("");
   const [parentId, setParentId] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -150,6 +233,7 @@ export default function MyCategoriesPage() {
     setName("");
     setNameAr("");
     setColor(ACCENT_COLORS[Math.floor(Math.random() * ACCENT_COLORS.length)]);
+    setEmoji("");
     setParentId(parent ?? "");
     setEditor({ type: "create", parentId: parent, kind });
   }
@@ -160,6 +244,7 @@ export default function MyCategoriesPage() {
     setName(cat.name);
     setNameAr(cat.nameAr);
     setColor(cat.color);
+    setEmoji(cat.emoji || "");
     setParentId(cat.parentId ?? "");
     setEditor({ type: "edit", cat });
     if (cat.parentId) {
@@ -185,6 +270,7 @@ export default function MyCategoriesPage() {
             name: name.trim(),
             nameAr: nameAr.trim(),
             color,
+            emoji,
             kind: editor.kind,
             parentId: parentId || undefined,
           }),
@@ -201,6 +287,7 @@ export default function MyCategoriesPage() {
               name: name.trim(),
               nameAr: nameAr.trim(),
               color,
+              emoji,
               parentId: parentId || "",
             }),
           },
@@ -308,6 +395,39 @@ export default function MyCategoriesPage() {
           />
           <Hint>{t("catsNameArHint")}</Hint>
         </label>
+
+        <div>
+          <p className="mb-2 text-sm font-medium">{t("catsEmoji")}</p>
+          <div className="flex flex-wrap gap-1.5">
+            <button
+              type="button"
+              onClick={() => setEmoji("")}
+              className={`flex h-9 min-w-9 items-center justify-center rounded-xl px-2 text-xs font-semibold ring-2 transition ${
+                !emoji
+                  ? "bg-[var(--surface-bg)] ring-[var(--foreground)]"
+                  : "bg-[var(--surface-bg)] ring-transparent text-[var(--muted)]"
+              }`}
+            >
+              {t("catsEmojiNone")}
+            </button>
+            {EMOJI_CHOICES.map((e) => (
+              <button
+                key={e}
+                type="button"
+                onClick={() => setEmoji(e)}
+                className={`flex h-9 w-9 items-center justify-center rounded-xl text-lg ring-2 transition ${
+                  emoji === e
+                    ? "bg-[var(--surface-bg)] ring-[var(--foreground)] scale-110"
+                    : "bg-[var(--surface-bg)] ring-transparent"
+                }`}
+                aria-label={e}
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+          <Hint>{t("catsEmojiHint")}</Hint>
+        </div>
 
         <div>
           <p className="mb-2 text-sm font-medium">{t("catsColor")}</p>
@@ -476,11 +596,7 @@ export default function MyCategoriesPage() {
                     onClick={() => toggleExpand(p.id)}
                     className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-3 py-2.5 text-start transition hover:bg-[var(--panel-soft)]"
                   >
-                    <span
-                      className="h-10 w-10 shrink-0 rounded-2xl"
-                      style={{ backgroundColor: p.color }}
-                      aria-hidden
-                    />
+                    <CatMark emoji={p.emoji} color={p.color} />
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center gap-1.5">
                         <span className="truncate text-base font-bold">
@@ -575,11 +691,13 @@ export default function MyCategoriesPage() {
                                 : "hover:bg-[var(--panel-soft)]"
                             }`}
                           >
-                            <span
-                              className="ms-4 h-3 w-3 shrink-0 rounded-full"
-                              style={{ backgroundColor: k.color }}
-                              aria-hidden
-                            />
+                            <span className="ms-4 inline-flex shrink-0">
+                              <CatMark
+                                emoji={k.emoji}
+                                color={k.color}
+                                size="sm"
+                              />
+                            </span>
                             <span className="min-w-0 flex-1 truncate text-sm font-semibold">
                               {categoryLabel(k, locale, t)}
                             </span>
