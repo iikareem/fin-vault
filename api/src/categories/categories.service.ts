@@ -1,9 +1,33 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
-import { HouseholdKind } from '@prisma/client';
+import { ManageCreateCategoryDto } from './dto/manage-create-category.dto';
+import { ManageUpdateCategoryDto } from './dto/manage-update-category.dto';
+import { CategoryKind, HouseholdKind } from '@prisma/client';
 import { PERSONAL_EXPENSE } from '../households/space-defaults';
 import { nameArFor } from './category-labels';
+import { NON_SPEND_CATEGORY_NAMES } from './non-spend-categories';
+
+/** Built-ins whose English name must stay for system matching. */
+const PROTECTED_SEED_KEYS = new Set<string>([
+  ...NON_SPEND_CATEGORY_NAMES,
+  'Salary',
+  'Loan repayment',
+  'Loan collected',
+  'Loan received',
+  'Outside loan',
+  'Loan repaid',
+  'Member payback',
+  'Given to member',
+  'Allowance',
+]);
+
+const ACCENT_FALLBACK = '#0f766e';
 
 const HOUSE_PAID = [
   { name: 'Family gift', kind: 'EXPENSE' as const, color: '#db2777' },
@@ -251,28 +275,12 @@ export class CategoriesService {
     const parentIds = new Map<string, string>();
     for (let i = 0; i < parents.length; i++) {
       const def = parents[i];
-      const row = await this.prisma.category.upsert({
-        where: {
-          householdId_name_kind: {
-            householdId,
-            name: def.name,
-            kind: 'EXPENSE',
-          },
-        },
-        update: {
-          color: def.color,
-          sortOrder: i,
-          parentId: null,
-          nameAr: nameArFor(def.name),
-        },
-        create: {
-          householdId,
-          name: def.name,
-          nameAr: nameArFor(def.name),
-          kind: 'EXPENSE',
-          color: def.color,
-          sortOrder: i,
-        },
+      const row = await this.ensureSeededCategory(householdId, {
+        seedKey: def.name,
+        name: def.name,
+        color: def.color,
+        sortOrder: i,
+        parentId: null,
       });
       parentIds.set(def.name, row.id);
     }
@@ -284,29 +292,12 @@ export class CategoriesService {
       if (!parentId) continue;
       const order = orderInGroup.get(group) ?? 0;
       orderInGroup.set(group, order + 1);
-      await this.prisma.category.upsert({
-        where: {
-          householdId_name_kind: {
-            householdId,
-            name: def.name,
-            kind: 'EXPENSE',
-          },
-        },
-        update: {
-          color: def.color,
-          parentId,
-          sortOrder: order,
-          nameAr: nameArFor(def.name),
-        },
-        create: {
-          householdId,
-          name: def.name,
-          nameAr: nameArFor(def.name),
-          kind: 'EXPENSE',
-          color: def.color,
-          parentId,
-          sortOrder: order,
-        },
+      await this.ensureSeededCategory(householdId, {
+        seedKey: def.name,
+        name: def.name,
+        color: def.color,
+        sortOrder: order,
+        parentId,
       });
     }
 
@@ -441,7 +432,290 @@ export class CategoriesService {
         kind: dto.kind,
         color: dto.color ?? '#2563eb',
         parentId: dto.parentId ?? null,
+        seedKey: null,
+        isUserManaged: true,
       },
     });
+  }
+
+  /**
+   * Upsert a built-in category by seedKey. Never overwrites user-managed
+   * display fields — each personal household keeps its own edits.
+   */
+  private async ensureSeededCategory(
+    householdId: string,
+    def: {
+      seedKey: string;
+      name: string;
+      color: string;
+      sortOrder: number;
+      parentId: string | null;
+    },
+  ) {
+    const existing =
+      (await this.prisma.category.findFirst({
+        where: { householdId, seedKey: def.seedKey, kind: 'EXPENSE' },
+      })) ??
+      (await this.prisma.category.findFirst({
+        where: {
+          householdId,
+          name: def.name,
+          kind: 'EXPENSE',
+          seedKey: null,
+        },
+      })) ??
+      (await this.prisma.category.findFirst({
+        where: { householdId, name: def.name, kind: 'EXPENSE' },
+      }));
+
+    if (!existing) {
+      return this.prisma.category.create({
+        data: {
+          householdId,
+          name: def.name,
+          nameAr: nameArFor(def.name),
+          kind: 'EXPENSE',
+          color: def.color,
+          sortOrder: def.sortOrder,
+          parentId: def.parentId,
+          seedKey: def.seedKey,
+          isUserManaged: false,
+        },
+      });
+    }
+
+    if (existing.isUserManaged) {
+      if (existing.seedKey !== def.seedKey) {
+        return this.prisma.category.update({
+          where: { id: existing.id },
+          data: { seedKey: def.seedKey },
+        });
+      }
+      return existing;
+    }
+
+    return this.prisma.category.update({
+      where: { id: existing.id },
+      data: {
+        seedKey: def.seedKey,
+        color: def.color,
+        sortOrder: def.sortOrder,
+        parentId: def.parentId,
+        nameAr: existing.nameAr || nameArFor(def.name),
+      },
+    });
+  }
+
+  async manageList(householdId: string) {
+    await this.syncPersonal(householdId);
+    await this.fillMissingNameAr(householdId);
+    const cats = await this.prisma.category.findMany({
+      where: { householdId },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      select: {
+        id: true,
+        name: true,
+        nameAr: true,
+        color: true,
+        kind: true,
+        parentId: true,
+        sortOrder: true,
+        seedKey: true,
+        isUserManaged: true,
+        _count: { select: { children: true, txs: true } },
+      },
+    });
+
+    return cats.map((c) => {
+      const seed = c.seedKey ?? c.name;
+      const protectedName = PROTECTED_SEED_KEYS.has(seed);
+      const isCustom = !c.seedKey;
+      return {
+        id: c.id,
+        name: c.name,
+        nameAr: c.nameAr,
+        color: c.color,
+        kind: c.kind,
+        parentId: c.parentId,
+        sortOrder: c.sortOrder,
+        seedKey: c.seedKey,
+        isUserManaged: c.isUserManaged || isCustom,
+        isCustom,
+        protected: protectedName,
+        canRename: !protectedName,
+        canDelete: isCustom && c._count.children === 0,
+        childCount: c._count.children,
+        txCount: c._count.txs,
+      };
+    });
+  }
+
+  async manageCreate(householdId: string, dto: ManageCreateCategoryDto) {
+    const name = dto.name.trim();
+    if (!name) throw new BadRequestException('Name required');
+    const kind: CategoryKind = dto.kind ?? 'EXPENSE';
+    const nameAr = dto.nameAr?.trim() || nameArFor(name) || '';
+    const color = dto.color ?? ACCENT_FALLBACK;
+
+    let parentId: string | null = dto.parentId?.trim() || null;
+    if (parentId) {
+      const parent = await this.prisma.category.findFirst({
+        where: { id: parentId, householdId, kind },
+      });
+      if (!parent) throw new BadRequestException('Parent category not found');
+      if (parent.parentId) {
+        throw new BadRequestException('Subcategories cannot have children');
+      }
+    }
+
+    const clash = await this.prisma.category.findFirst({
+      where: { householdId, name, kind },
+    });
+    if (clash) throw new BadRequestException('A category with this name already exists');
+
+    const maxSort = await this.prisma.category.aggregate({
+      where: { householdId, parentId, kind },
+      _max: { sortOrder: true },
+    });
+
+    return this.prisma.category.create({
+      data: {
+        householdId,
+        name,
+        nameAr,
+        kind,
+        color,
+        parentId,
+        sortOrder: (maxSort._max.sortOrder ?? -1) + 1,
+        seedKey: null,
+        isUserManaged: true,
+      },
+    });
+  }
+
+  async manageUpdate(
+    householdId: string,
+    categoryId: string,
+    dto: ManageUpdateCategoryDto,
+  ) {
+    const cat = await this.prisma.category.findFirst({
+      where: { id: categoryId, householdId },
+    });
+    if (!cat) throw new NotFoundException('Category not found');
+
+    const seed = cat.seedKey ?? cat.name;
+    const protectedName = PROTECTED_SEED_KEYS.has(seed);
+
+    const data: {
+      name?: string;
+      nameAr?: string;
+      color?: string;
+      parentId?: string | null;
+      isUserManaged: boolean;
+    } = { isUserManaged: true };
+
+    if (dto.name !== undefined) {
+      const name = dto.name.trim();
+      if (!name) throw new BadRequestException('Name required');
+      if (protectedName && name !== cat.name) {
+        throw new ForbiddenException(
+          'This system category name cannot be changed',
+        );
+      }
+      if (name !== cat.name) {
+        const clash = await this.prisma.category.findFirst({
+          where: {
+            householdId,
+            name,
+            kind: cat.kind,
+            NOT: { id: cat.id },
+          },
+        });
+        if (clash) {
+          throw new BadRequestException('A category with this name already exists');
+        }
+        data.name = name;
+      }
+    }
+
+    if (dto.nameAr !== undefined) {
+      data.nameAr = dto.nameAr.trim();
+    }
+
+    if (dto.color !== undefined) {
+      data.color = dto.color;
+    }
+
+    if (dto.parentId !== undefined) {
+      const raw = dto.parentId;
+      const parentId =
+        raw === null || raw === '' ? null : String(raw).trim() || null;
+      if (parentId === cat.id) {
+        throw new BadRequestException('Category cannot be its own parent');
+      }
+      if (parentId) {
+        const parent = await this.prisma.category.findFirst({
+          where: { id: parentId, householdId, kind: cat.kind },
+        });
+        if (!parent) throw new BadRequestException('Parent category not found');
+        if (parent.parentId) {
+          throw new BadRequestException('Subcategories cannot have children');
+        }
+        const kidCount = await this.prisma.category.count({
+          where: { parentId: cat.id },
+        });
+        if (kidCount > 0) {
+          throw new BadRequestException(
+            'Move or remove subcategories before nesting this group',
+          );
+        }
+      }
+      data.parentId = parentId;
+    }
+
+    return this.prisma.category.update({
+      where: { id: cat.id },
+      data,
+    });
+  }
+
+  async manageDelete(householdId: string, categoryId: string) {
+    const cat = await this.prisma.category.findFirst({
+      where: { id: categoryId, householdId },
+      include: { _count: { select: { children: true } } },
+    });
+    if (!cat) throw new NotFoundException('Category not found');
+    if (cat.seedKey) {
+      throw new ForbiddenException('Built-in categories cannot be deleted');
+    }
+    if (cat._count.children > 0) {
+      throw new BadRequestException('Remove subcategories first');
+    }
+
+    const other = await this.prisma.category.findFirst({
+      where: {
+        householdId,
+        kind: cat.kind,
+        OR: [{ seedKey: 'Other' }, { name: 'Other' }],
+        NOT: { id: cat.id },
+      },
+    });
+
+    if (other) {
+      await this.mergeCategory(cat.id, other.id);
+      return { ok: true, remappedTo: other.id };
+    }
+
+    const txCount = await this.prisma.transaction.count({
+      where: { categoryId: cat.id },
+    });
+    if (txCount > 0) {
+      throw new BadRequestException(
+        'This category has transactions; create an Other category or remap first',
+      );
+    }
+
+    await this.prisma.category.delete({ where: { id: cat.id } });
+    return { ok: true };
   }
 }

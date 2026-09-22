@@ -101,6 +101,7 @@ export class AccountsService {
           nameAr: nameArFor(WALLET_TRANSFER_CATEGORY),
           kind,
           color: '#57534e',
+          seedKey: WALLET_TRANSFER_CATEGORY,
         },
       });
     };
@@ -220,6 +221,7 @@ export class AccountsService {
         nameAr: nameArFor(CASH_WITHDRAWAL_CATEGORY),
         kind: 'EXPENSE',
         color: '#0f766e',
+        seedKey: CASH_WITHDRAWAL_CATEGORY,
       },
     });
   }

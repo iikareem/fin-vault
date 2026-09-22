@@ -41,6 +41,9 @@ function isCurrent(path: string, href: string) {
       )
     );
   }
+  if (href === "/profile") {
+    return path === "/profile" || path.startsWith("/profile/");
+  }
   return path.startsWith(href);
 }
 

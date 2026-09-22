@@ -157,6 +157,13 @@ model Category {
   name        String
   /** Arabic display label. Empty = fall back to `name` (English). */
   nameAr      String        @default("")
+  /**
+   * Immutable seed identity for built-in categories (e.g. "Food").
+   * Null = created by the user. Sync matches on this so renames stay personal.
+   */
+  seedKey     String?
+  /** True after the user edits a seeded category (or creates a custom one). */
+  isUserManaged Boolean     @default(false)
   kind        CategoryKind
   color       String        @default("#2563eb")
   sortOrder   Int           @default(0)
@@ -166,6 +173,7 @@ model Category {
   covers      HouseCover[]
 
   @@unique([householdId, name, kind])
+  @@unique([householdId, seedKey, kind])
   @@index([householdId, parentId])
 }
 

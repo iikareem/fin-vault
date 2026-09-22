@@ -185,6 +185,7 @@ export async function seedPersonalSpace(
         householdId: personal.id,
         ...c,
         nameAr: nameArFor(c.name),
+        seedKey: c.name,
       })),
       ...parents.map((c, i) => ({
         householdId: personal.id,
@@ -193,6 +194,7 @@ export async function seedPersonalSpace(
         kind: 'EXPENSE' as const,
         color: c.color,
         sortOrder: i,
+        seedKey: c.name,
       })),
     ],
   });
@@ -209,6 +211,7 @@ export async function seedPersonalSpace(
         kind: 'EXPENSE',
         color: child.color,
         parentId: parent.id,
+        seedKey: child.name,
       },
     });
   }
@@ -230,6 +233,7 @@ export async function seedHouseBooks(client: Db, householdId: string) {
         nameAr: nameArFor(c.name),
         kind: 'EXPENSE' as const,
         color: c.color,
+        seedKey: c.name,
       })),
       {
         householdId,
@@ -237,6 +241,7 @@ export async function seedHouseBooks(client: Db, householdId: string) {
         nameAr: nameArFor('Allowance'),
         kind: 'EXPENSE' as const,
         color: '#0284c7',
+        seedKey: 'Allowance',
       },
       {
         householdId,
@@ -244,6 +249,7 @@ export async function seedHouseBooks(client: Db, householdId: string) {
         nameAr: nameArFor('Salary'),
         kind: 'INCOME',
         color: '#15803d',
+        seedKey: 'Salary',
       },
       {
         householdId,
@@ -251,6 +257,7 @@ export async function seedHouseBooks(client: Db, householdId: string) {
         nameAr: nameArFor('Other income'),
         kind: 'INCOME',
         color: '#0f766e',
+        seedKey: 'Other income',
       },
       {
         householdId,
@@ -258,6 +265,7 @@ export async function seedHouseBooks(client: Db, householdId: string) {
         nameAr: nameArFor('Personal loan'),
         kind: 'PEER',
         color: '#57534e',
+        seedKey: 'Personal loan',
       },
       {
         householdId,
@@ -265,6 +273,7 @@ export async function seedHouseBooks(client: Db, householdId: string) {
         nameAr: nameArFor('Help with a bill'),
         kind: 'PEER',
         color: '#a16207',
+        seedKey: 'Help with a bill',
       },
     ],
   });

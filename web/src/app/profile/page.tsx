@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { BottomNav } from "@/components/BottomNav";
 import { ChangePasswordForm } from "@/components/ChangePasswordForm";
 import { Hint } from "@/components/Hint";
@@ -75,7 +76,30 @@ export default function ProfilePage() {
       ) : null}
       <Hint>{t("profileHint")}</Hint>
 
-      <section className="surface mt-6 space-y-5 rounded-[1.75rem] p-4">
+      <Link
+        href="/profile/categories"
+        className="surface mt-5 flex min-h-[4.5rem] items-center gap-3 rounded-[1.75rem] px-4 py-3 transition hover:bg-[var(--panel-soft)]"
+      >
+        <span
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-b-soft)] text-2xl"
+          aria-hidden
+        >
+          🏷️
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-lg font-bold leading-tight">
+            {t("myCategories")}
+          </span>
+          <span className="mt-0.5 block text-sm leading-relaxed text-[var(--muted)]">
+            {t("myCategoriesLinkHint")}
+          </span>
+        </span>
+        <span className="shrink-0 text-lg text-[var(--muted)]" aria-hidden>
+          →
+        </span>
+      </Link>
+
+      <section className="surface mt-5 space-y-5 rounded-[1.75rem] p-4">
         <h2 className="text-xl font-bold">{t("settingsTitle")}</h2>
 
         <label className="block">
