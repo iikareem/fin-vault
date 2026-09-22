@@ -16,6 +16,7 @@ import { NON_SPEND_CATEGORY_NAMES } from './non-spend-categories';
 /** Built-ins whose English name must stay for system matching. */
 const PROTECTED_SEED_KEYS = new Set<string>([
   ...NON_SPEND_CATEGORY_NAMES,
+  'Other',
   'Salary',
   'Loan repayment',
   'Loan collected',
@@ -178,7 +179,7 @@ export class CategoriesService {
     }
     await this.fillMissingNameAr(householdId);
     const cats = await this.prisma.category.findMany({
-      where: { householdId },
+      where: { householdId, hidden: false },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
     });
     return this.orderByUserUsage(householdId, userId, cats);
@@ -273,6 +274,7 @@ export class CategoriesService {
     const parents = PERSONAL_EXPENSE.filter((c) => !c.group);
     const children = PERSONAL_EXPENSE.filter((c) => c.group);
     const parentIds = new Map<string, string>();
+    const parentHidden = new Map<string, boolean>();
     for (let i = 0; i < parents.length; i++) {
       const def = parents[i];
       const row = await this.ensureSeededCategory(householdId, {
@@ -283,11 +285,14 @@ export class CategoriesService {
         parentId: null,
       });
       parentIds.set(def.name, row.id);
+      parentHidden.set(def.name, row.hidden);
     }
     const orderInGroup = new Map<string, number>();
     for (const def of children) {
       const group = def.group;
       if (!group) continue;
+      // User removed this group — don't resurrect its subcategories.
+      if (parentHidden.get(group)) continue;
       const parentId = parentIds.get(group);
       if (!parentId) continue;
       const order = orderInGroup.get(group) ?? 0;
@@ -510,7 +515,7 @@ export class CategoriesService {
     await this.syncPersonal(householdId);
     await this.fillMissingNameAr(householdId);
     const cats = await this.prisma.category.findMany({
-      where: { householdId },
+      where: { householdId, hidden: false },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
       select: {
         id: true,
@@ -543,7 +548,8 @@ export class CategoriesService {
         isCustom,
         protected: protectedName,
         canRename: !protectedName,
-        canDelete: isCustom && c._count.children === 0,
+        // Personal books only — any non-system category/subcategory.
+        canDelete: !protectedName,
         childCount: c._count.children,
         txCount: c._count.txs,
       };
@@ -681,41 +687,105 @@ export class CategoriesService {
 
   async manageDelete(householdId: string, categoryId: string) {
     const cat = await this.prisma.category.findFirst({
-      where: { id: categoryId, householdId },
-      include: { _count: { select: { children: true } } },
+      where: { id: categoryId, householdId, hidden: false },
     });
     if (!cat) throw new NotFoundException('Category not found');
-    if (cat.seedKey) {
-      throw new ForbiddenException('Built-in categories cannot be deleted');
-    }
-    if (cat._count.children > 0) {
-      throw new BadRequestException('Remove subcategories first');
+
+    const seed = cat.seedKey ?? cat.name;
+    if (PROTECTED_SEED_KEYS.has(seed)) {
+      throw new ForbiddenException('This system category cannot be deleted');
     }
 
-    const other = await this.prisma.category.findFirst({
+    const children = await this.prisma.category.findMany({
+      where: { householdId, parentId: cat.id, hidden: false },
+      select: { id: true },
+    });
+    // Cascade: remove subcategories first (same personal household only).
+    for (const child of children) {
+      await this.manageDelete(householdId, child.id);
+    }
+
+    const other = await this.ensureOtherCategory(householdId, cat.kind);
+    if (other.id === cat.id) {
+      throw new ForbiddenException('This system category cannot be deleted');
+    }
+
+    if (cat.seedKey) {
+      // Soft-hide seeded rows so sync does not recreate them for this user.
+      await this.remapCategoryRefs(cat.id, other.id);
+      await this.prisma.category.update({
+        where: { id: cat.id },
+        data: {
+          hidden: true,
+          isUserManaged: true,
+          parentId: null,
+        },
+      });
+      return { ok: true, remappedTo: other.id, hidden: true };
+    }
+
+    await this.mergeCategory(cat.id, other.id);
+    return { ok: true, remappedTo: other.id };
+  }
+
+  /** Fallback bucket for remapping spends when a category is removed. */
+  private async ensureOtherCategory(householdId: string, kind: CategoryKind) {
+    const existing = await this.prisma.category.findFirst({
       where: {
         householdId,
-        kind: cat.kind,
+        kind,
         OR: [{ seedKey: 'Other' }, { name: 'Other' }],
-        NOT: { id: cat.id },
       },
     });
-
-    if (other) {
-      await this.mergeCategory(cat.id, other.id);
-      return { ok: true, remappedTo: other.id };
+    if (existing) {
+      if (existing.hidden) {
+        return this.prisma.category.update({
+          where: { id: existing.id },
+          data: { hidden: false, isUserManaged: true, parentId: null },
+        });
+      }
+      return existing;
     }
 
-    const txCount = await this.prisma.transaction.count({
-      where: { categoryId: cat.id },
+    return this.prisma.category.create({
+      data: {
+        householdId,
+        name: 'Other',
+        nameAr: nameArFor('Other'),
+        kind,
+        color: '#78716c',
+        sortOrder: 999,
+        parentId: null,
+        seedKey: 'Other',
+        isUserManaged: true,
+        hidden: false,
+      },
     });
-    if (txCount > 0) {
-      throw new BadRequestException(
-        'This category has transactions; create an Other category or remap first',
-      );
-    }
+  }
 
-    await this.prisma.category.delete({ where: { id: cat.id } });
-    return { ok: true };
+  private async remapCategoryRefs(sourceId: string, targetId: string) {
+    if (sourceId === targetId) return;
+    await this.prisma.$transaction([
+      this.prisma.transaction.updateMany({
+        where: { categoryId: sourceId },
+        data: { categoryId: targetId },
+      }),
+      this.prisma.houseClaim.updateMany({
+        where: { categoryId: sourceId },
+        data: { categoryId: targetId },
+      }),
+      this.prisma.houseCover.updateMany({
+        where: { categoryId: sourceId },
+        data: { categoryId: targetId },
+      }),
+      this.prisma.peerLoan.updateMany({
+        where: { categoryId: sourceId },
+        data: { categoryId: targetId },
+      }),
+      this.prisma.category.updateMany({
+        where: { parentId: sourceId },
+        data: { parentId: targetId },
+      }),
+    ]);
   }
 }

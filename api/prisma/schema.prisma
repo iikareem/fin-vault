@@ -164,6 +164,11 @@ model Category {
   seedKey     String?
   /** True after the user edits a seeded category (or creates a custom one). */
   isUserManaged Boolean     @default(false)
+  /**
+   * Soft-removed from this household only (personal books).
+   * Seeded rows stay so sync does not recreate them; custom rows are hard-deleted.
+   */
+  hidden      Boolean       @default(false)
   kind        CategoryKind
   color       String        @default("#2563eb")
   sortOrder   Int           @default(0)

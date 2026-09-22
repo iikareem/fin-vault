@@ -1,7 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { api } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
@@ -69,6 +75,8 @@ export default function MyCategoriesPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [flash, setFlash] = useState("");
+  const editorRef = useRef<HTMLFormElement>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
 
   function load(hid: string) {
     return api<ManageCat[]>(householdPath(hid, "/categories/manage")).then(
@@ -84,6 +92,18 @@ export default function MyCategoriesPage() {
     setKind("PERSONAL");
     load(personal.householdId).catch((e) => setError(e.message));
   }, [personal?.householdId, setKind]);
+
+  useEffect(() => {
+    if (editor.type === "closed") return;
+    const form = editorRef.current;
+    if (!form) return;
+    // Keep the form under the tapped row — don't jump to page top.
+    const id = requestAnimationFrame(() => {
+      form.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      nameInputRef.current?.focus({ preventScroll: true });
+    });
+    return () => cancelAnimationFrame(id);
+  }, [editor]);
 
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -101,7 +121,10 @@ export default function MyCategoriesPage() {
   }, [cats, kind, search, locale, t]);
 
   const parents = useMemo(
-    () => visible.filter((c) => !c.parentId).sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)),
+    () =>
+      visible
+        .filter((c) => !c.parentId)
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name)),
     [visible],
   );
 
@@ -195,7 +218,10 @@ export default function MyCategoriesPage() {
 
   async function onDelete(cat: ManageCat) {
     if (!personal || !cat.canDelete) return;
-    if (!window.confirm(t("catsDeleteConfirm"))) return;
+    const msg = cat.parentId
+      ? t("catsDeleteConfirmSub")
+      : t("catsDeleteConfirm");
+    if (!window.confirm(msg)) return;
     setBusy(true);
     setError("");
     try {
@@ -204,8 +230,16 @@ export default function MyCategoriesPage() {
         { method: "DELETE" },
       );
       await load(personal.householdId);
-      setFlash(t("catsSaved"));
-      if (editor.type === "edit" && editor.cat.id === cat.id) closeEditor();
+      setFlash(t("catsDeleted"));
+      if (
+        editor.type === "edit" &&
+        (editor.cat.id === cat.id || editor.cat.parentId === cat.id)
+      ) {
+        closeEditor();
+      }
+      if (editor.type === "create" && editor.parentId === cat.id) {
+        closeEditor();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -221,6 +255,133 @@ export default function MyCategoriesPage() {
       return next;
     });
   }
+
+  const editingId = editor.type === "edit" ? editor.cat.id : null;
+  const creatingUnder =
+    editor.type === "create" ? editor.parentId : undefined;
+  const creatingTopLevel =
+    editor.type === "create" && editor.parentId === null;
+
+  const editorForm =
+    editor.type === "closed" ? null : (
+      <form
+        ref={editorRef}
+        onSubmit={onSave}
+        className="cat-editor mt-2 space-y-3 rounded-[1.35rem] border border-[var(--surface-border)] bg-[var(--panel-soft)] p-3.5"
+      >
+        <h2 className="text-base font-bold">
+          {editor.type === "create"
+            ? editor.parentId
+              ? t("catsAddSub")
+              : t("catsAddGroup")
+            : t("catsEdit")}
+        </h2>
+        {editor.type === "edit" && editor.cat.protected ? (
+          <p className="rounded-xl bg-[var(--surface-bg)] px-3 py-2 text-sm text-[var(--muted)]">
+            {t("catsProtectedHint")}
+          </p>
+        ) : null}
+
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium">{t("catsName")}</span>
+          <input
+            ref={nameInputRef}
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            disabled={editor.type === "edit" && !editor.cat.canRename}
+            className="field w-full rounded-2xl px-4 py-3 text-base disabled:opacity-60"
+            dir="auto"
+          />
+          <Hint>{t("catsNameHint")}</Hint>
+        </label>
+
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium">
+            {t("catsNameAr")}
+          </span>
+          <input
+            value={nameAr}
+            onChange={(e) => setNameAr(e.target.value)}
+            className="field w-full rounded-2xl px-4 py-3 text-base"
+            dir="rtl"
+          />
+          <Hint>{t("catsNameArHint")}</Hint>
+        </label>
+
+        <div>
+          <p className="mb-2 text-sm font-medium">{t("catsColor")}</p>
+          <div className="flex flex-wrap gap-2">
+            {ACCENT_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setColor(c)}
+                className={`h-9 w-9 rounded-full ring-2 transition ${
+                  color === c
+                    ? "scale-110 ring-[var(--foreground)]"
+                    : "ring-transparent"
+                }`}
+                style={{ backgroundColor: c }}
+                aria-label={c}
+              />
+            ))}
+          </div>
+        </div>
+
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium">
+            {t("catsParent")}
+          </span>
+          <select
+            value={parentId}
+            onChange={(e) => setParentId(e.target.value)}
+            className="field w-full rounded-2xl px-4 py-3 text-base"
+          >
+            <option value="">{t("catsParentNone")}</option>
+            {parentOptions.map((p) => (
+              <option key={p.id} value={p.id}>
+                {categoryLabel(p, locale, t)}
+              </option>
+            ))}
+          </select>
+          <Hint>{t("catsParentHint")}</Hint>
+        </label>
+
+        {error ? <p className="text-sm text-red-700">{error}</p> : null}
+
+        <div className="flex flex-wrap gap-2 pt-0.5">
+          <button
+            type="submit"
+            disabled={busy}
+            className="rounded-2xl bg-[var(--cta-bg)] px-4 py-2.5 text-sm font-bold text-[var(--cta-fg)] disabled:opacity-60"
+          >
+            {busy ? t("catsSaving") : t("catsSave")}
+          </button>
+          <button
+            type="button"
+            onClick={closeEditor}
+            className="rounded-2xl bg-[var(--surface-bg)] px-4 py-2.5 text-sm font-semibold"
+          >
+            {t("catsCancel")}
+          </button>
+          {editor.type === "edit" && editor.cat.canDelete ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onDelete(editor.cat)}
+              className="ms-auto rounded-2xl px-3 py-2.5 text-sm font-semibold text-red-700 disabled:opacity-50"
+            >
+              {busy ? t("catsDeleting") : t("catsDelete")}
+            </button>
+          ) : editor.type === "edit" && editor.cat.protected ? (
+            <p className="ms-auto max-w-[12rem] text-end text-[11px] leading-snug text-[var(--muted)]">
+              {t("catsCannotDeleteBuiltIn")}
+            </p>
+          ) : null}
+        </div>
+      </form>
+    );
 
   if (!personal) {
     return (
@@ -251,7 +412,10 @@ export default function MyCategoriesPage() {
           <button
             key={k}
             type="button"
-            onClick={() => setKindTab(k)}
+            onClick={() => {
+              setKindTab(k);
+              closeEditor();
+            }}
             className={`rounded-2xl py-2.5 text-base font-bold transition ${
               kind === k
                 ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
@@ -280,129 +444,31 @@ export default function MyCategoriesPage() {
         </button>
       </div>
 
-      {editor.type !== "closed" ? (
-        <form
-          onSubmit={onSave}
-          className="surface mt-4 space-y-3 rounded-[1.75rem] p-4"
-        >
-          <h2 className="text-lg font-bold">
-            {editor.type === "create"
-              ? editor.parentId
-                ? t("catsAddSub")
-                : t("catsAddGroup")
-              : t("catsEdit")}
-          </h2>
-          {editor.type === "edit" && editor.cat.protected ? (
-            <p className="rounded-2xl bg-[var(--panel-soft)] px-3 py-2 text-sm text-[var(--muted)]">
-              {t("catsProtectedHint")}
-            </p>
-          ) : null}
-
-          <label className="block">
-            <span className="mb-1 block font-medium">{t("catsName")}</span>
-            <input
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              disabled={editor.type === "edit" && !editor.cat.canRename}
-              className="field w-full rounded-2xl px-4 py-3 text-lg disabled:opacity-60"
-              dir="auto"
-            />
-            <Hint>{t("catsNameHint")}</Hint>
-          </label>
-
-          <label className="block">
-            <span className="mb-1 block font-medium">{t("catsNameAr")}</span>
-            <input
-              value={nameAr}
-              onChange={(e) => setNameAr(e.target.value)}
-              className="field w-full rounded-2xl px-4 py-3 text-lg"
-              dir="rtl"
-            />
-            <Hint>{t("catsNameArHint")}</Hint>
-          </label>
-
-          <div>
-            <p className="mb-2 font-medium">{t("catsColor")}</p>
-            <div className="flex flex-wrap gap-2">
-              {ACCENT_COLORS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  onClick={() => setColor(c)}
-                  className={`h-10 w-10 rounded-full ring-2 transition ${
-                    color === c
-                      ? "ring-[var(--foreground)] scale-110"
-                      : "ring-transparent"
-                  }`}
-                  style={{ backgroundColor: c }}
-                  aria-label={c}
-                />
-              ))}
-            </div>
-          </div>
-
-          <label className="block">
-            <span className="mb-1 block font-medium">{t("catsParent")}</span>
-            <select
-              value={parentId}
-              onChange={(e) => setParentId(e.target.value)}
-              className="field w-full rounded-2xl px-4 py-3 text-base"
-            >
-              <option value="">{t("catsParentNone")}</option>
-              {parentOptions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {categoryLabel(p, locale, t)}
-                </option>
-              ))}
-            </select>
-            <Hint>{t("catsParentHint")}</Hint>
-          </label>
-
-          {error ? <p className="text-red-700">{error}</p> : null}
-
-          <div className="flex flex-wrap gap-2 pt-1">
-            <button
-              type="submit"
-              disabled={busy}
-              className="rounded-2xl bg-[var(--cta-bg)] px-5 py-3 text-base font-bold text-[var(--cta-fg)] disabled:opacity-60"
-            >
-              {busy ? t("catsSaving") : t("catsSave")}
-            </button>
-            <button
-              type="button"
-              onClick={closeEditor}
-              className="rounded-2xl bg-[var(--panel-soft)] px-5 py-3 text-base font-semibold"
-            >
-              {t("catsCancel")}
-            </button>
-            {editor.type === "edit" && editor.cat.canDelete ? (
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => onDelete(editor.cat)}
-                className="ms-auto rounded-2xl px-4 py-3 text-base font-semibold text-red-700"
-              >
-                {t("catsDelete")}
-              </button>
-            ) : null}
-          </div>
-        </form>
-      ) : null}
+      {creatingTopLevel ? editorForm : null}
 
       <div className="mt-5 space-y-2">
-        {parents.length === 0 ? (
+        {parents.length === 0 && !creatingTopLevel ? (
           <p className="surface rounded-3xl px-4 py-6 text-center text-[var(--muted)]">
             {t("catsEmpty")}
           </p>
         ) : (
           parents.map((p) => {
             const kids = kidsOf(p.id);
-            const open = expanded.has(p.id) || search.trim().length > 0;
+            const open =
+              expanded.has(p.id) ||
+              search.trim().length > 0 ||
+              editingId === p.id ||
+              kids.some((k) => k.id === editingId) ||
+              creatingUnder === p.id;
+            const parentEditing = editingId === p.id;
             return (
               <section
                 key={p.id}
-                className="surface overflow-hidden rounded-[1.5rem]"
+                className={`surface overflow-hidden rounded-[1.5rem] transition ${
+                  parentEditing
+                    ? "ring-2 ring-[var(--accent-a)]"
+                    : ""
+                }`}
               >
                 <div className="flex items-stretch gap-1 p-2">
                   <button
@@ -450,56 +516,110 @@ export default function MyCategoriesPage() {
                   <div className="flex shrink-0 flex-col gap-1 py-1 pe-1">
                     <button
                       type="button"
-                      onClick={() => openEdit(p)}
-                      className="rounded-xl bg-[var(--panel-soft)] px-2.5 py-1.5 text-xs font-semibold"
+                      onClick={() =>
+                        parentEditing ? closeEditor() : openEdit(p)
+                      }
+                      className={`rounded-xl px-2.5 py-1.5 text-xs font-semibold ${
+                        parentEditing
+                          ? "bg-[var(--accent-a)] text-[var(--accent-a-fg)]"
+                          : "bg-[var(--panel-soft)]"
+                      }`}
                     >
-                      {t("catsEdit")}
+                      {parentEditing ? t("catsCancel") : t("catsEdit")}
                     </button>
                     <button
                       type="button"
                       onClick={() => {
+                        if (creatingUnder === p.id) {
+                          closeEditor();
+                          return;
+                        }
                         setExpanded((prev) => new Set(prev).add(p.id));
                         openCreate(p.id);
                       }}
-                      className="rounded-xl bg-[var(--panel-soft)] px-2.5 py-1.5 text-xs font-semibold"
+                      className={`rounded-xl px-2.5 py-1.5 text-xs font-semibold ${
+                        creatingUnder === p.id
+                          ? "bg-[var(--accent-a)] text-[var(--accent-a-fg)]"
+                          : "bg-[var(--panel-soft)]"
+                      }`}
                     >
                       ＋
                     </button>
+                    {p.canDelete ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => onDelete(p)}
+                        className="rounded-xl px-2.5 py-1.5 text-xs font-semibold text-red-700 disabled:opacity-50"
+                      >
+                        {t("catsDelete")}
+                      </button>
+                    ) : null}
                   </div>
                 </div>
 
+                {parentEditing || creatingUnder === p.id ? (
+                  <div className="px-2 pb-2">{editorForm}</div>
+                ) : null}
+
                 {open && kids.length > 0 ? (
                   <ul className="space-y-1 border-t border-[var(--surface-border)] px-2 pb-2 pt-1">
-                    {kids.map((k) => (
-                      <li key={k.id}>
-                        <div className="flex items-center gap-2 rounded-2xl px-2 py-2 hover:bg-[var(--panel-soft)]">
-                          <span
-                            className="ms-4 h-3 w-3 shrink-0 rounded-full"
-                            style={{ backgroundColor: k.color }}
-                            aria-hidden
-                          />
-                          <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-                            {categoryLabel(k, locale, t)}
-                          </span>
-                          {k.isCustom ? (
-                            <span className="rounded-full bg-[var(--accent-b-soft)] px-1.5 py-0.5 text-[9px] font-semibold text-[var(--accent-b-text)]">
-                              {t("catsCustomBadge")}
-                            </span>
-                          ) : k.isUserManaged ? (
-                            <span className="text-[9px] font-semibold text-[var(--muted)]">
-                              {t("catsEditedBadge")}
-                            </span>
-                          ) : null}
-                          <button
-                            type="button"
-                            onClick={() => openEdit(k)}
-                            className="rounded-lg bg-[var(--panel-soft)] px-2 py-1 text-xs font-semibold"
+                    {kids.map((k) => {
+                      const kidEditing = editingId === k.id;
+                      return (
+                        <li key={k.id}>
+                          <div
+                            className={`flex items-center gap-2 rounded-2xl px-2 py-2 ${
+                              kidEditing
+                                ? "bg-[var(--panel-soft)] ring-1 ring-[var(--accent-a)]"
+                                : "hover:bg-[var(--panel-soft)]"
+                            }`}
                           >
-                            {t("catsEdit")}
-                          </button>
-                        </div>
-                      </li>
-                    ))}
+                            <span
+                              className="ms-4 h-3 w-3 shrink-0 rounded-full"
+                              style={{ backgroundColor: k.color }}
+                              aria-hidden
+                            />
+                            <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                              {categoryLabel(k, locale, t)}
+                            </span>
+                            {k.isCustom ? (
+                              <span className="rounded-full bg-[var(--accent-b-soft)] px-1.5 py-0.5 text-[9px] font-semibold text-[var(--accent-b-text)]">
+                                {t("catsCustomBadge")}
+                              </span>
+                            ) : k.isUserManaged ? (
+                              <span className="text-[9px] font-semibold text-[var(--muted)]">
+                                {t("catsEditedBadge")}
+                              </span>
+                            ) : null}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                kidEditing ? closeEditor() : openEdit(k)
+                              }
+                              className={`rounded-lg px-2 py-1 text-xs font-semibold ${
+                                kidEditing
+                                  ? "bg-[var(--accent-a)] text-[var(--accent-a-fg)]"
+                                  : "bg-[var(--panel-soft)]"
+                              }`}
+                            >
+                              {kidEditing ? t("catsCancel") : t("catsEdit")}
+                            </button>
+                            {k.canDelete ? (
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => onDelete(k)}
+                                className="rounded-lg px-2 py-1 text-xs font-semibold text-red-700 disabled:opacity-50"
+                              >
+                                {t("catsDelete")}
+                              </button>
+                            ) : null}
+                          </div>
+                          {kidEditing ? editorForm : null}
+                        </li>
+                      );
+                    })}
                   </ul>
                 ) : null}
               </section>

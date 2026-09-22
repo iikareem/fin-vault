@@ -384,7 +384,7 @@ const ar = {
   myCategoriesLinkHint: "إنشاء وتعديل الفئات والتفاصيل لفلوسكم.",
   catsManageTitle: "فئاتي",
   catsManageHint:
-    "الفئات دي لفلوسكم أنتم بس. عدّلوا الاسم أو اللون أو ضيفوا تفصيلة تحت فئة.",
+    "الفئات دي لفلوسكم أنتم بس. عدّلوا أو احذفوا — مش هتأثر على حد تاني.",
   catsExpense: "صرف",
   catsIncome: "دخل",
   catsCustomBadge: "بتاعتكم",
@@ -394,7 +394,11 @@ const ar = {
   catsAddSub: "تفصيلة",
   catsEdit: "تعديل",
   catsDelete: "حذف",
-  catsDeleteConfirm: "تحذفوا الفئة؟ العمليات هتتربط بـ «أخرى» لو موجودة.",
+  catsDeleteConfirm:
+    "تحذفوا الفئة من كتبكم الشخصية بس؟ التفاصيل تحتها هتتحذف كمان، والعمليات هتروح لـ «أخرى».",
+  catsDeleteConfirmSub:
+    "تحذفوا التفصيلة من كتبكم الشخصية بس؟ العمليات هتروح لـ «أخرى».",
+  catsDeleting: "جاري الحذف…",
   catsName: "الاسم",
   catsNameAr: "الاسم بالعربي",
   catsNameHint: "الاسم اللي يظهر لما تضيفوا مصروف.",
@@ -409,8 +413,10 @@ const ar = {
   catsEmpty: "مفيش فئات هنا.",
   catsSearch: "دوروا في الفئات…",
   catsSubsCount: "{n} تفصيلة",
-  catsCannotDeleteBuiltIn: "الفئات الأساسية ما تتحذفش — عدّلوا الاسم أو اللون بس.",
+  catsCannotDeleteBuiltIn:
+    "فئات النظام (تحويلات، سحب كاش، أخرى…) ما تتحذفش.",
   catsSaved: "اتحفظ",
+  catsDeleted: "اتمسحت من كتبكم الشخصية",
   memberPayback: "رد فلوس لفرد",
   salary: "مرتب",
   otherIncome: "دخل تاني",
@@ -1078,7 +1084,7 @@ const en = {
   myCategoriesLinkHint: "Create and edit categories and subcategories for your books.",
   catsManageTitle: "My categories",
   catsManageHint:
-    "These categories are only in your personal books. Rename, recolor, or add a subcategory under a group.",
+    "These categories are only in your personal books. Edit or delete — other people are not affected.",
   catsExpense: "Spending",
   catsIncome: "Income",
   catsCustomBadge: "Yours",
@@ -1090,7 +1096,10 @@ const en = {
   catsEdit: "Edit",
   catsDelete: "Delete",
   catsDeleteConfirm:
-    "Delete this category? Past transactions move to “Other” if it exists.",
+    "Delete this category from your personal books only? Subcategories are removed too, and past spends move to “Other”.",
+  catsDeleteConfirmSub:
+    "Delete this subcategory from your personal books only? Past spends move to “Other”.",
+  catsDeleting: "Deleting…",
   catsName: "Name",
   catsNameAr: "Arabic name",
   catsNameHint: "Shown when you add a spend.",
@@ -1106,8 +1115,9 @@ const en = {
   catsSearch: "Search categories…",
   catsSubsCount: "{n} subcategories",
   catsCannotDeleteBuiltIn:
-    "Built-in categories can’t be deleted — edit the name or color instead.",
+    "System categories (transfers, cash withdraw, Other…) can’t be deleted.",
   catsSaved: "Saved",
+  catsDeleted: "Removed from your personal books",
   memberPayback: "Member payback",
   salary: "Salary",
   otherIncome: "Other income",
