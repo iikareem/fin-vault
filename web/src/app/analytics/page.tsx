@@ -8,14 +8,20 @@ import { PageShell } from "@/components/PageShell";
 import { Money } from "@/components/Money";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
-import { labelFor, categoryLabel } from "@/lib/i18n";
+import { labelFor, categoryLabel, fill } from "@/lib/i18n";
 import { useCalendarClock } from "@/hooks/useCalendarClock";
-import { budgetMonthKey, budgetMonthRange, isoLocal } from "@/lib/calendar";
+import {
+  budgetMonthKey,
+  budgetMonthRange,
+  budgetWeekForDate,
+  isoLocal,
+  shiftBudgetWeek,
+} from "@/lib/calendar";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 import { DateField } from "@/components/DateField";
 
-type Period = "day" | "month" | "year" | "range";
+type Period = "day" | "week" | "month" | "year" | "range";
 type DayRow = { day: string; income: number; expense: number };
 type CatRow = {
   categoryId?: string;
@@ -81,10 +87,13 @@ function eachMonthKey(from: string, to: string) {
 
 function rangeFor(period: Period, cursor: Date, startDay = 1) {
   const y = cursor.getFullYear();
-  const m = cursor.getMonth();
   if (period === "day") {
     const day = isoLocal(cursor);
     return { from: day, to: day };
+  }
+  if (period === "week") {
+    const week = budgetWeekForDate(cursor, startDay);
+    return { from: week.from, to: week.to };
   }
   if (period === "month") {
     const range = budgetMonthRange(cursor, startDay);
@@ -108,6 +117,9 @@ function shift(
     next.setDate(next.getDate() + dir);
     return next;
   }
+  if (period === "week") {
+    return shiftBudgetWeek(cursor, dir, startDay);
+  }
   if (period === "month") {
     if (startDay === 1) {
       return new Date(cursor.getFullYear(), cursor.getMonth() + dir, 1);
@@ -117,6 +129,26 @@ function shift(
     return new Date(y, m - 1 + dir, startDay);
   }
   return new Date(cursor.getFullYear() + dir, 0, 1);
+}
+
+function weekRangeLabel(from: string, to: string, locale: string) {
+  const loc = locale === "ar" ? "ar" : "en";
+  const a = parseIso(from);
+  const b = parseIso(to);
+  const sameMonth = a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear();
+  if (sameMonth) {
+    return `${a.toLocaleDateString(loc, { day: "numeric" })} – ${b.toLocaleDateString(loc, {
+      day: "numeric",
+      month: "short",
+    })}`;
+  }
+  return `${a.toLocaleDateString(loc, {
+    day: "numeric",
+    month: "short",
+  })} – ${b.toLocaleDateString(loc, {
+    day: "numeric",
+    month: "short",
+  })}`;
 }
 
 function monthLabel(key: string, locale: string) {
@@ -254,7 +286,11 @@ export default function AnalyticsPage() {
 
   const chartBars = useMemo((): ChartBar[] => {
     const loc = locale === "ar" ? "ar" : "en";
-    if (period === "month" || (period === "range" && !chartByMonth)) {
+    if (
+      period === "week" ||
+      period === "month" ||
+      (period === "range" && !chartByMonth)
+    ) {
       const dayKeys =
         period === "month"
           ? (() => {
@@ -373,7 +409,7 @@ export default function AnalyticsPage() {
 
   function setPeriodMode(next: Period) {
     if (next === "range") {
-      if (period === "month" || period === "day") {
+      if (period === "month" || period === "week" || period === "day") {
         const bounds = rangeFor(
           period === "day" ? "month" : period,
           cursor,
@@ -389,6 +425,12 @@ export default function AnalyticsPage() {
     setPeriod(next);
   }
 
+  const activeWeek =
+    period === "week" ? budgetWeekForDate(cursor, startDay) : null;
+  const weekInProgress =
+    activeWeek != null &&
+    todayIso >= activeWeek.from &&
+    todayIso <= activeWeek.to;
   const monthKey = budgetMonthKey(cursor, startDay);
   const yearKey = String(cursor.getFullYear());
   const yearSavings = savingsMonths.filter((m) => m.month.startsWith(yearKey));
@@ -410,13 +452,13 @@ export default function AnalyticsPage() {
     <PageShell>
       <h1 className="page-title">📊 {t("navCharts")}</h1>
       <Hint>{t("chartsHint")}</Hint>
-      <div className="seg mt-4 grid w-full min-w-0 grid-cols-4">
-        {(["day", "month", "year", "range"] as Period[]).map((p) => (
+      <div className="seg mt-4 grid w-full min-w-0 grid-cols-5">
+        {(["day", "week", "month", "year", "range"] as Period[]).map((p) => (
           <button
             key={p}
             type="button"
             onClick={() => setPeriodMode(p)}
-            className={`min-w-0 rounded-2xl px-0.5 py-2.5 text-center text-xs font-bold transition sm:px-1 sm:text-base ${
+            className={`min-w-0 rounded-2xl px-0.5 py-2.5 text-center text-[11px] font-bold transition sm:px-1 sm:text-sm ${
               period === p
                 ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
                 : "text-[var(--muted)]"
@@ -424,11 +466,13 @@ export default function AnalyticsPage() {
           >
             {p === "day"
               ? t("periodDay")
-              : p === "month"
-                ? t("periodMonth")
-                : p === "year"
-                  ? t("periodYear")
-                  : t("customRange")}
+              : p === "week"
+                ? t("periodWeek")
+                : p === "month"
+                  ? t("periodMonth")
+                  : p === "year"
+                    ? t("periodYear")
+                    : t("customRange")}
           </button>
         ))}
       </div>
@@ -467,6 +511,18 @@ export default function AnalyticsPage() {
                 value={iso(cursor)}
                 onChange={(v) => setCursor(new Date(`${v}T12:00:00`))}
               />
+            ) : period === "week" && activeWeek ? (
+              <div className="field flex min-h-[3.25rem] w-full flex-col items-center justify-center gap-0.5 !py-1.5">
+                <span className="text-base font-semibold leading-tight">
+                  {fill(t("weekOfMonth"), { n: String(activeWeek.index) })}
+                </span>
+                <span
+                  className="text-xs font-medium tabular-nums text-[var(--muted)]"
+                  dir="ltr"
+                >
+                  {weekRangeLabel(activeWeek.from, activeWeek.to, locale)}
+                </span>
+              </div>
             ) : period === "month" ? (
               <DateField
                 type="month"
@@ -516,6 +572,11 @@ export default function AnalyticsPage() {
         </div>
       )}
       <Hint>{t("pickPeriodHint")}</Hint>
+      {period === "week" && weekInProgress ? (
+        <p className="mt-2 text-center text-sm text-[var(--muted)]">
+          {t("weekSoFar")}
+        </p>
+      ) : null}
       {period === "month" && startDay !== 1 ? (
         <p className="mt-2 text-center text-sm text-[var(--muted)]" dir="ltr">
           {from} → {to}
@@ -830,16 +891,18 @@ export default function AnalyticsPage() {
                           : i === 0 ||
                             i === n - 1 ||
                             (b.dayNum != null && b.dayNum % 2 === 1)
-                        : period === "month"
-                          ? b.dayNum === 1 ||
-                            b.dayNum === n ||
-                            (b.dayNum != null &&
-                              (b.dayNum === 8 ||
-                                b.dayNum === 15 ||
-                                b.dayNum === 22))
-                          : i === 0 ||
-                            i === n - 1 ||
-                            i % (n > 45 ? 7 : 5) === 0;
+                        : period === "week"
+                          ? true
+                          : period === "month"
+                            ? b.dayNum === 1 ||
+                              b.dayNum === n ||
+                              (b.dayNum != null &&
+                                (b.dayNum === 8 ||
+                                  b.dayNum === 15 ||
+                                  b.dayNum === 22))
+                            : i === 0 ||
+                              i === n - 1 ||
+                              i % (n > 45 ? 7 : 5) === 0;
                       return (
                         <button
                           key={`lbl-${b.key}`}

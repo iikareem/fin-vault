@@ -101,6 +101,78 @@ export function remainingDaysInBudgetMonth(d = new Date(), startDay = 1) {
   return Math.max(0, Math.round(ms / 86_400_000));
 }
 
+function parseIsoLocal(day: string) {
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+export type BudgetWeek = {
+  /** 1-based week within the budget period (1 = first 7 days). */
+  index: number;
+  from: string;
+  to: string;
+  monthKey: string;
+};
+
+/**
+ * Split a budget period into fixed 7-day weeks from period start
+ * (week 1 = days 1–7, week 2 = 8–14, …). The last week may be shorter.
+ */
+export function budgetWeeksInMonth(
+  dOrKey: Date | string = new Date(),
+  startDay = 1,
+): BudgetWeek[] {
+  const range = budgetMonthRange(dOrKey, startDay);
+  const start = parseIsoLocal(range.from);
+  const end = parseIsoLocal(range.to);
+  const weeks: BudgetWeek[] = [];
+  let cursor = new Date(start);
+  let index = 1;
+  while (cursor <= end) {
+    const weekStart = new Date(cursor);
+    const weekEnd = new Date(cursor);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    if (weekEnd > end) weekEnd.setTime(end.getTime());
+    weeks.push({
+      index,
+      from: isoLocal(weekStart),
+      to: isoLocal(weekEnd),
+      monthKey: range.key,
+    });
+    cursor.setDate(cursor.getDate() + 7);
+    index += 1;
+  }
+  return weeks;
+}
+
+/** Week-of-budget-month containing `d`. */
+export function budgetWeekForDate(d: Date, startDay = 1): BudgetWeek {
+  const key = isoLocal(d);
+  const weeks = budgetWeeksInMonth(d, startDay);
+  return (
+    weeks.find((w) => key >= w.from && key <= w.to) ??
+    weeks[weeks.length - 1]!
+  );
+}
+
+/** Move to the start of the adjacent week-of-budget-month. */
+export function shiftBudgetWeek(cursor: Date, dir: number, startDay = 1) {
+  const current = budgetWeekForDate(cursor, startDay);
+  const weeks = budgetWeeksInMonth(current.monthKey, startDay);
+  const nextIndex = current.index + dir;
+  if (nextIndex >= 1 && nextIndex <= weeks.length) {
+    return parseIsoLocal(weeks[nextIndex - 1]!.from);
+  }
+  const neighborKey = shiftBudgetMonthKey(current.monthKey, dir > 0 ? 1 : -1);
+  const neighborWeeks = budgetWeeksInMonth(neighborKey, startDay);
+  if (neighborWeeks.length === 0) return cursor;
+  const target =
+    dir > 0
+      ? neighborWeeks[0]!
+      : neighborWeeks[neighborWeeks.length - 1]!;
+  return parseIsoLocal(target.from);
+}
+
 /** Normalize API dates (YYYY-MM-DD or ISO) to a calendar key. */
 export function toDateKey(value: string | Date | null | undefined) {
   if (!value) return "";
