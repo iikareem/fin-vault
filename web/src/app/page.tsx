@@ -61,6 +61,13 @@ type GoalsHome = {
   savingsBalance: number;
   goals: { id: string }[];
 };
+type SubsHome = {
+  unpaidCount: number;
+  dueAmount: number;
+  monthlyTotal: number;
+  paidCount: number;
+  subscriptions: { id: string }[];
+};
 type Tx = {
   id: string;
   type: "INCOME" | "EXPENSE" | "REIMBURSEMENT" | "TRACK";
@@ -120,6 +127,7 @@ export default function HomePage() {
   const [charity, setCharity] = useState<CharityMonth | null>(null);
   const [gold, setGold] = useState<GoldHome | null>(null);
   const [goals, setGoals] = useState<GoalsHome | null>(null);
+  const [subs, setSubs] = useState<SubsHome | null>(null);
   const [claims, setClaims] = useState<Claim[]>([]);
   const [covers, setCovers] = useState<Cover[]>([]);
   const [payingId, setPayingId] = useState("");
@@ -185,6 +193,7 @@ export default function HomePage() {
       jobs.push(
         api<GoldHome>(householdPath(active.householdId, "/gold")),
         api<GoalsHome>(householdPath(active.householdId, "/savings-goals")),
+        api<SubsHome>(householdPath(active.householdId, "/subscriptions")),
       );
     }
     Promise.all(jobs)
@@ -204,9 +213,11 @@ export default function HomePage() {
           setCovers(sortByOccurredOnDesc(result[5] as Cover[]));
           setGold(null);
           setGoals(null);
+          setSubs(null);
         } else {
           setGold(result[3] as GoldHome);
           setGoals(result[4] as GoalsHome);
+          setSubs(result[5] as SubsHome);
         }
       })
       .catch((e) => setError(e.message));
@@ -1453,6 +1464,40 @@ export default function HomePage() {
             </p>
           ) : null}
           <Hint>{t("goalsHomeHint")}</Hint>
+        </Link>
+        <Link
+          href="/subscriptions"
+          className="surface mt-3 flex flex-col rounded-[1.75rem] p-4"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xl font-semibold">📺 {t("navSubs")}</span>
+            <span className="font-semibold">
+              {subs ? (
+                <PrivateMoney
+                  amount={
+                    subs.unpaidCount > 0 ? subs.dueAmount : subs.monthlyTotal
+                  }
+                  currency={currency}
+                  locale={locale}
+                  visible={moneyVisible}
+                />
+              ) : (
+                ""
+              )}
+            </span>
+          </div>
+          {subs && subs.subscriptions.length > 0 ? (
+            <p className="mt-1 text-sm text-stone-500">
+              {subs.unpaidCount === 0
+                ? t("subsHomeAllPaid")
+                : subs.unpaidCount === 1
+                  ? t("subsHomeUnpaidOne")
+                  : fill(t("subsHomeUnpaid"), {
+                      n: String(subs.unpaidCount),
+                    })}
+            </p>
+          ) : null}
+          <Hint>{t("subsHomeHint")}</Hint>
         </Link>
         <Link
           href="/gold"

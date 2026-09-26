@@ -91,6 +91,7 @@ model Household {
   goldHoldings GoldHolding[]
   outsideLoans OutsideLoan[]
   savingsGoals SavingsGoal[]
+  subscriptions Subscription[]
 }
 
 model User {
@@ -120,6 +121,7 @@ model User {
   goldHoldings      GoldHolding[]
   outsideLoans      OutsideLoan[]
   savingsGoals      SavingsGoal[]
+  subscriptions     Subscription[]
 }
 
 model Membership {
@@ -147,6 +149,7 @@ model Account {
   coverRepayments CoverRepayment[]
   outsideLoans   OutsideLoan[]
   outsideLoanCollections OutsideLoanCollection[]
+  subscriptions  Subscription[]
 }
 
 model Category {
@@ -176,10 +179,11 @@ model Category {
   kind        CategoryKind
   color       String        @default("#2563eb")
   sortOrder   Int           @default(0)
-  txs         Transaction[]
-  loans       PeerLoan[]
-  claims      HouseClaim[]
-  covers      HouseCover[]
+  txs           Transaction[]
+  loans         PeerLoan[]
+  claims        HouseClaim[]
+  covers        HouseCover[]
+  subscriptions Subscription[]
 
   @@unique([householdId, name, kind])
   @@unique([householdId, seedKey, kind])
@@ -217,6 +221,7 @@ model Transaction {
   loanRepayToPersonal   LoanRepayment? @relation("LoanRepayToPersonalTx")
   outsideLendTx         OutsideLoan? @relation("OutsideLendTx")
   outsideCollectTx      OutsideLoanCollection? @relation("OutsideCollectTx")
+  subscriptionPayment   SubscriptionPayment? @relation("SubscriptionPayTx")
 
   @@index([householdId, occurredOn])
   @@index([householdId, categoryId])
@@ -470,4 +475,46 @@ model SavingsGoal {
 
   @@index([householdId, archived])
   @@index([userId])
+}
+
+/** Recurring personal bill (Netflix, Cursor, etc.). Mark Paid creates a real EXPENSE. */
+model Subscription {
+  id          String                 @id @default(cuid())
+  householdId String
+  household   Household              @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  amount      Decimal                @db.Decimal(14, 2)
+  /** Day of month (1–28) when this bill is typically charged. */
+  billingDay  Int
+  categoryId  String
+  category    Category               @relation(fields: [categoryId], references: [id])
+  accountId   String
+  account     Account                @relation(fields: [accountId], references: [id])
+  note        String                 @default("")
+  color       String                 @default("#4f46e5")
+  active      Boolean                @default(true)
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  payments    SubscriptionPayment[]
+
+  @@index([householdId, active])
+  @@index([userId])
+}
+
+model SubscriptionPayment {
+  id             String       @id @default(cuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  /** Personal budget period key YYYY-MM. */
+  periodKey      String
+  amount         Decimal      @db.Decimal(14, 2)
+  paidOn         DateTime     @db.Date
+  transactionId  String       @unique
+  transaction    Transaction  @relation("SubscriptionPayTx", fields: [transactionId], references: [id])
+  createdAt      DateTime     @default(now())
+
+  @@unique([subscriptionId, periodKey])
+  @@index([subscriptionId])
 }
