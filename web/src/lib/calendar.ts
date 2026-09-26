@@ -44,6 +44,63 @@ export function shiftMonthKey(key: string, dir: number) {
   return monthKeyLocal(d);
 }
 
+/** Clamp payday to 1–28 so February never overflows. */
+export function clampBudgetStartDay(day: number) {
+  if (!Number.isFinite(day)) return 1;
+  return Math.min(28, Math.max(1, Math.trunc(day)));
+}
+
+/** YYYY-MM key for the budget period containing `d`. */
+export function budgetMonthKey(d: Date, startDay: number) {
+  const day = clampBudgetStartDay(startDay);
+  if (day === 1) return monthKeyLocal(d);
+  const year = d.getFullYear();
+  const month = d.getMonth() + 1;
+  const dom = d.getDate();
+  if (dom >= day) return `${year}-${pad2(month)}`;
+  return monthKeyLocal(new Date(year, month - 2, 1));
+}
+
+/** Budget period for a calendar date, or for a YYYY-MM period key. */
+export function budgetMonthRange(
+  dOrKey: Date | string = new Date(),
+  startDay = 1,
+) {
+  const day = clampBudgetStartDay(startDay);
+  if (typeof dOrKey === "string") {
+    const [y, m] = dOrKey.split("-").map(Number);
+    if (day === 1) {
+      return {
+        key: dOrKey,
+        from: `${y}-${pad2(m)}-01`,
+        to: `${y}-${pad2(m)}-${pad2(daysInMonth(y, m))}`,
+        days: daysInMonth(y, m),
+      };
+    }
+    const from = `${y}-${pad2(m)}-${pad2(day)}`;
+    const end = new Date(y, m - 1 + 1, day - 1);
+    const to = isoLocal(end);
+    const startMs = new Date(y, m - 1, day).getTime();
+    const days = Math.round((end.getTime() - startMs) / 86_400_000) + 1;
+    return { key: dOrKey, from, to, days };
+  }
+  const key = budgetMonthKey(dOrKey, day);
+  return budgetMonthRange(key, day);
+}
+
+export function shiftBudgetMonthKey(key: string, dir: number) {
+  return shiftMonthKey(key, dir);
+}
+
+export function remainingDaysInBudgetMonth(d = new Date(), startDay = 1) {
+  const { to } = budgetMonthRange(d, startDay);
+  const [y, m, day] = to.split("-").map(Number);
+  const end = new Date(y, m - 1, day);
+  const startOfToday = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const ms = end.getTime() - startOfToday.getTime();
+  return Math.max(0, Math.round(ms / 86_400_000));
+}
+
 /** Normalize API dates (YYYY-MM-DD or ISO) to a calendar key. */
 export function toDateKey(value: string | Date | null | undefined) {
   if (!value) return "";

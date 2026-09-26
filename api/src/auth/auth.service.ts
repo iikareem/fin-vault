@@ -32,6 +32,7 @@ export class AuthService {
         email: user.email,
         preferredCurrency: user.preferredCurrency,
         theme: user.theme,
+        budgetMonthStartDay: user.budgetMonthStartDay,
       },
     };
   }
@@ -61,9 +62,16 @@ export class AuthService {
   }
 
   async updatePreferences(userId: string, dto: UpdatePreferencesDto) {
-    const data: { preferredCurrency?: string; theme?: string } = {};
+    const data: {
+      preferredCurrency?: string;
+      theme?: string;
+      budgetMonthStartDay?: number;
+    } = {};
     if (dto.preferredCurrency) data.preferredCurrency = dto.preferredCurrency;
     if (dto.theme) data.theme = dto.theme;
+    if (dto.budgetMonthStartDay != null) {
+      data.budgetMonthStartDay = dto.budgetMonthStartDay;
+    }
 
     const user = await this.prisma.user.update({
       where: { id: userId },
@@ -97,6 +105,7 @@ export class AuthService {
     return {
       preferredCurrency: user.preferredCurrency,
       theme: user.theme,
+      budgetMonthStartDay: user.budgetMonthStartDay,
     };
   }
 
@@ -114,6 +123,7 @@ export class AuthService {
       email: user.email,
       preferredCurrency: user.preferredCurrency,
       theme: user.theme,
+      budgetMonthStartDay: user.budgetMonthStartDay,
       spaces: user.memberships.map((m) => ({
         householdId: m.householdId,
         name: m.household.name,

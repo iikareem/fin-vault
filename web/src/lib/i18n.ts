@@ -478,6 +478,16 @@ const ar = {
   currencyPref: "العملة",
   currencyPrefHint: "هتتغيّر عملة فلوسكم الشخصية.",
   currencyPrefHintAdmin: "هتتغيّر عملة فلوسكم ودفتر البيت.",
+  budgetMonthStartPref: "بداية الشهر الشخصي",
+  budgetMonthStartHint:
+    "يوم استلام المرتب. شهرك الشخصي يبدأ من اليوم ده؛ الباقي من الشهر اللي فات بيتشال للشهر الحالي.",
+  budgetMonthStartPreview: "الشهر الحالي هيبقى من {from} لـ {to}.",
+  budgetMonthStartWarn:
+    "تغيير اليوم ده هيعيد تجميع إجماليات الشهور والمدّخرات حسب الفترة. الرصيد والمعاملات مش هتتغيّر.",
+  budgetMonthStartConfirm: "تأكيد التغيير",
+  budgetMonthStartContinue: "متابعة",
+  budgetMonthStartCancel: "إلغاء",
+  budgetMonthStartDay: "يوم {n}",
   themePref: "الثيم",
   themeLight: "فاتح",
   themeDark: "غامق",
@@ -1182,6 +1192,16 @@ const en = {
   currencyPref: "Currency",
   currencyPrefHint: "This changes your personal money currency.",
   currencyPrefHintAdmin: "This changes your personal money and the house books currency.",
+  budgetMonthStartPref: "Personal month start",
+  budgetMonthStartHint:
+    "Your payday. Your personal month starts on this day; leftover cash carries from the previous period.",
+  budgetMonthStartPreview: "This period would run {from} to {to}.",
+  budgetMonthStartWarn:
+    "Changing this regroups personal month totals and savings-by-period. Wallets and transactions stay the same.",
+  budgetMonthStartConfirm: "Confirm change",
+  budgetMonthStartContinue: "Continue",
+  budgetMonthStartCancel: "Cancel",
+  budgetMonthStartDay: "Day {n}",
   themePref: "Theme",
   themeLight: "Light",
   themeDark: "Dark",

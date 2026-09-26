@@ -1,10 +1,12 @@
-import { isoLocal } from "@/lib/calendar";
+import { budgetMonthKey, budgetMonthRange, isoLocal } from "@/lib/calendar";
 
 export type HistoryPeriod = "day" | "week" | "month";
 
-export function rangeForPeriod(period: HistoryPeriod, cursor: Date) {
-  const y = cursor.getFullYear();
-  const m = cursor.getMonth();
+export function rangeForPeriod(
+  period: HistoryPeriod,
+  cursor: Date,
+  budgetMonthStartDay = 1,
+) {
   if (period === "day") {
     const day = isoLocal(cursor);
     return { from: day, to: day };
@@ -17,13 +19,16 @@ export function rangeForPeriod(period: HistoryPeriod, cursor: Date) {
     end.setDate(start.getDate() + 6);
     return { from: isoLocal(start), to: isoLocal(end) };
   }
-  return {
-    from: isoLocal(new Date(y, m, 1)),
-    to: isoLocal(new Date(y, m + 1, 0)),
-  };
+  const range = budgetMonthRange(cursor, budgetMonthStartDay);
+  return { from: range.from, to: range.to };
 }
 
-export function shiftPeriod(period: HistoryPeriod, cursor: Date, dir: number) {
+export function shiftPeriod(
+  period: HistoryPeriod,
+  cursor: Date,
+  dir: number,
+  budgetMonthStartDay = 1,
+) {
   const next = new Date(cursor);
   if (period === "day") {
     next.setDate(next.getDate() + dir);
@@ -33,7 +38,13 @@ export function shiftPeriod(period: HistoryPeriod, cursor: Date, dir: number) {
     next.setDate(next.getDate() + dir * 7);
     return next;
   }
-  return new Date(cursor.getFullYear(), cursor.getMonth() + dir, 1);
+  if (budgetMonthStartDay === 1) {
+    return new Date(cursor.getFullYear(), cursor.getMonth() + dir, 1);
+  }
+  const key = budgetMonthKey(cursor, budgetMonthStartDay);
+  const [y, m] = key.split("-").map(Number);
+  // Land on the start day of the shifted budget period.
+  return new Date(y, m - 1 + dir, budgetMonthStartDay);
 }
 
 export function periodLabel(
@@ -53,6 +64,18 @@ export function periodLabel(
     });
   }
   if (period === "week") {
+    const a = new Date(`${from}T12:00:00`);
+    const b = new Date(`${to}T12:00:00`);
+    return `${a.toLocaleDateString(loc, {
+      day: "numeric",
+      month: "short",
+    })} – ${b.toLocaleDateString(loc, {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    })}`;
+  }
+  if (from.slice(0, 7) !== to.slice(0, 7)) {
     const a = new Date(`${from}T12:00:00`);
     const b = new Date(`${to}T12:00:00`);
     return `${a.toLocaleDateString(loc, {

@@ -2,7 +2,15 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MembershipContext } from '../households/membership-context';
 import { actorForSpace, HOUSE_ACTOR } from '../households/house-actor';
-import { dateOnlyUtc, isoFromDbDate, isoLocal } from '../common/calendar';
+import {
+  budgetMonthKey,
+  budgetMonthKeyFromDbDate,
+  budgetMonthRange,
+  clampBudgetStartDay,
+  dateOnlyUtc,
+  isoFromDbDate,
+  isoLocal,
+} from '../common/calendar';
 import {
   NON_SPEND_CATEGORY_NAMES,
   nonSpendCategoryFilter,
@@ -60,12 +68,17 @@ export class AnalyticsService {
     return totalMoney;
   }
 
-  private monthKey(d: Date) {
-    return isoFromDbDate(d).slice(0, 7);
-  }
-
-  private currentMonthKey() {
-    return isoLocal(new Date()).slice(0, 7);
+  /** Personal books use the user's payday; House always uses calendar months. */
+  async resolveBudgetStartDay(
+    membership: MembershipContext,
+    userId: string,
+  ) {
+    if (membership.kind !== 'PERSONAL') return 1;
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { budgetMonthStartDay: true },
+    });
+    return clampBudgetStartDay(user?.budgetMonthStartDay ?? 1);
   }
 
   private nextMonthKey(key: string) {
@@ -84,7 +97,8 @@ export class AnalyticsService {
     return keys;
   }
 
-  async cashSavings(householdId: string) {
+  async cashSavings(householdId: string, startDay = 1) {
+    const day = clampBudgetStartDay(startDay);
     const accounts = await this.prisma.account.findMany({
       where: { householdId, archived: false, type: 'CASH' },
     });
@@ -106,7 +120,7 @@ export class AnalyticsService {
 
     const byMonth = new Map<string, { income: number; expense: number }>();
     for (const tx of txs) {
-      const key = this.monthKey(tx.occurredOn);
+      const key = budgetMonthKeyFromDbDate(tx.occurredOn, day);
       const cur = byMonth.get(key) ?? { income: 0, expense: 0 };
       const amt = Number(tx.amount);
       if (tx.type === 'INCOME') cur.income += amt;
@@ -117,7 +131,7 @@ export class AnalyticsService {
       byMonth.set(key, cur);
     }
 
-    const endKey = this.currentMonthKey();
+    const endKey = budgetMonthKey(new Date(), day);
     const activity = [...byMonth.keys()].sort();
     const startKey = activity[0] && activity[0] < endKey ? activity[0] : endKey;
     const months = this.monthsThrough(startKey, endKey).map((month) => {
@@ -150,16 +164,17 @@ export class AnalyticsService {
         remaining: opening,
       };
 
-    return { opening, cashNow: remaining, current, months: rows };
+    return { opening, cashNow: remaining, current, months: rows, startDay: day };
   }
 
   async summary(membership: MembershipContext, userId: string) {
     const householdId = membership.householdId;
+    const startDay = await this.resolveBudgetStartDay(membership, userId);
     const now = new Date();
     const today = dateOnlyUtc(isoLocal(now));
     const [totalMoney, cash, cashAccounts] = await Promise.all([
       this.walletTotal(householdId),
-      this.cashSavings(householdId),
+      this.cashSavings(householdId, startDay),
       this.prisma.account.findMany({
         where: { householdId, archived: false, type: 'CASH' },
         select: { id: true },
@@ -304,11 +319,9 @@ export class AnalyticsService {
     }
 
     const monthKey = cash.current.month;
-    const [year, month] = monthKey.split('-').map(Number);
-    const monthStart = dateOnlyUtc(`${monthKey}-01`);
-    const monthEnd = dateOnlyUtc(
-      `${monthKey}-${String(new Date(year, month, 0).getDate()).padStart(2, '0')}`,
-    );
+    const range = budgetMonthRange(monthKey, startDay);
+    const monthStart = dateOnlyUtc(range.from);
+    const monthEnd = dateOnlyUtc(range.to);
     // Month "out" = real spend only (EXPENSE + TRACK), not cash withdrawal / transfers.
     const monthSpendAgg = await this.prisma.transaction.aggregate({
       where: {
@@ -338,6 +351,9 @@ export class AnalyticsService {
       coversWaiting,
       coversPendingTotal,
       coversPendingCount,
+      budgetMonthStartDay: startDay,
+      periodFrom: range.from,
+      periodTo: range.to,
     };
   }
 

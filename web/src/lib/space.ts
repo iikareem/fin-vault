@@ -36,6 +36,7 @@ export async function loadSpace() {
     name: string;
     preferredCurrency?: string;
     theme?: string;
+    budgetMonthStartDay?: number;
     spaces: Space[];
   }>("/auth/me");
   const stored = localStorage.getItem(KEY);
@@ -61,6 +62,7 @@ export async function loadSpace() {
     name: me.name,
     preferredCurrency: me.preferredCurrency,
     theme: me.theme,
+    budgetMonthStartDay: me.budgetMonthStartDay ?? 1,
     spaces: me.spaces,
     space,
     personalOnly,

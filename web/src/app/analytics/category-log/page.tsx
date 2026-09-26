@@ -10,7 +10,7 @@ import { Money } from "@/components/Money";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
 import { categoryLabel, labelFor } from "@/lib/i18n";
-import { formatItemDate, isoLocal } from "@/lib/calendar";
+import { budgetMonthKey, budgetMonthRange, formatItemDate } from "@/lib/calendar";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 import { DateField } from "@/components/DateField";
@@ -60,29 +60,32 @@ type CategoryLog = {
   days: DayGroup[];
 };
 
-function pad(n: number) {
-  return String(n).padStart(2, "0");
+function monthBounds(cursor: Date, startDay = 1) {
+  const range = budgetMonthRange(cursor, startDay);
+  return { from: range.from, to: range.to };
 }
 
-function monthBounds(cursor: Date) {
-  const y = cursor.getFullYear();
-  const m = cursor.getMonth();
-  return {
-    from: isoLocal(new Date(y, m, 1)),
-    to: isoLocal(new Date(y, m + 1, 0)),
-  };
-}
-
-function isExactMonth(from: string, to: string) {
-  const [fy, fm, fd] = from.split("-").map(Number);
-  if (!fy || !fm || fd !== 1) return false;
-  const last = isoLocal(new Date(fy, fm, 0));
-  return to === last;
+function isExactBudgetMonth(from: string, to: string, startDay: number) {
+  const range = budgetMonthRange(from.slice(0, 7), startDay);
+  // If `from` falls mid-period, also accept matching the period containing from.
+  const byDate = budgetMonthRange(
+    new Date(
+      Number(from.slice(0, 4)),
+      Number(from.slice(5, 7)) - 1,
+      Number(from.slice(8, 10)),
+    ),
+    startDay,
+  );
+  return (
+    (from === range.from && to === range.to) ||
+    (from === byDate.from && to === byDate.to)
+  );
 }
 
 function CategoryLogInner() {
   const { t, locale } = useI18n();
-  const { active, house } = useBooks();
+  const { active, house, budgetMonthStartDay } = useBooks();
+  const startDay = active?.kind === "PERSONAL" ? budgetMonthStartDay : 1;
   const router = useRouter();
   const search = useSearchParams();
   const currency = active?.currency ?? "EGP";
@@ -102,7 +105,7 @@ function CategoryLogInner() {
   const initialTo = search.get("to") ?? "";
 
   const [rangeMode, setRangeMode] = useState<RangeMode>(() =>
-    initialFrom && initialTo && isExactMonth(initialFrom, initialTo)
+    initialFrom && initialTo && isExactBudgetMonth(initialFrom, initialTo, 1)
       ? "month"
       : initialFrom && initialTo
         ? "custom"
@@ -110,26 +113,25 @@ function CategoryLogInner() {
   );
   const [cursor, setCursor] = useState(() => {
     if (initialFrom) {
-      const [y, m] = initialFrom.split("-").map(Number);
-      if (y && m) return new Date(y, m - 1, 1);
+      const [y, m, d] = initialFrom.split("-").map(Number);
+      if (y && m) return new Date(y, m - 1, d || 1);
     }
-    const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth(), 1);
+    return new Date();
   });
   const [customFrom, setCustomFrom] = useState(
-    () => initialFrom || monthBounds(new Date()).from,
+    () => initialFrom || monthBounds(new Date(), 1).from,
   );
   const [customTo, setCustomTo] = useState(
-    () => initialTo || monthBounds(new Date()).to,
+    () => initialTo || monthBounds(new Date(), 1).to,
   );
 
   const { from, to } = useMemo(() => {
-    if (rangeMode === "month") return monthBounds(cursor);
+    if (rangeMode === "month") return monthBounds(cursor, startDay);
     return {
       from: customFrom,
       to: customTo >= customFrom ? customTo : customFrom,
     };
-  }, [rangeMode, cursor, customFrom, customTo]);
+  }, [rangeMode, cursor, customFrom, customTo, startDay]);
 
   const [data, setData] = useState<CategoryLog | null>(null);
   const [loading, setLoading] = useState(true);
@@ -173,9 +175,14 @@ function CategoryLogInner() {
   const extraCats = Math.max(0, categories.length - visibleCats.length);
 
   function shiftMonth(dir: number) {
-    setCursor(
-      (c) => new Date(c.getFullYear(), c.getMonth() + dir, 1),
-    );
+    setCursor((c) => {
+      if (startDay === 1) {
+        return new Date(c.getFullYear(), c.getMonth() + dir, 1);
+      }
+      const key = budgetMonthKey(c, startDay);
+      const [y, m] = key.split("-").map(Number);
+      return new Date(y, m - 1 + dir, startDay);
+    });
   }
 
   function rowTitle(item: LogItem) {
@@ -333,10 +340,15 @@ function CategoryLogInner() {
                   <DateField
                     type="month"
                     align="center"
-                    value={`${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}`}
-                    onChange={(v) =>
-                      setCursor(new Date(`${v}-01T12:00:00`))
-                    }
+                    value={budgetMonthKey(cursor, startDay)}
+                    onChange={(v) => {
+                      if (startDay === 1) {
+                        setCursor(new Date(`${v}-01T12:00:00`));
+                        return;
+                      }
+                      const [y, m] = v.split("-").map(Number);
+                      setCursor(new Date(y, m - 1, startDay));
+                    }}
                   />
                 </div>
                 <button

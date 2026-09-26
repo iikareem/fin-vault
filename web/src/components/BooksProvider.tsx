@@ -37,11 +37,14 @@ type BooksValue = {
   personalOnly: boolean;
   preferredCurrency: string;
   theme: ThemeMode;
+  /** Personal budget period start day (1–28). Ignored for House books. */
+  budgetMonthStartDay: number;
   setKind: (kind: "HOUSE" | "PERSONAL") => void;
   refreshSpaces: () => Promise<void>;
   setPreferences: (prefs: {
     preferredCurrency?: string;
     theme?: ThemeMode;
+    budgetMonthStartDay?: number;
   }) => Promise<void>;
 };
 
@@ -85,6 +88,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
   const [personalOnly, setPersonalOnly] = useState(!HOUSE_BOOKS_ENABLED);
   const [preferredCurrency, setPreferredCurrency] = useState("EGP");
   const [theme, setTheme] = useState<ThemeMode>("light");
+  const [budgetMonthStartDay, setBudgetMonthStartDay] = useState(1);
 
   const applyMe = useCallback(
     (me: {
@@ -92,6 +96,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       name: string;
       preferredCurrency?: string;
       theme?: string;
+      budgetMonthStartDay?: number;
       spaces: Space[];
       space: Space | null;
       personalOnly?: boolean;
@@ -114,6 +119,9 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       setTheme(nextTheme);
       applyTheme(nextTheme);
       setPreferredCurrency(me.preferredCurrency ?? p?.currency ?? "EGP");
+      setBudgetMonthStartDay(
+        Math.min(28, Math.max(1, me.budgetMonthStartDay ?? 1)),
+      );
     },
     [],
   );
@@ -175,18 +183,26 @@ export function BooksProvider({ children }: { children: ReactNode }) {
   );
 
   const setPreferences = useCallback(
-    async (prefs: { preferredCurrency?: string; theme?: ThemeMode }) => {
-      const res = await api<{ preferredCurrency: string; theme: string }>(
-        "/auth/preferences",
-        {
-          method: "PATCH",
-          body: JSON.stringify(prefs),
-        },
-      );
+    async (prefs: {
+      preferredCurrency?: string;
+      theme?: ThemeMode;
+      budgetMonthStartDay?: number;
+    }) => {
+      const res = await api<{
+        preferredCurrency: string;
+        theme: string;
+        budgetMonthStartDay: number;
+      }>("/auth/preferences", {
+        method: "PATCH",
+        body: JSON.stringify(prefs),
+      });
       const nextTheme = normalizeTheme(res.theme);
       setTheme(nextTheme);
       applyTheme(nextTheme);
       setPreferredCurrency(res.preferredCurrency);
+      setBudgetMonthStartDay(
+        Math.min(28, Math.max(1, res.budgetMonthStartDay ?? 1)),
+      );
       await refreshSpaces();
     },
     [refreshSpaces],
@@ -203,6 +219,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       personalOnly,
       preferredCurrency,
       theme,
+      budgetMonthStartDay,
       setKind,
       refreshSpaces,
       setPreferences,
@@ -217,6 +234,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       personalOnly,
       preferredCurrency,
       theme,
+      budgetMonthStartDay,
       setKind,
       refreshSpaces,
       setPreferences,

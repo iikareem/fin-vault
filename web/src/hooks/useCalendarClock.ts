@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import {
+  budgetMonthKey,
+  budgetMonthRange,
   daysInMonth,
   isoLocal,
-  monthKeyLocal,
-  remainingDaysInMonth,
+  remainingDaysInBudgetMonth,
 } from "@/lib/calendar";
 
-export function useCalendarClock() {
+export function useCalendarClock(budgetMonthStartDay = 1) {
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -49,14 +50,19 @@ export function useCalendarClock() {
   const year = now.getFullYear();
   const month = now.getMonth() + 1;
   const day = now.getDate();
+  const startDay = budgetMonthStartDay;
+  const range = budgetMonthRange(now, startDay);
   return {
     now,
     year,
     month,
     day,
     today: isoLocal(now),
-    monthKey: monthKeyLocal(now),
+    monthKey: budgetMonthKey(now, startDay),
+    periodFrom: range.from,
+    periodTo: range.to,
     daysInMonth: daysInMonth(year, month),
-    remainingDays: remainingDaysInMonth(now),
+    remainingDays: remainingDaysInBudgetMonth(now, startDay),
+    budgetMonthStartDay: startDay,
   };
 }

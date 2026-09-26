@@ -99,9 +99,11 @@ model User {
   email             String          @unique
   passwordHash      String
   relation          String          @default("")
-  preferredCurrency String          @default("EGP")
-  theme             String          @default("light")
-  createdAt         DateTime        @default(now())
+  preferredCurrency   String          @default("EGP")
+  theme               String          @default("light")
+  /** Day of month (1–28) when the personal budget period starts. 1 = calendar month. */
+  budgetMonthStartDay Int             @default(1)
+  createdAt           DateTime        @default(now())
   memberships       Membership[]
   txs               Transaction[]
   loansGiven        PeerLoan[]      @relation("LoansGiven")

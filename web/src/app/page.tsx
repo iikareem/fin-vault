@@ -100,9 +100,19 @@ type Cover = {
 
 export default function HomePage() {
   const { t, locale } = useI18n();
-  const { name, userId, active, personal, house, setKind, personalOnly } =
-    useBooks();
-  const cal = useCalendarClock();
+  const {
+    name,
+    userId,
+    active,
+    personal,
+    house,
+    setKind,
+    personalOnly,
+    budgetMonthStartDay,
+  } = useBooks();
+  const personalStartDay =
+    active?.kind === "PERSONAL" ? budgetMonthStartDay : 1;
+  const cal = useCalendarClock(personalStartDay);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [personalAccounts, setPersonalAccounts] = useState<Account[]>([]);

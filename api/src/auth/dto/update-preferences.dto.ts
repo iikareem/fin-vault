@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 
 export const CURRENCIES = [
   'EGP',
@@ -25,4 +25,11 @@ export class UpdatePreferencesDto {
   @IsString()
   @IsIn([...THEMES])
   theme?: (typeof THEMES)[number];
+
+  /** Personal budget period start day (1–28). House books ignore this. */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(28)
+  budgetMonthStartDay?: number;
 }

@@ -10,7 +10,7 @@ import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
 import { labelFor, categoryLabel } from "@/lib/i18n";
 import { useCalendarClock } from "@/hooks/useCalendarClock";
-import { isoLocal } from "@/lib/calendar";
+import { budgetMonthKey, budgetMonthRange, isoLocal } from "@/lib/calendar";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 import { DateField } from "@/components/DateField";
@@ -79,7 +79,7 @@ function eachMonthKey(from: string, to: string) {
   return out;
 }
 
-function rangeFor(period: Period, cursor: Date) {
+function rangeFor(period: Period, cursor: Date, startDay = 1) {
   const y = cursor.getFullYear();
   const m = cursor.getMonth();
   if (period === "day") {
@@ -87,28 +87,34 @@ function rangeFor(period: Period, cursor: Date) {
     return { from: day, to: day };
   }
   if (period === "month") {
-    return {
-      from: isoLocal(new Date(y, m, 1)),
-      to: isoLocal(new Date(y, m + 1, 0)),
-    };
+    const range = budgetMonthRange(cursor, startDay);
+    return { from: range.from, to: range.to };
   }
   if (period === "year") {
     return { from: `${y}-01-01`, to: `${y}-12-31` };
   }
-  return {
-    from: isoLocal(new Date(y, m, 1)),
-    to: isoLocal(new Date(y, m + 1, 0)),
-  };
+  const range = budgetMonthRange(cursor, startDay);
+  return { from: range.from, to: range.to };
 }
 
-function shift(period: Exclude<Period, "range">, cursor: Date, dir: number) {
+function shift(
+  period: Exclude<Period, "range">,
+  cursor: Date,
+  dir: number,
+  startDay = 1,
+) {
   if (period === "day") {
     const next = new Date(cursor);
     next.setDate(next.getDate() + dir);
     return next;
   }
   if (period === "month") {
-    return new Date(cursor.getFullYear(), cursor.getMonth() + dir, 1);
+    if (startDay === 1) {
+      return new Date(cursor.getFullYear(), cursor.getMonth() + dir, 1);
+    }
+    const key = budgetMonthKey(cursor, startDay);
+    const [y, m] = key.split("-").map(Number);
+    return new Date(y, m - 1 + dir, startDay);
   }
   return new Date(cursor.getFullYear() + dir, 0, 1);
 }
@@ -123,13 +129,14 @@ function monthLabel(key: string, locale: string) {
 
 export default function AnalyticsPage() {
   const { t, locale } = useI18n();
-  const cal = useCalendarClock();
-  const { active, house } = useBooks();
+  const { active, house, budgetMonthStartDay } = useBooks();
+  const startDay = active?.kind === "PERSONAL" ? budgetMonthStartDay : 1;
+  const cal = useCalendarClock(startDay);
   const [period, setPeriod] = useState<Period>("month");
   const [cursor, setCursor] = useState(() => new Date());
   const [rangeFrom, setRangeFrom] = useState(() => {
     const now = new Date();
-    return isoLocal(new Date(now.getFullYear(), now.getMonth(), 1));
+    return budgetMonthRange(now, 1).from;
   });
   const [rangeTo, setRangeTo] = useState(() => isoLocal(new Date()));
   const [days, setDays] = useState<DayRow[]>([]);
@@ -148,14 +155,20 @@ export default function AnalyticsPage() {
       const end = rangeTo >= rangeFrom ? rangeTo : rangeFrom;
       return { from: rangeFrom, to: end };
     }
-    return rangeFor(period, cursor);
-  }, [period, cursor, rangeFrom, rangeTo]);
+    return rangeFor(period, cursor, startDay);
+  }, [period, cursor, rangeFrom, rangeTo, startDay]);
 
   const chartByMonth = period === "year" || (period === "range" && daysBetween(from, to) > 62);
 
   useEffect(() => {
     setCursor(new Date(cal.year, cal.month - 1, cal.day));
   }, [cal.monthKey]);
+
+  useEffect(() => {
+    if (period !== "range") return;
+    const bounds = budgetMonthRange(new Date(), startDay);
+    setRangeFrom(bounds.from);
+  }, [startDay]);
 
   useEffect(() => {
     if (!active) return;
@@ -361,7 +374,11 @@ export default function AnalyticsPage() {
   function setPeriodMode(next: Period) {
     if (next === "range") {
       if (period === "month" || period === "day") {
-        const bounds = rangeFor(period === "day" ? "month" : period, cursor);
+        const bounds = rangeFor(
+          period === "day" ? "month" : period,
+          cursor,
+          startDay,
+        );
         setRangeFrom(bounds.from);
         setRangeTo(period === "day" ? iso(cursor) : bounds.to);
       } else if (period === "year") {
@@ -372,7 +389,7 @@ export default function AnalyticsPage() {
     setPeriod(next);
   }
 
-  const monthKey = `${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}`;
+  const monthKey = budgetMonthKey(cursor, startDay);
   const yearKey = String(cursor.getFullYear());
   const yearSavings = savingsMonths.filter((m) => m.month.startsWith(yearKey));
   const prior = [...savingsMonths].filter((m) => m.month < monthKey).at(-1);
@@ -439,7 +456,7 @@ export default function AnalyticsPage() {
           <button
             type="button"
             className="icon-btn shrink-0 px-3 text-xl sm:px-4"
-            onClick={() => setCursor((c) => shift(period, c, -1))}
+            onClick={() => setCursor((c) => shift(period, c, -1, startDay))}
           >
             ‹
           </button>
@@ -454,8 +471,15 @@ export default function AnalyticsPage() {
               <DateField
                 type="month"
                 align="center"
-                value={`${cursor.getFullYear()}-${pad(cursor.getMonth() + 1)}`}
-                onChange={(v) => setCursor(new Date(`${v}-01T12:00:00`))}
+                value={budgetMonthKey(cursor, startDay)}
+                onChange={(v) => {
+                  if (startDay === 1) {
+                    setCursor(new Date(`${v}-01T12:00:00`));
+                    return;
+                  }
+                  const [y, m] = v.split("-").map(Number);
+                  setCursor(new Date(y, m - 1, startDay));
+                }}
               />
             ) : (
               <label className="block min-w-0">
@@ -485,13 +509,18 @@ export default function AnalyticsPage() {
           <button
             type="button"
             className="icon-btn shrink-0 px-3 text-xl sm:px-4"
-            onClick={() => setCursor((c) => shift(period, c, 1))}
+            onClick={() => setCursor((c) => shift(period, c, 1, startDay))}
           >
             ›
           </button>
         </div>
       )}
       <Hint>{t("pickPeriodHint")}</Hint>
+      {period === "month" && startDay !== 1 ? (
+        <p className="mt-2 text-center text-sm text-[var(--muted)]" dir="ltr">
+          {from} → {to}
+        </p>
+      ) : null}
       {error ? <p className="mt-3 text-red-700">{error}</p> : null}
       {hideAggregates ? (
         <p className="surface mt-4 rounded-3xl px-4 py-3 text-sm text-stone-500">
