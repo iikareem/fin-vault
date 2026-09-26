@@ -1,5 +1,6 @@
 import {
   IsBoolean,
+  IsEnum,
   IsInt,
   IsNumber,
   IsOptional,
@@ -9,6 +10,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { SubscriptionKind } from '@prisma/client';
 
 export class UpdateSubscriptionDto {
   @IsOptional()
@@ -26,6 +28,16 @@ export class UpdateSubscriptionDto {
   @Min(1)
   @Max(28)
   billingDay?: number;
+
+  @IsOptional()
+  @IsEnum(SubscriptionKind)
+  kind?: SubscriptionKind;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(360)
+  totalInstallments?: number | null;
 
   @IsOptional()
   @IsString()

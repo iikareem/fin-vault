@@ -4,10 +4,9 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, SubscriptionKind } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
-  budgetMonthKey,
   budgetMonthRange,
   clampBudgetStartDay,
   isoLocal,
@@ -31,6 +30,9 @@ type SubRow = {
   name: string;
   amount: Prisma.Decimal;
   billingDay: number;
+  kind: SubscriptionKind;
+  totalInstallments: number | null;
+  installmentsPaid: number;
   categoryId: string;
   accountId: string;
   note: string;
@@ -95,7 +97,42 @@ export class SubscriptionsService {
     const startDay = clampBudgetStartDay(user?.budgetMonthStartDay ?? 1);
     const range = budgetMonthRange(now, startDay);
     const today = isoLocal(now);
-    return { startDay, periodKey: range.key, periodFrom: range.from, periodTo: range.to, today };
+    return {
+      startDay,
+      periodKey: range.key,
+      periodFrom: range.from,
+      periodTo: range.to,
+      today,
+    };
+  }
+
+  private normalizeKindFields(
+    kind: SubscriptionKind,
+    totalInstallments?: number | null,
+  ) {
+    if (kind === SubscriptionKind.INSTALLMENT) {
+      const total = totalInstallments ?? null;
+      if (total == null || total < 1) {
+        throw new BadRequestException(
+          'Installments need a total number of payments',
+        );
+      }
+      return { kind, totalInstallments: total };
+    }
+    return { kind, totalInstallments: null as number | null };
+  }
+
+  private notePrefix(kind: SubscriptionKind) {
+    switch (kind) {
+      case SubscriptionKind.INSTALLMENT:
+        return 'Installment';
+      case SubscriptionKind.CHARITY:
+        return 'Charity';
+      case SubscriptionKind.OTHER:
+        return 'Commitment';
+      default:
+        return 'Subscription';
+    }
   }
 
   private shape(
@@ -116,11 +153,19 @@ export class SubscriptionsService {
       ctx.startDay,
     );
     const status = this.statusFor(Boolean(payment), dueOn, ctx.today);
+    const remainingInstallments =
+      sub.kind === SubscriptionKind.INSTALLMENT && sub.totalInstallments != null
+        ? Math.max(0, sub.totalInstallments - sub.installmentsPaid)
+        : null;
     return {
       id: sub.id,
       name: sub.name,
       amount: Number(sub.amount),
       billingDay: sub.billingDay,
+      kind: sub.kind,
+      totalInstallments: sub.totalInstallments,
+      installmentsPaid: sub.installmentsPaid,
+      remainingInstallments,
       categoryId: sub.categoryId,
       accountId: sub.accountId,
       note: sub.note,
@@ -233,6 +278,8 @@ export class SubscriptionsService {
     const name = dto.name.trim();
     if (!name) throw new BadRequestException('Name is required');
     const billingDay = clampBudgetStartDay(dto.billingDay);
+    const kind = dto.kind ?? SubscriptionKind.SUBSCRIPTION;
+    const fields = this.normalizeKindFields(kind, dto.totalInstallments);
     await this.assertCategory(householdId, dto.categoryId);
     await this.assertAccount(householdId, dto.accountId);
 
@@ -243,6 +290,9 @@ export class SubscriptionsService {
         name,
         amount: new Prisma.Decimal(dto.amount),
         billingDay,
+        kind: fields.kind,
+        totalInstallments: fields.totalInstallments,
+        installmentsPaid: 0,
         categoryId: dto.categoryId,
         accountId: dto.accountId,
         note: dto.note?.trim() ?? '',
@@ -258,12 +308,42 @@ export class SubscriptionsService {
     id: string,
     dto: UpdateSubscriptionDto,
   ) {
-    await this.requireOwn(householdId, userId, id);
+    const existing = await this.requireOwn(householdId, userId, id);
     if (dto.name !== undefined && !dto.name.trim()) {
       throw new BadRequestException('Name is required');
     }
     if (dto.categoryId) await this.assertCategory(householdId, dto.categoryId);
     if (dto.accountId) await this.assertAccount(householdId, dto.accountId);
+
+    const nextKind = dto.kind ?? existing.kind;
+    let kindPatch: {
+      kind?: SubscriptionKind;
+      totalInstallments?: number | null;
+      installmentsPaid?: number;
+    } = {};
+    if (
+      dto.kind !== undefined ||
+      dto.totalInstallments !== undefined
+    ) {
+      const fields = this.normalizeKindFields(
+        nextKind,
+        dto.totalInstallments !== undefined
+          ? dto.totalInstallments
+          : existing.totalInstallments,
+      );
+      kindPatch = {
+        kind: fields.kind,
+        totalInstallments: fields.totalInstallments,
+      };
+      if (fields.kind !== SubscriptionKind.INSTALLMENT) {
+        kindPatch.installmentsPaid = 0;
+      } else if (
+        fields.totalInstallments != null &&
+        existing.installmentsPaid > fields.totalInstallments
+      ) {
+        kindPatch.installmentsPaid = fields.totalInstallments;
+      }
+    }
 
     await this.prisma.subscription.update({
       where: { id },
@@ -275,6 +355,7 @@ export class SubscriptionsService {
         ...(dto.billingDay !== undefined
           ? { billingDay: clampBudgetStartDay(dto.billingDay) }
           : {}),
+        ...kindPatch,
         ...(dto.categoryId !== undefined
           ? { categoryId: dto.categoryId }
           : {}),
@@ -310,7 +391,7 @@ export class SubscriptionsService {
     dto: PaySubscriptionDto,
   ) {
     const sub = await this.requireOwn(householdId, userId, id);
-    if (!sub.active) throw new BadRequestException('Subscription is archived');
+    if (!sub.active) throw new BadRequestException('Commitment is archived');
 
     const ctx = await this.periodContext(userId);
     const existing = await this.prisma.subscriptionPayment.findUnique({
@@ -334,7 +415,16 @@ export class SubscriptionsService {
       : new Date(ctx.today);
     const note =
       dto.note?.trim() ||
-      `Subscription: ${sub.name} (${ctx.periodKey})`;
+      `${this.notePrefix(sub.kind)}: ${sub.name} (${ctx.periodKey})`;
+
+    const nextPaid =
+      sub.kind === SubscriptionKind.INSTALLMENT
+        ? sub.installmentsPaid + 1
+        : sub.installmentsPaid;
+    const complete =
+      sub.kind === SubscriptionKind.INSTALLMENT &&
+      sub.totalInstallments != null &&
+      nextPaid >= sub.totalInstallments;
 
     await this.prisma.$transaction(async (db) => {
       const tx = await db.transaction.create({
@@ -358,13 +448,22 @@ export class SubscriptionsService {
           transactionId: tx.id,
         },
       });
+      if (sub.kind === SubscriptionKind.INSTALLMENT) {
+        await db.subscription.update({
+          where: { id },
+          data: {
+            installmentsPaid: nextPaid,
+            ...(complete ? { active: false } : {}),
+          },
+        });
+      }
     });
 
     return this.summary(householdId, userId);
   }
 
   async unpay(householdId: string, userId: string, id: string) {
-    await this.requireOwn(householdId, userId, id);
+    const sub = await this.requireOwn(householdId, userId, id);
     const ctx = await this.periodContext(userId);
     const payment = await this.prisma.subscriptionPayment.findUnique({
       where: {
@@ -376,9 +475,27 @@ export class SubscriptionsService {
     });
     if (!payment) throw new NotFoundException('No payment this period');
 
+    const nextPaid =
+      sub.kind === SubscriptionKind.INSTALLMENT
+        ? Math.max(0, sub.installmentsPaid - 1)
+        : sub.installmentsPaid;
+    const reopen =
+      sub.kind === SubscriptionKind.INSTALLMENT &&
+      !sub.active &&
+      (sub.totalInstallments == null || nextPaid < sub.totalInstallments);
+
     await this.prisma.$transaction(async (db) => {
       await db.subscriptionPayment.delete({ where: { id: payment.id } });
       await db.transaction.delete({ where: { id: payment.transactionId } });
+      if (sub.kind === SubscriptionKind.INSTALLMENT) {
+        await db.subscription.update({
+          where: { id },
+          data: {
+            installmentsPaid: nextPaid,
+            ...(reopen ? { active: true } : {}),
+          },
+        });
+      }
     });
 
     return this.summary(householdId, userId);

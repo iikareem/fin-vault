@@ -1,4 +1,5 @@
 import {
+  IsEnum,
   IsInt,
   IsNumber,
   IsOptional,
@@ -8,6 +9,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
+import { SubscriptionKind } from '@prisma/client';
 
 export class CreateSubscriptionDto {
   @IsString()
@@ -22,6 +24,17 @@ export class CreateSubscriptionDto {
   @Min(1)
   @Max(28)
   billingDay: number;
+
+  @IsOptional()
+  @IsEnum(SubscriptionKind)
+  kind?: SubscriptionKind;
+
+  /** Required when kind is INSTALLMENT. */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(360)
+  totalInstallments?: number;
 
   @IsString()
   categoryId: string;

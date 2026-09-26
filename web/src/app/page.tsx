@@ -1466,11 +1466,11 @@ export default function HomePage() {
           <Hint>{t("goalsHomeHint")}</Hint>
         </Link>
         <Link
-          href="/subscriptions"
+          href="/commitments"
           className="surface mt-3 flex flex-col rounded-[1.75rem] p-4"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xl font-semibold">📺 {t("navSubs")}</span>
+            <span className="text-xl font-semibold">📌 {t("navSubs")}</span>
             <span className="font-semibold">
               {subs ? (
                 <PrivateMoney

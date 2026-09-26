@@ -72,6 +72,14 @@ enum GoldKarat {
   K24
 }
 
+/** Kind of personal monthly commitment (bills due each budget period). */
+enum SubscriptionKind {
+  SUBSCRIPTION
+  INSTALLMENT
+  CHARITY
+  OTHER
+}
+
 model Household {
   id          String         @id @default(cuid())
   name        String
@@ -477,7 +485,7 @@ model SavingsGoal {
   @@index([userId])
 }
 
-/** Recurring personal bill (Netflix, Cursor, etc.). Mark Paid creates a real EXPENSE. */
+/** Personal monthly commitment (subscription, installment, charity pledge, etc.). Mark Paid creates a real EXPENSE. */
 model Subscription {
   id          String                 @id @default(cuid())
   householdId String
@@ -488,6 +496,11 @@ model Subscription {
   amount      Decimal                @db.Decimal(14, 2)
   /** Day of month (1–28) when this bill is typically charged. */
   billingDay  Int
+  kind        SubscriptionKind       @default(SUBSCRIPTION)
+  /** For INSTALLMENT: total number of payments planned. Null for open-ended kinds. */
+  totalInstallments Int?
+  /** For INSTALLMENT: how many payments have been marked paid. */
+  installmentsPaid  Int              @default(0)
   categoryId  String
   category    Category               @relation(fields: [categoryId], references: [id])
   accountId   String
