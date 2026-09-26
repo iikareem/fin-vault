@@ -111,12 +111,16 @@ export class SubscriptionsService {
     totalInstallments?: number | null,
   ) {
     if (kind === SubscriptionKind.INSTALLMENT) {
-      const total = totalInstallments ?? null;
-      if (total == null || total < 1) {
+      const total =
+        totalInstallments == null || totalInstallments === undefined
+          ? null
+          : totalInstallments;
+      if (total != null && total < 1) {
         throw new BadRequestException(
-          'Installments need a total number of payments',
+          'Number of months must be at least 1',
         );
       }
+      // null = open-ended; user closes manually when done
       return { kind, totalInstallments: total };
     }
     return { kind, totalInstallments: null as number | null };
@@ -187,9 +191,16 @@ export class SubscriptionsService {
     };
   }
 
-  private async loadActive(householdId: string, periodKey: string) {
+  private async loadVisible(householdId: string, periodKey: string) {
     return this.prisma.subscription.findMany({
-      where: { householdId, active: true },
+      where: {
+        householdId,
+        OR: [
+          { active: true },
+          // Keep closed installments visible so they can be reopened
+          { kind: SubscriptionKind.INSTALLMENT, active: false },
+        ],
+      },
       include: {
         category: {
           select: {
@@ -203,19 +214,20 @@ export class SubscriptionsService {
         account: { select: { id: true, name: true } },
         payments: { where: { periodKey } },
       },
-      orderBy: [{ billingDay: 'asc' }, { name: 'asc' }],
+      orderBy: [{ active: 'desc' }, { billingDay: 'asc' }, { name: 'asc' }],
     });
   }
 
   async summary(householdId: string, userId: string) {
     const ctx = await this.periodContext(userId);
-    const rows = await this.loadActive(householdId, ctx.periodKey);
+    const rows = await this.loadVisible(householdId, ctx.periodKey);
     const subscriptions = rows.map((s) => this.shape(s, ctx));
+    const open = subscriptions.filter((s) => s.active);
 
     const monthlyTotal =
-      Math.round(subscriptions.reduce((s, r) => s + r.amount, 0) * 100) / 100;
-    const paid = subscriptions.filter((s) => s.status === 'paid');
-    const unpaid = subscriptions.filter((s) => s.status !== 'paid');
+      Math.round(open.reduce((s, r) => s + r.amount, 0) * 100) / 100;
+    const paid = open.filter((s) => s.status === 'paid');
+    const unpaid = open.filter((s) => s.status !== 'paid');
     const paidAmount =
       Math.round(paid.reduce((s, r) => s + r.amount, 0) * 100) / 100;
     const dueAmount =

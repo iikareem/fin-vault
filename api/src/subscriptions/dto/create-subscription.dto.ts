@@ -29,7 +29,7 @@ export class CreateSubscriptionDto {
   @IsEnum(SubscriptionKind)
   kind?: SubscriptionKind;
 
-  /** Required when kind is INSTALLMENT. */
+  /** Optional months for INSTALLMENT; omit/null = close manually. */
   @IsOptional()
   @IsInt()
   @Min(1)

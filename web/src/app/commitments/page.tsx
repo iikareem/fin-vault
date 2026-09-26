@@ -165,6 +165,26 @@ function kindLabel(kind: SubKind, t: (key: MessageKey) => string) {
   return t("subsKindSubscription");
 }
 
+/** Prefer the matching seeded category for each commitment kind. */
+function categoryIdForKind(kind: SubKind, cats: Category[]): string | undefined {
+  const preferred: Record<SubKind, string[]> = {
+    SUBSCRIPTION: ["Subscriptions"],
+    CHARITY: ["Charity & sadaqah", "Charity"],
+    INSTALLMENT: ["Installments"],
+    OTHER: ["Other"],
+  };
+  for (const name of preferred[kind]) {
+    const hit = cats.find(
+      (c) =>
+        c.kind === "EXPENSE" &&
+        !HIDDEN_EXPENSE_CATEGORIES.has(c.name) &&
+        (c.name === name || c.name.toLowerCase() === name.toLowerCase()),
+    );
+    if (hit) return hit.id;
+  }
+  return undefined;
+}
+
 export default function SubscriptionsPage() {
   const { t, locale } = useI18n();
   const { personal, setKind } = useBooks();
@@ -181,7 +201,7 @@ export default function SubscriptionsPage() {
   const [amount, setAmount] = useState("");
   const [billingDay, setBillingDay] = useState(1);
   const [kind, setKindForm] = useState<SubKind>("SUBSCRIPTION");
-  const [totalInstallments, setTotalInstallments] = useState("12");
+  const [totalInstallments, setTotalInstallments] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [accountId, setAccountId] = useState("");
   const [note, setNote] = useState("");
@@ -198,12 +218,13 @@ export default function SubscriptionsPage() {
   const [editAmount, setEditAmount] = useState("");
   const [editDay, setEditDay] = useState(1);
   const [editKind, setEditKind] = useState<SubKind>("SUBSCRIPTION");
-  const [editTotalInstallments, setEditTotalInstallments] = useState("12");
+  const [editTotalInstallments, setEditTotalInstallments] = useState("");
   const [editCategoryId, setEditCategoryId] = useState("");
   const [editAccountId, setEditAccountId] = useState("");
   const [editNote, setEditNote] = useState("");
   const [editColor, setEditColor] = useState(ACCENT_COLORS[0]);
   const [deletingId, setDeletingId] = useState("");
+  const [togglingId, setTogglingId] = useState("");
 
   const expenseCats = useMemo(
     () =>
@@ -212,6 +233,27 @@ export default function SubscriptionsPage() {
       ),
     [categories],
   );
+
+  function applyKindCategory(
+    nextKind: SubKind,
+    setCat: (id: string) => void,
+    cats: Category[] = categories,
+  ) {
+    const id = categoryIdForKind(nextKind, cats);
+    if (id) setCat(id);
+  }
+
+  function selectAddKind(next: SubKind) {
+    setKindForm(next);
+    applyKindCategory(next, setCategoryId);
+    if (next !== "INSTALLMENT") setTotalInstallments("");
+  }
+
+  function selectEditKind(next: SubKind) {
+    setEditKind(next);
+    applyKindCategory(next, setEditCategoryId);
+    if (next !== "INSTALLMENT") setEditTotalInstallments("");
+  }
 
   function load(householdId: string) {
     return Promise.all([
@@ -227,15 +269,17 @@ export default function SubscriptionsPage() {
       if (current) {
         setAccountId((prev) => prev || current.id);
       }
-      const subsCat = cats.find(
-        (c) =>
-          c.kind === "EXPENSE" &&
-          (c.name === "Subscriptions" || c.name.toLowerCase() === "subscriptions"),
-      );
-      const firstExpense = cats.find(
-        (c) => c.kind === "EXPENSE" && !HIDDEN_EXPENSE_CATEGORIES.has(c.name),
-      );
-      setCategoryId((prev) => prev || subsCat?.id || firstExpense?.id || "");
+      setCategoryId((prev) => {
+        if (prev) return prev;
+        return (
+          categoryIdForKind("SUBSCRIPTION", cats) ||
+          cats.find(
+            (c) =>
+              c.kind === "EXPENSE" && !HIDDEN_EXPENSE_CATEGORIES.has(c.name),
+          )?.id ||
+          ""
+        );
+      });
     });
   }
 
@@ -248,7 +292,7 @@ export default function SubscriptionsPage() {
   const unpaid = useMemo(
     () =>
       (data?.subscriptions ?? [])
-        .filter((s) => s.status !== "paid")
+        .filter((s) => s.active && s.status !== "paid")
         .sort((a, b) => {
           const rank = (s: SubStatus) =>
             s === "overdue" ? 0 : s === "due" ? 1 : 2;
@@ -257,7 +301,17 @@ export default function SubscriptionsPage() {
     [data],
   );
   const paid = useMemo(
-    () => (data?.subscriptions ?? []).filter((s) => s.status === "paid"),
+    () =>
+      (data?.subscriptions ?? []).filter(
+        (s) => s.active && s.status === "paid",
+      ),
+    [data],
+  );
+  const closedInstallments = useMemo(
+    () =>
+      (data?.subscriptions ?? []).filter(
+        (s) => !s.active && s.kind === "INSTALLMENT",
+      ),
     [data],
   );
 
@@ -284,9 +338,16 @@ export default function SubscriptionsPage() {
       setError(t("subsPickWalletCat"));
       return;
     }
+    const monthsRaw = totalInstallments.trim();
     const installments =
-      kind === "INSTALLMENT" ? Math.trunc(Number(totalInstallments)) : undefined;
-    if (kind === "INSTALLMENT" && !(installments && installments >= 1)) {
+      kind === "INSTALLMENT" && monthsRaw
+        ? Math.trunc(Number(monthsRaw))
+        : undefined;
+    if (
+      kind === "INSTALLMENT" &&
+      monthsRaw &&
+      !(installments && installments >= 1)
+    ) {
       setError(t("subsInstallmentsHint"));
       return;
     }
@@ -302,7 +363,9 @@ export default function SubscriptionsPage() {
             amount: amt,
             billingDay,
             kind,
-            totalInstallments: installments,
+            ...(kind === "INSTALLMENT" && installments
+              ? { totalInstallments: installments }
+              : {}),
             categoryId,
             accountId,
             note: note.trim() || undefined,
@@ -315,7 +378,8 @@ export default function SubscriptionsPage() {
       setAmount("");
       setNote("");
       setKindForm("SUBSCRIPTION");
-      setTotalInstallments("12");
+      setTotalInstallments("");
+      applyKindCategory("SUBSCRIPTION", setCategoryId);
       setShowAdd(false);
       setColor(
         ACCENT_COLORS[(next.subscriptions.length || 0) % ACCENT_COLORS.length],
@@ -383,7 +447,7 @@ export default function SubscriptionsPage() {
     setEditDay(sub.billingDay);
     setEditKind(sub.kind ?? "SUBSCRIPTION");
     setEditTotalInstallments(
-      String(sub.totalInstallments ?? Math.max(1, sub.installmentsPaid || 1)),
+      sub.totalInstallments != null ? String(sub.totalInstallments) : "",
     );
     setEditCategoryId(sub.categoryId);
     setEditAccountId(sub.accountId);
@@ -401,11 +465,16 @@ export default function SubscriptionsPage() {
       setError(t("subsAmountHint"));
       return;
     }
+    const monthsRaw = editTotalInstallments.trim();
     const installments =
-      editKind === "INSTALLMENT"
-        ? Math.trunc(Number(editTotalInstallments))
+      editKind === "INSTALLMENT" && monthsRaw
+        ? Math.trunc(Number(monthsRaw))
         : null;
-    if (editKind === "INSTALLMENT" && !(installments && installments >= 1)) {
+    if (
+      editKind === "INSTALLMENT" &&
+      monthsRaw &&
+      !(installments && installments >= 1)
+    ) {
       setError(t("subsInstallmentsHint"));
       return;
     }
@@ -421,7 +490,7 @@ export default function SubscriptionsPage() {
             amount: amt,
             billingDay: editDay,
             kind: editKind,
-            totalInstallments: installments,
+            totalInstallments: editKind === "INSTALLMENT" ? installments : null,
             categoryId: editCategoryId,
             accountId: editAccountId,
             note: editNote.trim(),
@@ -435,6 +504,28 @@ export default function SubscriptionsPage() {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function setInstallmentActive(id: string, active: boolean) {
+    if (!personal) return;
+    setTogglingId(id);
+    setError("");
+    try {
+      const next = await api<SubsSummary>(
+        householdPath(personal.householdId, `/subscriptions/${id}`),
+        {
+          method: "PATCH",
+          body: JSON.stringify({ active }),
+        },
+      );
+      setData(next);
+      setConfirmPayId("");
+      setConfirmUnpayId("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("couldNotSave"));
+    } finally {
+      setTogglingId("");
     }
   }
 
@@ -466,9 +557,27 @@ export default function SubscriptionsPage() {
     );
   }
 
-  const total = data?.subscriptions.length ?? 0;
+  const total =
+    data?.subscriptions.filter((s) => s.active).length ?? 0;
   const paidN = data?.paidCount ?? 0;
   const accent = "var(--accent-b, #0369a1)";
+
+  function installmentProgress(sub: Subscription) {
+    if (sub.kind !== "INSTALLMENT") return null;
+    if (sub.totalInstallments != null) {
+      if (sub.remainingInstallments === 1) {
+        return t("subsInstallmentDone");
+      }
+      return fill(t("subsInstallmentsLeft"), {
+        n: String(sub.remainingInstallments ?? 0),
+        total: String(sub.totalInstallments),
+      });
+    }
+    if (sub.installmentsPaid > 0) {
+      return `${sub.installmentsPaid} · ${t("subsInstallmentOpen")}`;
+    }
+    return t("subsInstallmentOpen");
+  }
 
   return (
     <PageShell>
@@ -560,7 +669,7 @@ export default function SubscriptionsPage() {
                 <button
                   key={k}
                   type="button"
-                  onClick={() => setKindForm(k)}
+                  onClick={() => selectAddKind(k)}
                   className={`rounded-2xl px-1 py-2 text-center text-xs font-bold transition sm:text-sm ${
                     kind === k
                       ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
@@ -711,15 +820,9 @@ export default function SubscriptionsPage() {
                             n: String(sub.billingDay),
                           })}
                         </p>
-                        {sub.kind === "INSTALLMENT" &&
-                        sub.totalInstallments != null ? (
+                        {sub.kind === "INSTALLMENT" ? (
                           <p className="mt-1 text-xs font-medium text-[var(--muted)]">
-                            {sub.remainingInstallments === 1
-                              ? t("subsInstallmentDone")
-                              : fill(t("subsInstallmentsLeft"), {
-                                  n: String(sub.remainingInstallments ?? 0),
-                                  total: String(sub.totalInstallments),
-                                })}
+                            {installmentProgress(sub)}
                           </p>
                         ) : null}
                       </div>
@@ -797,6 +900,18 @@ export default function SubscriptionsPage() {
                         >
                           {t("subsMarkPaid")}
                         </button>
+                        {sub.kind === "INSTALLMENT" ? (
+                          <button
+                            type="button"
+                            disabled={togglingId === sub.id}
+                            onClick={() => setInstallmentActive(sub.id, false)}
+                            className="min-h-10 rounded-2xl bg-[var(--panel-soft)] px-3 text-sm font-semibold disabled:opacity-60"
+                          >
+                            {togglingId === sub.id
+                              ? t("saving")
+                              : t("subsCloseInstallment")}
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           onClick={() => openEdit(sub)}
@@ -817,7 +932,7 @@ export default function SubscriptionsPage() {
                             <button
                               key={k}
                               type="button"
-                              onClick={() => setEditKind(k)}
+                              onClick={() => selectEditKind(k)}
                               className={`rounded-2xl px-1 py-2 text-center text-xs font-bold ${
                                 editKind === k
                                   ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
@@ -855,15 +970,19 @@ export default function SubscriptionsPage() {
                           </select>
                         </div>
                         {editKind === "INSTALLMENT" ? (
-                          <input
-                            className="w-full rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2"
-                            inputMode="numeric"
-                            value={editTotalInstallments}
-                            onChange={(e) =>
-                              setEditTotalInstallments(e.target.value)
-                            }
-                            placeholder={t("subsTotalInstallments")}
-                          />
+                          <label className="block text-sm font-medium">
+                            {t("subsTotalInstallments")}
+                            <input
+                              className="mt-1 w-full rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2"
+                              inputMode="numeric"
+                              value={editTotalInstallments}
+                              onChange={(e) =>
+                                setEditTotalInstallments(e.target.value)
+                              }
+                              placeholder={t("subsTotalInstallments")}
+                            />
+                            <Hint>{t("subsInstallmentsHint")}</Hint>
+                          </label>
                         ) : null}
                         {expenseCats.length > 0 ? (
                           <CategoryPicker
@@ -974,13 +1093,9 @@ export default function SubscriptionsPage() {
                           </>
                         ) : null}
                       </p>
-                      {sub.kind === "INSTALLMENT" &&
-                      sub.totalInstallments != null ? (
+                      {sub.kind === "INSTALLMENT" ? (
                         <p className="mt-1 text-xs font-medium text-[var(--muted)]">
-                          {fill(t("subsInstallmentsLeft"), {
-                            n: String(sub.remainingInstallments ?? 0),
-                            total: String(sub.totalInstallments),
-                          })}
+                          {installmentProgress(sub)}
                         </p>
                       ) : null}
                     </div>
@@ -1027,6 +1142,18 @@ export default function SubscriptionsPage() {
                       >
                         {t("subsUndoPay")}
                       </button>
+                      {sub.kind === "INSTALLMENT" ? (
+                        <button
+                          type="button"
+                          disabled={togglingId === sub.id}
+                          onClick={() => setInstallmentActive(sub.id, false)}
+                          className="min-h-9 rounded-2xl px-3 text-xs font-semibold text-[var(--muted)] disabled:opacity-60"
+                        >
+                          {togglingId === sub.id
+                            ? t("saving")
+                            : t("subsCloseInstallment")}
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => openEdit(sub)}
@@ -1046,7 +1173,7 @@ export default function SubscriptionsPage() {
                           <button
                             key={k}
                             type="button"
-                            onClick={() => setEditKind(k)}
+                            onClick={() => selectEditKind(k)}
                             className={`rounded-2xl px-1 py-2 text-center text-xs font-bold ${
                               editKind === k
                                 ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
@@ -1084,15 +1211,19 @@ export default function SubscriptionsPage() {
                         </select>
                       </div>
                       {editKind === "INSTALLMENT" ? (
-                        <input
-                          className="w-full rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2"
-                          inputMode="numeric"
-                          value={editTotalInstallments}
-                          onChange={(e) =>
-                            setEditTotalInstallments(e.target.value)
-                          }
-                          placeholder={t("subsTotalInstallments")}
-                        />
+                        <label className="block text-sm font-medium">
+                          {t("subsTotalInstallments")}
+                          <input
+                            className="mt-1 w-full rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2"
+                            inputMode="numeric"
+                            value={editTotalInstallments}
+                            onChange={(e) =>
+                              setEditTotalInstallments(e.target.value)
+                            }
+                            placeholder={t("subsTotalInstallments")}
+                          />
+                          <Hint>{t("subsInstallmentsHint")}</Hint>
+                        </label>
                       ) : null}
                       <div className="flex flex-wrap gap-2">
                         <button
@@ -1127,7 +1258,76 @@ export default function SubscriptionsPage() {
         </section>
       ) : null}
 
-      {data && data.subscriptions.length === 0 && !showAdd ? (
+      {closedInstallments.length > 0 ? (
+        <section className="mt-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">
+            {t("subsClosedSection")}
+          </h2>
+          <ul className="mt-2 space-y-2">
+            {closedInstallments.map((sub) => (
+              <li
+                key={sub.id}
+                className="surface flex items-stretch overflow-hidden rounded-[1.5rem] opacity-75"
+              >
+                <div
+                  className="w-1.5 shrink-0"
+                  style={{ backgroundColor: sub.color }}
+                  aria-hidden
+                />
+                <div className="min-w-0 flex-1 p-3.5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-semibold">
+                        {sub.name}
+                      </p>
+                      <p className="mt-0.5 text-sm text-[var(--muted)]">
+                        {kindLabel(sub.kind, t)} ·{" "}
+                        {categoryLabel(sub.category, locale, t)}
+                      </p>
+                      {installmentProgress(sub) ? (
+                        <p className="mt-1 text-xs font-medium text-[var(--muted)]">
+                          {installmentProgress(sub)}
+                        </p>
+                      ) : null}
+                    </div>
+                    <p className="shrink-0 text-base font-semibold tabular-nums">
+                      <Money
+                        amount={sub.amount}
+                        currency={currency}
+                        locale={locale}
+                      />
+                    </p>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={togglingId === sub.id}
+                      onClick={() => setInstallmentActive(sub.id, true)}
+                      className="min-h-9 rounded-2xl bg-stone-900 px-3 text-xs font-semibold text-white disabled:opacity-60"
+                    >
+                      {togglingId === sub.id
+                        ? t("saving")
+                        : t("subsReopenInstallment")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openEdit(sub)}
+                      className="min-h-9 rounded-2xl px-3 text-xs font-semibold text-[var(--muted)]"
+                    >
+                      {t("subsEdit")}
+                    </button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {data &&
+      data.subscriptions.filter((s) => s.active).length === 0 &&
+      closedInstallments.length === 0 &&
+      !showAdd ? (
         <p className="mt-8 text-center text-sm text-[var(--muted)]">
           {t("subsEmpty")}
         </p>

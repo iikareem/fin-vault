@@ -758,10 +758,15 @@ const ar = {
   subsKindInstallment: "تقسيط",
   subsKindCharity: "صدقة",
   subsKindOther: "أخرى",
-  subsTotalInstallments: "عدد الأقساط",
-  subsInstallmentsHint: "كام قسط في الإجمالي؟",
-  subsInstallmentsLeft: "باقي {n} من {total}",
-  subsInstallmentDone: "آخر قسط — هيتقفل بعد الدفع",
+  subsTotalInstallments: "عدد الشهور",
+  subsInstallmentsHint:
+    "اختياري. اكتبوا عدد الشهور، أو سيبوه فاضي وقفّلوا التقسيط بإيدكم لما يخلّص.",
+  subsInstallmentsLeft: "باقي {n} من {total} شهر",
+  subsInstallmentDone: "آخر شهر — هيتقفل بعد الدفع",
+  subsInstallmentOpen: "مفتوح — قفّلوه لما يخلّص",
+  subsCloseInstallment: "قفّل التقسيط",
+  subsReopenInstallment: "افتح تاني",
+  subsClosedSection: "تقسيط مقفول",
   subsNamePlaceholder: "نتفلكس، تقسيط موبايل، صدقة…",
 };
 
@@ -1531,10 +1536,15 @@ const en = {
   subsKindInstallment: "Installment",
   subsKindCharity: "Charity",
   subsKindOther: "Other",
-  subsTotalInstallments: "Total payments",
-  subsInstallmentsHint: "How many payments in total?",
-  subsInstallmentsLeft: "{n} of {total} left",
-  subsInstallmentDone: "Last payment — closes after pay",
+  subsTotalInstallments: "Number of months",
+  subsInstallmentsHint:
+    "Optional. Set how many months, or leave empty and close it yourself when done.",
+  subsInstallmentsLeft: "{n} of {total} months left",
+  subsInstallmentDone: "Last month — closes after pay",
+  subsInstallmentOpen: "Open — close when done",
+  subsCloseInstallment: "Close installment",
+  subsReopenInstallment: "Reopen",
+  subsClosedSection: "Closed installments",
   subsNamePlaceholder: "Netflix, phone plan, sadaqah…",
 };
 
