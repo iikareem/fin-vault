@@ -2,14 +2,14 @@
 
 Personal cash management for everyday use.
 
-Track balances, record income and spending, review day-by-day history, set goals and commitments, and understand where your money goes — with an Arabic-first interface and EGP as the default currency.
+Track balances, record income and spending, review day-by-day history, set goals and commitments, and understand where your money goes — English by default, with Arabic available, and EGP as the default currency.
 
 | | |
 | --- | --- |
-| **Live app** | [https://family-budget-calc.up.railway.app](https://family-budget-calc.up.railway.app) |
+| **Live app** | [https://personal-budget-calc.up.railway.app](https://personal-budget-calc.up.railway.app) |
 | **Source** | [https://github.com/iikareem/fin-vault](https://github.com/iikareem/fin-vault) |
 
-Create an account at [/register](https://family-budget-calc.up.railway.app/register), or clone the repository and run your own instance.
+Create an account at [/register](https://personal-budget-calc.up.railway.app/register), or clone the repository and run your own instance.
 
 ---
 

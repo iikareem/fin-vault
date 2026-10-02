@@ -1,6 +1,6 @@
 export type Locale = "ar" | "en";
 
-export const DEFAULT_LOCALE: Locale = "ar";
+export const DEFAULT_LOCALE: Locale = "en";
 export const LANG_KEY = "fb_lang";
 
 const ar = {

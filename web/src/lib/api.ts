@@ -88,7 +88,7 @@ export type MoneySign = "+" | "−" | "-";
 export function moneyParts(
   amount: number,
   currency = "EGP",
-  locale: "ar" | "en" = "ar",
+  locale: "ar" | "en" = "en",
   extraSign?: MoneySign,
 ) {
   const value = Number(amount) || 0;
@@ -106,7 +106,7 @@ export function moneyParts(
 export function money(
   amount: number,
   currency = "EGP",
-  locale: "ar" | "en" = "ar",
+  locale: "ar" | "en" = "en",
   extraSign?: MoneySign,
 ) {
   const { n, sign, symbol } = moneyParts(amount, currency, locale, extraSign);

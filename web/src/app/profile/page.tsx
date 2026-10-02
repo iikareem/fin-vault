@@ -299,8 +299,8 @@ export default function ProfilePage() {
             value={locale}
             onChange={(e) => setLocale(e.target.value as "ar" | "en")}
           >
-            <option value="ar">{t("langAr")}</option>
             <option value="en">{t("langEn")}</option>
+            <option value="ar">{t("langAr")}</option>
           </select>
         </label>
 

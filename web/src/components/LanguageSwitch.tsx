@@ -9,18 +9,6 @@ export function LanguageSwitch({ compact = false }: { compact?: boolean }) {
     <div className="inline-flex shrink-0 rounded-full bg-[var(--panel-soft)] p-1 text-sm font-semibold">
       <button
         type="button"
-        onClick={() => setLocale("ar")}
-        aria-label={t("langAr")}
-        className={`rounded-full ${pad} ${
-          locale === "ar"
-            ? "bg-[var(--accent-a)] text-[var(--accent-a-fg)]"
-            : "text-stone-600"
-        }`}
-      >
-        {compact ? "ع" : t("langAr")}
-      </button>
-      <button
-        type="button"
         onClick={() => setLocale("en")}
         aria-label={t("langEn")}
         className={`rounded-full ${pad} ${
@@ -30,6 +18,18 @@ export function LanguageSwitch({ compact = false }: { compact?: boolean }) {
         }`}
       >
         {compact ? "En" : t("langEn")}
+      </button>
+      <button
+        type="button"
+        onClick={() => setLocale("ar")}
+        aria-label={t("langAr")}
+        className={`rounded-full ${pad} ${
+          locale === "ar"
+            ? "bg-[var(--accent-a)] text-[var(--accent-a-fg)]"
+            : "text-stone-600"
+        }`}
+      >
+        {compact ? "ع" : t("langAr")}
       </button>
     </div>
   );
