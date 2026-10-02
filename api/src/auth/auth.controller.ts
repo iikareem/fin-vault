@@ -2,6 +2,7 @@ import { Body, Controller, Get, Patch, Post, Res, UseGuards } from '@nestjs/comm
 import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -24,6 +25,16 @@ function sessionCookieOptions() {
 @Controller('auth')
 export class AuthController {
   constructor(private auth: AuthService) {}
+
+  @Post('register')
+  async register(
+    @Body() dto: RegisterDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.auth.register(dto);
+    res.cookie('fb_token', result.token, sessionCookieOptions());
+    return result.user;
+  }
 
   @Post('login')
   async login(

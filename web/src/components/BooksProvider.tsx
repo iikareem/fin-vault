@@ -78,7 +78,7 @@ function applyTheme(theme: ThemeMode) {
 export function BooksProvider({ children }: { children: ReactNode }) {
   const path = usePathname();
   const router = useRouter();
-  const onLogin = path === "/login";
+  const onAuthPage = path === "/login" || path === "/register";
   const [userId, setUserId] = useState("");
   const [name, setName] = useState("");
   const [house, setHouse] = useState<Space | null>(null);
@@ -132,7 +132,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
   }, [applyMe]);
 
   useEffect(() => {
-    if (onLogin) {
+    if (onAuthPage) {
       setLoading(false);
       applyTheme("light");
       return;
@@ -156,14 +156,14 @@ export function BooksProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [onLogin, router, applyMe]);
+  }, [onAuthPage, router, applyMe]);
 
   useEffect(() => {
-    if (loading || onLogin || !personalOnly) return;
+    if (loading || onAuthPage || !personalOnly) return;
     if (HOUSE_ONLY.some((p) => path.startsWith(p))) {
       router.replace("/");
     }
-  }, [loading, onLogin, personalOnly, path, router]);
+  }, [loading, onAuthPage, personalOnly, path, router]);
 
   const setKind = useCallback(
     (kind: "HOUSE" | "PERSONAL") => {

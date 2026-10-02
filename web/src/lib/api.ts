@@ -6,9 +6,10 @@ const TIMEOUT_MS = 20000;
 export const AUTH_REQUIRED = "Please log in";
 
 function goLogin() {
-  if (typeof window !== "undefined" && window.location.pathname !== "/login") {
-    window.location.href = "/login";
-  }
+  if (typeof window === "undefined") return;
+  const path = window.location.pathname;
+  if (path === "/login" || path === "/register") return;
+  window.location.href = "/login";
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -29,12 +30,14 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
       signal: timed.signal,
     });
   } catch (e) {
-    const onLogin =
-      typeof window !== "undefined" && window.location.pathname === "/login";
+    const onAuthPage =
+      typeof window !== "undefined" &&
+      (window.location.pathname === "/login" ||
+        window.location.pathname === "/register");
     const timedOut =
       (e instanceof DOMException && e.name === "AbortError") ||
       (e instanceof Error && e.name === "AbortError");
-    if (onLogin) {
+    if (onAuthPage) {
       throw new Error(timedOut ? "LOGIN_TIMEOUT" : "LOGIN_NETWORK");
     }
     // Keep the session: network blips must not force a new login.

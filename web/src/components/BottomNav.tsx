@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useI18n } from "./I18nProvider";
 import { useBooks } from "./BooksProvider";
+import { HOUSE_BOOKS_ENABLED } from "@/lib/features";
 import type { MessageKey } from "@/lib/i18n";
 
 type NavIcon =
@@ -121,8 +122,9 @@ function NavGlyph({
 export function BottomNav() {
   const path = usePathname();
   const { t } = useI18n();
-  const { active } = useBooks();
-  const personal = active?.kind === "PERSONAL";
+  const { active, personalOnly } = useBooks();
+  const personal =
+    !HOUSE_BOOKS_ENABLED || personalOnly || active?.kind === "PERSONAL";
   const side = personal ? mineSide : houseSide;
   const left = side.slice(0, 2);
   const right = side.slice(2);

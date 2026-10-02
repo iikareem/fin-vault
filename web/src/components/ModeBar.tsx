@@ -8,7 +8,7 @@ export function ModeBar() {
   const path = usePathname();
   const { t } = useI18n();
   const { house, personal, active, setKind, personalOnly } = useBooks();
-  if (path === "/login") return null;
+  if (path === "/login" || path === "/register") return null;
   if (personalOnly) return null;
   if (!house || !personal) return null;
   const kind = active?.kind ?? "PERSONAL";

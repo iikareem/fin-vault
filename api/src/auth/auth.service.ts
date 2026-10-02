@@ -1,11 +1,17 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 import { normalizeLoginEmail, normalizeLoginPassword } from './login-text';
+import { seedPersonalSpace } from '../households/space-defaults';
 
 @Injectable()
 export class AuthService {
@@ -13,6 +19,51 @@ export class AuthService {
     private prisma: PrismaService,
     private jwt: JwtService,
   ) {}
+
+  async register(dto: RegisterDto) {
+    const name = dto.name.trim();
+    const email = normalizeLoginEmail(dto.email);
+    const password = normalizeLoginPassword(dto.password);
+    if (password.length < 8) {
+      throw new UnauthorizedException(
+        'Password must be at least 8 characters',
+      );
+    }
+
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+    if (existing) {
+      throw new ConflictException('Email already registered');
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const user = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          name,
+          email,
+          passwordHash,
+          preferredCurrency: 'EGP',
+          theme: 'light',
+          budgetMonthStartDay: 1,
+        },
+      });
+      await seedPersonalSpace(tx, created.id, name);
+      return created;
+    });
+
+    const token = await this.issueToken(user.id);
+    return {
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        preferredCurrency: user.preferredCurrency,
+        theme: user.theme,
+        budgetMonthStartDay: user.budgetMonthStartDay,
+      },
+    };
+  }
 
   async login(dto: LoginDto) {
     const email = normalizeLoginEmail(dto.email);
