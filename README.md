@@ -1,12 +1,12 @@
 # Fin Vault
 
-Household and personal cash management for everyday use.
+Personal cash management for everyday use.
 
-I built Fin Vault for personal use — to track my own spending, see where money goes, and keep clear analytics for household and personal cash. It is shared here so anyone can clone the repository and deploy their own instance.
+I built Fin Vault to track my own spending, see where money goes, and keep clear analytics on personal cash. It is shared here so anyone can clone the repository and run their own instance.
 
 This project is a **monorepo**: the NestJS API (`api/`) and the Next.js web app (`web/`) live in one repository and share a single Postgres database.
 
-Fin Vault keeps shared household finances and individual wallets in one place. Track balances, record income and spending, review day-by-day history, and understand spending patterns — with an Arabic-first interface and EGP as the default currency.
+Track balances, record income and spending, review day-by-day history, set goals and commitments, and understand spending patterns — with an Arabic-first interface and EGP as the default currency.
 
 ---
 
@@ -24,13 +24,14 @@ fin-vault/
 
 ## Features
 
-- **Dual ledgers** — separate books for household cash and each member’s personal money
-- **Wallets** — current and savings accounts per ledger
-- **Transactions** — income, expenses, allowances, and reimbursements
+- **Personal ledger** — your own cash books and wallets
+- **Wallets** — current and savings accounts
+- **Transactions** — income, expenses, and transfers
 - **Spending categories** — purchases, food, clothing, transport, bills, and more
 - **Daily history** — editable day-by-day activity
-- **Analytics** — totals by day, category, and person
-- **Charity tracking** — monthly contributions from household or personal cash
+- **Analytics** — totals by day and category
+- **Goals & commitments** — track targets and recurring obligations
+- **Registration** — create an account in the app; personal books are seeded automatically
 
 ---
 
@@ -61,12 +62,6 @@ cp api/.env.example api/.env
 
 Set a strong random value for `JWT_SECRET` in `api/.env`.
 
-```bash
-cp api/prisma/family.seed.example.json api/prisma/family.seed.json
-```
-
-Add household members (names, emails, passwords) to `family.seed.json`. This file is gitignored and must not be committed.
-
 ### 2. Start the database
 
 ```bash
@@ -79,7 +74,6 @@ docker compose up -d
 cd api
 npm install
 npx prisma migrate deploy
-npx prisma db seed
 npm run start:dev
 ```
 
@@ -91,38 +85,23 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) and sign in with an email from your seed file.
-
-Household membership is defined at seed time. Members are not added through the UI after seeding.
+Open [http://localhost:3000](http://localhost:3000), create an account at **/register**, then sign in.
 
 ---
 
 ## Deployment (Railway)
 
-Seed the production database **once**, after Postgres is available and before the first login. Seeding with example data first will block creation of your real household.
-
-### Recommended: seed from your machine
-
-Use the Railway Postgres `DATABASE_URL` locally so `family.seed.json` never leaves your computer:
+1. Provision Postgres and set `DATABASE_URL`, `JWT_SECRET`, and `WEB_ORIGIN` on the API service.
+2. Run migrations once:
 
 ```bash
 cd api
 DATABASE_URL='postgresql://…railway…' npx prisma migrate deploy
-DATABASE_URL='postgresql://…railway…' npx prisma db seed
 ```
 
-### Alternative: seed on Railway
+3. Deploy the API and web app. Users create accounts through **/register** — no seed file is required for personal use.
 
-1. Set `FAMILY_SEED` on the API service to the same JSON as `family.seed.json` (single line is fine).
-2. Run a one-off command:
-
-```bash
-npx prisma migrate deploy && npx prisma db seed
-```
-
-3. Remove `FAMILY_SEED` after a successful seed.
-
-Do not commit seed credentials or production secrets to GitHub.
+Do not commit credentials or production secrets to GitHub.
 
 ---
 
@@ -133,7 +112,6 @@ Never commit:
 | File | Purpose |
 | --- | --- |
 | `api/.env` | Local secrets and database URL |
-| `api/prisma/family.seed.json` | Real names, emails, and passwords |
 | Other `.env` / `.env.local` files | Environment-specific secrets |
 
 Use the `*.example` files as templates only.
