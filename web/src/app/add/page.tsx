@@ -20,6 +20,7 @@ import {
   HIDDEN_EXPENSE_CATEGORIES,
   HIDDEN_INCOME_CATEGORIES,
 } from "@/lib/category-visibility";
+import { categoryLabel } from "@/lib/i18n";
 
 type Account = { id: string; name: string; type?: string };
 type Category = {
@@ -33,10 +34,54 @@ type Category = {
 type Person = { id: string; name: string };
 type WalletKind = "EXPENSE" | "INCOME" | "GIVE";
 
+const RECENT_CATS_KEY = "fb_recent_cats";
+const LAST_WALLET_KEY = "fb_last_wallet";
+
+function recentCatsKey(householdId: string) {
+  return `${RECENT_CATS_KEY}:${householdId}`;
+}
+
+function lastWalletKey(householdId: string) {
+  return `${LAST_WALLET_KEY}:${householdId}`;
+}
+
+function readRecentCategoryIds(householdId: string): string[] {
+  try {
+    const raw = localStorage.getItem(recentCatsKey(householdId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed)
+      ? parsed.filter((id): id is string => typeof id === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function pushRecentCategory(householdId: string, categoryId: string) {
+  const prev = readRecentCategoryIds(householdId).filter(
+    (id) => id !== categoryId,
+  );
+  const next = [categoryId, ...prev].slice(0, 5);
+  localStorage.setItem(recentCatsKey(householdId), JSON.stringify(next));
+}
+
+function readLastWalletId(householdId: string): string | null {
+  try {
+    return localStorage.getItem(lastWalletKey(householdId));
+  } catch {
+    return null;
+  }
+}
+
+function writeLastWalletId(householdId: string, accountId: string) {
+  localStorage.setItem(lastWalletKey(householdId), accountId);
+}
+
 function AddForm() {
   const router = useRouter();
   const search = useSearchParams();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { active } = useBooks();
   const [space, setSpace] = useState<Space | null>(null);
   const [mode, setMode] = useState<
@@ -55,6 +100,7 @@ function AddForm() {
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
+  const [recentCategoryIds, setRecentCategoryIds] = useState<string[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [trackOnly, setTrackOnly] = useState(false);
@@ -108,11 +154,24 @@ function AddForm() {
         const c = result[1] as Category[];
         setAccounts(a);
         setCategories(c);
+        const remembered =
+          active.kind === "PERSONAL"
+            ? readLastWalletId(active.householdId)
+            : null;
+        const rememberedAccount = remembered
+          ? a.find((x) => x.id === remembered)
+          : null;
         const current = a.find(isCurrentWallet) ?? a[0];
         const savings = a.find(isSavingsWallet);
-        if (current) setAccountId(current.id);
+        if (rememberedAccount) setAccountId(rememberedAccount.id);
+        else if (current) setAccountId(current.id);
         if (savings) setToAccountId(savings.id);
         else if (a[1]) setToAccountId(a[1].id);
+        if (active.kind === "PERSONAL") {
+          setRecentCategoryIds(readRecentCategoryIds(active.householdId));
+        } else {
+          setRecentCategoryIds([]);
+        }
         if (active.kind === "HOUSE") {
           const users = result[2] as Person[];
           setPeople(users);
@@ -140,10 +199,24 @@ function AddForm() {
     [categories, type],
   );
 
+  const recentCats = useMemo(() => {
+    const list =
+      mode === "claim" || mode === "cover" ? expenseCats : walletCats;
+    const byId = new Map(list.map((c) => [c.id, c]));
+    return recentCategoryIds
+      .map((id) => byId.get(id))
+      .filter((c): c is Category => Boolean(c))
+      .slice(0, 5);
+  }, [recentCategoryIds, expenseCats, walletCats, mode]);
+
   useEffect(() => {
     if (transferMode || withdrawMode) return;
     const list =
       mode === "claim" || mode === "cover" ? expenseCats : walletCats;
+    if (!list.length) return;
+    const recentPick = recentCategoryIds
+      .map((id) => list.find((c) => c.id === id))
+      .find(Boolean);
     const preferred =
       type === "INCOME" && mode === "wallet"
         ? "Salary"
@@ -151,6 +224,7 @@ function AddForm() {
           ? "Dining & cafés"
           : "Home food";
     const pick =
+      recentPick ??
       list.find((c) => c.name === preferred) ??
       list.find((c) => c.name === "Consumables") ??
       list[0];
@@ -163,6 +237,7 @@ function AddForm() {
     transferMode,
     withdrawMode,
     personalBooks,
+    recentCategoryIds,
   ]);
 
   async function onSubmit(e: FormEvent) {
@@ -294,6 +369,9 @@ function AddForm() {
           return;
         }
         await Promise.all(jobs);
+        if (personalBooks && typeof window !== "undefined") {
+          pushRecentCategory(space.householdId, categoryId);
+        }
       } else {
         await api(householdPath(space.householdId, "/transactions"), {
           method: "POST",
@@ -306,6 +384,12 @@ function AddForm() {
             note,
           }),
         });
+        if (personalBooks && typeof window !== "undefined") {
+          pushRecentCategory(space.householdId, categoryId);
+          if (!(personalPaid && trackOnly) && accountId) {
+            writeLastWalletId(space.householdId, accountId);
+          }
+        }
       }
       router.replace("/");
     } catch {
@@ -664,11 +748,34 @@ function AddForm() {
           </div>
         ) : null}
         {!transferMode && !withdrawMode && !giveMode ? (
-          <CategoryPicker
-            categories={claimMode || coverMode ? expenseCats : walletCats}
-            value={categoryId}
-            onChange={setCategoryId}
-          />
+          <div className="space-y-3">
+            {recentCats.length > 0 ? (
+              <div>
+                <p className="mb-1 font-medium">{t("addRecentCategories")}</p>
+                <div className="flex flex-wrap gap-2">
+                  {recentCats.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setCategoryId(c.id)}
+                      className={`rounded-2xl px-3 py-2 text-sm font-semibold transition ${
+                        categoryId === c.id
+                          ? "bg-emerald-800 text-white shadow"
+                          : "bg-white text-stone-700 ring-1 ring-[var(--input-border)]"
+                      }`}
+                    >
+                      {categoryLabel(c, locale, t)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <CategoryPicker
+              categories={claimMode || coverMode ? expenseCats : walletCats}
+              value={categoryId}
+              onChange={setCategoryId}
+            />
+          </div>
         ) : null}
         {!transferMode &&
         !withdrawMode &&
@@ -681,7 +788,12 @@ function AddForm() {
                 <button
                   key={a.id}
                   type="button"
-                  onClick={() => setAccountId(a.id)}
+                  onClick={() => {
+                    setAccountId(a.id);
+                    if (personalBooks && space) {
+                      writeLastWalletId(space.householdId, a.id);
+                    }
+                  }}
                   className={`rounded-2xl px-3 py-3 text-lg font-bold ${
                     accountId === a.id
                       ? "bg-emerald-800 text-white shadow"

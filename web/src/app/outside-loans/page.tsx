@@ -36,6 +36,18 @@ type LoansData = {
   owedToYou: number;
 };
 
+function ProgressBar({ pct }: { pct: number }) {
+  const width = Math.min(100, Math.max(0, pct));
+  return (
+    <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--panel-soft)]">
+      <div
+        className="h-full rounded-full bg-emerald-700 transition-[width] duration-500"
+        style={{ width: `${width}%` }}
+      />
+    </div>
+  );
+}
+
 export default function OutsideLoansPage() {
   const { t, locale } = useI18n();
   const { personal, setKind } = useBooks();
@@ -43,6 +55,7 @@ export default function OutsideLoansPage() {
   const hid = personal?.householdId ?? "";
   const [data, setData] = useState<LoansData | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
+  const [showLend, setShowLend] = useState(false);
   const [personName, setPersonName] = useState("");
   const [amount, setAmount] = useState("");
   const [accountId, setAccountId] = useState("");
@@ -106,6 +119,7 @@ export default function OutsideLoansPage() {
       setPersonName("");
       setAmount("");
       setNote("");
+      setShowLend(false);
       setMessage(t("outsideSaved"));
       await load(hid);
     } catch (err) {
@@ -115,10 +129,12 @@ export default function OutsideLoansPage() {
     }
   }
 
-  async function collect(loan: Loan) {
+  async function collect(loan: Loan, fullRemaining = false) {
     if (!hid) return;
     const raw = collectAmount[loan.id] ?? "";
-    const value = parseAmount(raw || String(loan.remaining));
+    const value = fullRemaining
+      ? loan.remaining
+      : parseAmount(raw || String(loan.remaining));
     const wallet = collectWallet[loan.id] || accountId;
     setBusy(true);
     setError("");
@@ -144,81 +160,114 @@ export default function OutsideLoansPage() {
 
   return (
     <PageShell>
-      <h1 className="page-title">
-        🤝 {t("outsideLoansTitle")}
-      </h1>
-      <Hint>{t("outsideLoansHint")}</Hint>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="page-title">🤝 {t("outsideLoansTitle")}</h1>
+          <Hint>{t("outsideLoansHint")}</Hint>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setShowLend((v) => !v);
+            setError("");
+            setMessage("");
+          }}
+          className={`shrink-0 rounded-2xl px-4 py-3 text-sm font-bold shadow-sm ${
+            showLend
+              ? "bg-stone-200 text-stone-800"
+              : "bg-stone-900 text-white"
+          }`}
+        >
+          {showLend ? t("goalsCancel") : `＋ ${t("outsideLendTitle")}`}
+        </button>
+      </div>
 
       {data ? (
-        <p className="mt-4 text-lg font-semibold">
-          {t("outsideOwedToYou")}:{" "}
-          <Money amount={data.owedToYou} currency={currency} locale={locale} />
-        </p>
+        <section className="surface mt-4 rounded-[1.75rem] p-4">
+          <p className="text-sm text-stone-500">{t("outsideOwedToYou")}</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums">
+            <Money
+              amount={data.owedToYou}
+              currency={currency}
+              locale={locale}
+            />
+          </p>
+        </section>
       ) : null}
 
-      <form onSubmit={lend} className="surface mt-5 space-y-3 rounded-[1.75rem] p-4">
-        <h2 className="text-xl font-bold">{t("outsideLendTitle")}</h2>
-        <label className="block">
-          <span className="mb-1 block font-medium">{t("outsidePersonName")}</span>
-          <input
-            className="field text-lg"
-            value={personName}
-            onChange={(e) => setPersonName(e.target.value)}
-            required
-          />
-          <Hint>{t("outsidePersonNameHint")}</Hint>
-        </label>
-        <label className="block">
-          <span className="mb-1 block font-medium">{t("outsideAmount")}</span>
-          <input
-            inputMode="decimal"
-            className="field text-lg"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            required
-          />
-        </label>
-        <label className="block">
-          <span className="mb-1 block font-medium">{t("outsidePickWallet")}</span>
-          <select
-            className="field text-lg"
-            value={accountId}
-            onChange={(e) => setAccountId(e.target.value)}
-            required
-          >
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {labelFor(a.name, t)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="block">
-          <span className="mb-1 block font-medium">{t("day")}</span>
-          <input
-            type="date"
-            className="field text-lg"
-            value={occurredOn}
-            onChange={(e) => setOccurredOn(e.target.value)}
-            required
-          />
-        </label>
-        <label className="block">
-          <span className="mb-1 block font-medium">{t("noteOptional")}</span>
-          <input
-            className="field text-lg"
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
-        </label>
-        <button
-          type="submit"
-          disabled={busy}
-          className="flex min-h-14 w-full items-center justify-center rounded-3xl bg-stone-900 text-lg font-semibold text-white disabled:opacity-60"
+      {showLend ? (
+        <form
+          onSubmit={lend}
+          className="surface mt-4 space-y-3 rounded-[1.75rem] p-4"
         >
-          {t("outsideLendSave")}
-        </button>
-      </form>
+          <h2 className="text-xl font-bold">{t("outsideLendTitle")}</h2>
+          <label className="block">
+            <span className="mb-1 block font-medium">
+              {t("outsidePersonName")}
+            </span>
+            <input
+              className="field text-lg"
+              value={personName}
+              onChange={(e) => setPersonName(e.target.value)}
+              required
+              autoFocus
+            />
+            <Hint>{t("outsidePersonNameHint")}</Hint>
+          </label>
+          <label className="block">
+            <span className="mb-1 block font-medium">{t("outsideAmount")}</span>
+            <input
+              inputMode="decimal"
+              className="field text-lg"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block font-medium">
+              {t("outsidePickWallet")}
+            </span>
+            <select
+              className="field text-lg"
+              value={accountId}
+              onChange={(e) => setAccountId(e.target.value)}
+              required
+            >
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {labelFor(a.name, t)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block font-medium">{t("day")}</span>
+            <input
+              type="date"
+              className="field text-lg"
+              value={occurredOn}
+              onChange={(e) => setOccurredOn(e.target.value)}
+              required
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block font-medium">{t("noteOptional")}</span>
+            <input
+              className="field text-lg"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={busy}
+            className="flex min-h-14 w-full items-center justify-center rounded-3xl bg-stone-900 text-lg font-semibold text-white disabled:opacity-60"
+          >
+            {t("outsideLendSave")}
+          </button>
+        </form>
+      ) : null}
 
       {error ? <p className="mt-3 text-red-700">{error}</p> : null}
       {message ? <p className="flash mt-3">{message}</p> : null}
@@ -228,83 +277,133 @@ export default function OutsideLoansPage() {
         {!data?.open.length ? (
           <p className="text-stone-500">{t("outsideNoOpen")}</p>
         ) : (
-          data.open.map((loan) => (
-            <article key={loan.id} className="surface rounded-[1.75rem] p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xl font-bold">{loan.personName}</p>
-                  <p className="text-sm text-stone-500">
-                    {t("outsideLentOn")}{" "}
-                    <ItemDate value={loan.occurredOn} locale={locale} />
-                  </p>
-                  {loan.note ? (
-                    <p className="mt-1 text-stone-600">{loan.note}</p>
-                  ) : null}
+          data.open.map((loan) => {
+            const pct =
+              loan.originalAmount > 0
+                ? Math.round(
+                    (loan.collected / loan.originalAmount) * 1000,
+                  ) / 10
+                : 0;
+            return (
+              <article key={loan.id} className="surface rounded-[1.75rem] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-xl font-bold" dir="auto">
+                      {loan.personName}
+                    </p>
+                    <p className="text-sm text-stone-500">
+                      {t("outsideLentOn")}{" "}
+                      <ItemDate value={loan.occurredOn} locale={locale} />
+                    </p>
+                    {loan.note ? (
+                      <p className="mt-1 text-stone-600" dir="auto">
+                        {loan.note}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="shrink-0 text-left">
+                    <p className="font-semibold tabular-nums">
+                      <Money
+                        amount={loan.remaining}
+                        currency={currency}
+                        locale={locale}
+                      />
+                    </p>
+                    <p className="text-sm text-stone-500">
+                      {t("outsideRemaining")}
+                    </p>
+                  </div>
                 </div>
-                <div className="text-left">
-                  <p className="font-semibold">
-                    <Money
-                      amount={loan.remaining}
-                      currency={currency}
-                      locale={locale}
-                    />
-                  </p>
-                  <p className="text-sm text-stone-500">
-                    {t("outsideRemaining")}
-                  </p>
+
+                <div className="mt-3 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs text-stone-500">
+                    <span>
+                      <Money
+                        amount={loan.collected}
+                        currency={currency}
+                        locale={locale}
+                      />{" "}
+                      /{" "}
+                      <Money
+                        amount={loan.originalAmount}
+                        currency={currency}
+                        locale={locale}
+                      />
+                    </span>
+                    <span className="font-semibold tabular-nums">{pct}%</span>
+                  </div>
+                  <ProgressBar pct={pct} />
                 </div>
-              </div>
-              <div className="mt-3 space-y-2">
-                <label className="block">
-                  <span className="mb-1 block text-sm font-medium">
-                    {t("outsideCollect")}
-                  </span>
-                  <input
-                    inputMode="decimal"
-                    className="field"
-                    placeholder={String(loan.remaining)}
-                    value={collectAmount[loan.id] ?? ""}
-                    onChange={(e) =>
-                      setCollectAmount((prev) => ({
-                        ...prev,
-                        [loan.id]: e.target.value,
-                      }))
-                    }
-                  />
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-sm font-medium">
-                    {t("outsidePickWalletBack")}
-                  </span>
-                  <select
-                    className="field"
-                    value={collectWallet[loan.id] || accountId}
-                    onChange={(e) =>
-                      setCollectWallet((prev) => ({
-                        ...prev,
-                        [loan.id]: e.target.value,
-                      }))
-                    }
+
+                <div className="mt-3 space-y-2">
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium">
+                      {t("outsidePickWalletBack")}
+                    </span>
+                    <select
+                      className="field"
+                      value={collectWallet[loan.id] || accountId}
+                      onChange={(e) =>
+                        setCollectWallet((prev) => ({
+                          ...prev,
+                          [loan.id]: e.target.value,
+                        }))
+                      }
+                    >
+                      {accounts.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {labelFor(a.name, t)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => collect(loan, true)}
+                    className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-emerald-800 font-semibold text-white disabled:opacity-60"
                   >
-                    {accounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {labelFor(a.name, t)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <Hint>{t("outsideCollectHint")}</Hint>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => collect(loan)}
-                  className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-emerald-800 font-semibold text-white disabled:opacity-60"
-                >
-                  {t("outsideCollectSave")}
-                </button>
-              </div>
-            </article>
-          ))
+                    {t("outsideCollectRemaining")} ·{" "}
+                    <span className="ms-1 tabular-nums">
+                      <Money
+                        amount={loan.remaining}
+                        currency={currency}
+                        locale={locale}
+                      />
+                    </span>
+                  </button>
+                  <details className="rounded-2xl bg-[var(--panel-soft)] px-3 py-2">
+                    <summary className="cursor-pointer text-sm font-semibold text-stone-600">
+                      {t("outsideCollectPartial")}
+                    </summary>
+                    <div className="mt-2 space-y-2">
+                      <input
+                        inputMode="decimal"
+                        className="field"
+                        placeholder={String(loan.remaining)}
+                        value={collectAmount[loan.id] ?? ""}
+                        onChange={(e) =>
+                          setCollectAmount((prev) => ({
+                            ...prev,
+                            [loan.id]: e.target.value,
+                          }))
+                        }
+                      />
+                      <Hint>{t("outsideCollectHint")}</Hint>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => collect(loan, false)}
+                        className="flex min-h-11 w-full items-center justify-center rounded-2xl bg-stone-800 text-sm font-semibold text-white disabled:opacity-60"
+                      >
+                        {t("outsideCollectSave")}
+                      </button>
+                    </div>
+                  </details>
+                </div>
+              </article>
+            );
+          })
         )}
       </section>
 
@@ -317,7 +416,9 @@ export default function OutsideLoansPage() {
               className="rounded-[1.75rem] border border-stone-200 bg-white/70 px-4 py-3"
             >
               <div className="flex justify-between gap-3">
-                <span className="font-semibold">{loan.personName}</span>
+                <span className="font-semibold" dir="auto">
+                  {loan.personName}
+                </span>
                 <Money
                   amount={loan.originalAmount}
                   currency={currency}

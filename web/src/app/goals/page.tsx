@@ -107,6 +107,14 @@ export default function GoalsPage() {
       setActionAmount(
         goal.savedAmount > 0 ? String(goal.savedAmount) : "",
       );
+    } else if (mode === "allocate" && goal) {
+      const preferSavings = Boolean(data && data.free > 0.001);
+      setFromSource(preferSavings ? "SAVINGS" : "CURRENT");
+      const available = preferSavings
+        ? (data?.free ?? 0)
+        : (data?.currentBalance ?? 0);
+      const fill = Math.min(goal.remaining, available);
+      if (fill > 0.001) setActionAmount(String(Math.round(fill * 100) / 100));
     } else {
       setFromSource(
         data && data.free > 0.001 && mode === "allocate"
@@ -115,6 +123,17 @@ export default function GoalsPage() {
       );
     }
     setError("");
+  }
+
+  function fillRemainingAmount(goal: Goal) {
+    const available =
+      fromSource === "SAVINGS"
+        ? (data?.free ?? 0)
+        : (data?.currentBalance ?? 0);
+    const fill = Math.min(goal.remaining, available);
+    if (fill > 0.001) {
+      setActionAmount(String(Math.round(fill * 100) / 100));
+    }
   }
 
   function closeAction() {
@@ -410,308 +429,382 @@ export default function GoalsPage() {
         </button>
       </form>
 
-      <section className="surface mt-6 overflow-hidden rounded-[1.75rem]">
-        <div className="border-b border-[var(--surface-border)] bg-[var(--soft-emerald)] px-4 py-3">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 className="text-xl font-semibold">{t("goalsList")}</h2>
-            {data && data.goals.length > 0 ? (
-              <span className="text-sm font-medium text-[var(--muted)]">
-                {data.goals.length === 1
-                  ? t("goalsCountOne")
-                  : fill(t("goalsCount"), {
-                      n: String(data.goals.length),
-                    })}
-              </span>
-            ) : null}
-          </div>
-          <Hint>{t("goalsListHint")}</Hint>
+      <section className="mt-6">
+        <div className="mb-3 flex items-baseline justify-between gap-3">
+          <h2 className="text-xl font-semibold">{t("goalsList")}</h2>
+          {data && data.goals.length > 0 ? (
+            <span className="text-sm font-medium text-[var(--muted)]">
+              {data.goals.length === 1
+                ? t("goalsCountOne")
+                : fill(t("goalsCount"), {
+                    n: String(data.goals.length),
+                  })}
+            </span>
+          ) : null}
         </div>
+        <Hint>{t("goalsListHint")}</Hint>
 
         {!data ? (
-          <p className="px-4 py-5 text-[var(--muted)]">…</p>
+          <p className="mt-3 text-[var(--muted)]">…</p>
         ) : data.goals.length === 0 ? (
-          <p className="px-4 py-5 text-[var(--muted)]">{t("goalsEmpty")}</p>
+          <p className="mt-3 text-[var(--muted)]">{t("goalsEmpty")}</p>
         ) : (
-          <ul className="divide-y divide-[var(--surface-border)]">
+          <ul className="mt-3 grid grid-cols-2 gap-3">
             {data.goals.map((g) => {
               const done = g.savedAmount + 0.001 >= g.targetAmount;
               const isOpen = actionId === g.id;
               return (
-                <li key={g.id} className="px-4 py-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                <li
+                  key={g.id}
+                  className={`surface overflow-hidden rounded-[1.5rem] ${
+                    isOpen || confirmBuyId === g.id ? "col-span-2" : ""
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (done) {
+                        closeAction();
+                        setConfirmBuyId((prev) =>
+                          prev === g.id ? "" : g.id,
+                        );
+                        setError("");
+                        return;
+                      }
+                      if (isOpen && actionMode === "allocate") {
+                        closeAction();
+                      } else {
+                        openAction(g.id, "allocate");
+                      }
+                    }}
+                    className="flex w-full flex-col p-3.5 text-start transition hover:bg-[var(--panel-soft)]"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
                         <span
-                          className="h-3 w-3 shrink-0 rounded-full"
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
                           style={{ background: g.color }}
                           aria-hidden
                         />
                         <p
-                          className="truncate text-lg font-semibold"
+                          className="truncate text-sm font-semibold"
                           dir="auto"
                         >
                           {g.name}
                         </p>
                       </div>
-                      {g.note ? (
-                        <p
-                          className="mt-1 text-sm text-[var(--muted)]"
-                          dir="auto"
-                        >
-                          {g.note}
-                        </p>
-                      ) : null}
-                    </div>
-                    <p className="shrink-0 text-sm font-bold text-[var(--accent-a-text)]">
-                      {fill(t("goalsProgress"), { pct: String(g.pct) })}
-                    </p>
-                  </div>
-
-                  <div className="mt-3">
-                    <ProgressBar pct={g.pct} color={g.color} />
-                    <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm">
-                      <span className="font-medium">
-                        <Money
-                          amount={g.savedAmount}
-                          currency={currency}
-                          locale={locale}
-                        />
-                        <span className="text-[var(--muted)]"> / </span>
-                        <Money
-                          amount={g.targetAmount}
-                          currency={currency}
-                          locale={locale}
-                        />
-                      </span>
-                      {done ? (
-                        <span className="font-semibold text-[var(--accent-a-text)]">
-                          {t("goalsDone")}
-                        </span>
-                      ) : (
-                        <span className="text-[var(--muted)]">
-                          {fill(t("goalsRemaining"), {
-                            amount: money(g.remaining, currency, locale),
-                          })}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {done ? (
-                      <button
-                        type="button"
-                        disabled={!!buyingId}
-                        onClick={() => {
-                          closeAction();
-                          setConfirmBuyId(g.id);
-                          setError("");
-                        }}
-                        className="rounded-xl bg-emerald-700 px-3 py-2 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
-                      >
-                        🛍 {t("goalsBuy")}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => openAction(g.id, "allocate")}
-                        className="rounded-xl bg-teal-800 px-3 py-2 text-sm font-semibold text-white"
-                      >
-                        ＋ {t("goalsAddMoney")}
-                      </button>
-                    )}
-                    {done ? (
-                      <button
-                        type="button"
-                        onClick={() => openAction(g.id, "allocate")}
-                        className="rounded-xl bg-[var(--panel-soft)] px-3 py-2 text-sm font-semibold"
-                      >
-                        ＋ {t("goalsAddMoney")}
-                      </button>
-                    ) : null}
-                    {g.savedAmount > 0.001 ? (
-                      <button
-                        type="button"
-                        onClick={() => openAction(g.id, "release")}
-                        className="rounded-xl bg-[var(--panel-soft)] px-3 py-2 text-sm font-semibold"
-                      >
-                        ↩ {t("goalsRelease")}
-                      </button>
-                    ) : null}
-                    <button
-                      type="button"
-                      onClick={() => openAction(g.id, "edit")}
-                      className="rounded-xl bg-[var(--panel-soft)] px-3 py-2 text-sm font-semibold"
-                    >
-                      ✎ {t("goalsEdit")}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!!deletingId}
-                      onClick={() => onDelete(g.id)}
-                      className="rounded-xl px-3 py-2 text-sm font-semibold text-red-700 hover:bg-[var(--soft-red)] disabled:opacity-60"
-                    >
-                      {deletingId === g.id ? t("saving") : t("goalsDelete")}
-                    </button>
-                  </div>
-
-                  {confirmBuyId === g.id ? (
-                    <div className="mt-3 space-y-2 rounded-2xl bg-[var(--soft-emerald)] p-3">
-                      <p className="text-sm font-medium text-[var(--accent-a-text)]">
-                        {t("goalsBuyConfirm")}
+                      <p className="shrink-0 text-sm font-bold text-[var(--accent-a-text)]">
+                        {fill(t("goalsProgress"), { pct: String(g.pct) })}
                       </p>
-                      <Hint>{t("goalsBuyHint")}</Hint>
-                      <div className="flex gap-2">
+                    </div>
+                    <div className="mt-3">
+                      <ProgressBar pct={g.pct} color={g.color} />
+                    </div>
+                    <p className="mt-2 text-xs font-medium tabular-nums text-[var(--muted)]">
+                      <Money
+                        amount={g.savedAmount}
+                        currency={currency}
+                        locale={locale}
+                      />
+                      <span> / </span>
+                      <Money
+                        amount={g.targetAmount}
+                        currency={currency}
+                        locale={locale}
+                      />
+                    </p>
+                    {done ? (
+                      <p className="mt-1 text-xs font-semibold text-[var(--accent-a-text)]">
+                        {t("goalsDone")}
+                      </p>
+                    ) : null}
+                  </button>
+
+                  {isOpen || confirmBuyId === g.id ? (
+                    <div className="space-y-3 border-t border-[var(--surface-border)] px-3.5 py-3">
+                      <div className="flex flex-wrap gap-2">
+                        {done ? (
+                          <button
+                            type="button"
+                            disabled={!!buyingId}
+                            onClick={() => {
+                              closeAction();
+                              setConfirmBuyId(g.id);
+                              setError("");
+                            }}
+                            className="rounded-xl bg-emerald-700 px-3 py-2 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
+                          >
+                            🛍 {t("goalsBuy")}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => openAction(g.id, "allocate")}
+                            className={`rounded-xl px-3 py-2 text-sm font-semibold ${
+                              actionMode === "allocate"
+                                ? "bg-teal-800 text-white"
+                                : "bg-[var(--panel-soft)]"
+                            }`}
+                          >
+                            ＋ {t("goalsAddMoney")}
+                          </button>
+                        )}
+                        {done ? (
+                          <button
+                            type="button"
+                            onClick={() => openAction(g.id, "allocate")}
+                            className="rounded-xl bg-[var(--panel-soft)] px-3 py-2 text-sm font-semibold"
+                          >
+                            ＋ {t("goalsAddMoney")}
+                          </button>
+                        ) : null}
+                        {g.savedAmount > 0.001 ? (
+                          <button
+                            type="button"
+                            onClick={() => openAction(g.id, "release")}
+                            className={`rounded-xl px-3 py-2 text-sm font-semibold ${
+                              actionMode === "release"
+                                ? "bg-teal-800 text-white"
+                                : "bg-[var(--panel-soft)]"
+                            }`}
+                          >
+                            ↩ {t("goalsRelease")}
+                          </button>
+                        ) : null}
                         <button
                           type="button"
-                          disabled={!!buyingId}
-                          onClick={() => onBuy(g.id)}
-                          className="flex min-h-12 flex-1 items-center justify-center rounded-2xl bg-emerald-700 font-semibold text-white disabled:opacity-60"
+                          onClick={() => openAction(g.id, "edit")}
+                          className={`rounded-xl px-3 py-2 text-sm font-semibold ${
+                            actionMode === "edit"
+                              ? "bg-teal-800 text-white"
+                              : "bg-[var(--panel-soft)]"
+                          }`}
                         >
-                          {buyingId === g.id ? t("goalsBuying") : t("goalsBuy")}
+                          ✎ {t("goalsEdit")}
                         </button>
                         <button
                           type="button"
-                          onClick={() => setConfirmBuyId("")}
-                          className="min-h-12 rounded-2xl bg-[var(--surface-bg)] px-4 font-semibold text-[var(--muted)]"
+                          disabled={!!deletingId}
+                          onClick={() => onDelete(g.id)}
+                          className="rounded-xl px-3 py-2 text-sm font-semibold text-red-700 hover:bg-[var(--soft-red)] disabled:opacity-60"
                         >
-                          {t("goalsCancel")}
+                          {deletingId === g.id
+                            ? t("saving")
+                            : t("goalsDelete")}
                         </button>
                       </div>
-                    </div>
-                  ) : null}
 
-                  {isOpen && actionMode ? (
-                    <form
-                      onSubmit={submitAction}
-                      className="mt-3 space-y-3 rounded-2xl bg-[var(--panel-soft)] p-3"
-                    >
-                      <p className="text-sm font-medium">
-                        {actionMode === "allocate"
-                          ? t("goalsAddMoney")
-                          : actionMode === "release"
-                            ? t("goalsRelease")
-                            : t("goalsEditTitle")}
-                      </p>
-                      <Hint>
-                        {actionMode === "allocate"
-                          ? t("goalsAddMoneyHint")
-                          : actionMode === "release"
-                            ? t("goalsReleaseHint")
-                            : t("goalsEditHint")}
-                      </Hint>
-
-                      {actionMode === "edit" ? (
-                        <>
-                          <label className="block">
-                            <span className="mb-1 block text-sm font-medium">
-                              {t("goalsName")}
-                            </span>
-                            <input
-                              required
-                              autoFocus
-                              value={editName}
-                              onChange={(e) => setEditName(e.target.value)}
-                              className="field w-full rounded-2xl px-4 py-3 text-lg"
-                              dir="auto"
-                            />
-                          </label>
-                          <label className="block">
-                            <span className="mb-1 block text-sm font-medium">
-                              {t("goalsTarget")}
-                            </span>
-                            <input
-                              inputMode="decimal"
-                              dir="ltr"
-                              required
-                              value={editTarget}
-                              onChange={(e) => setEditTarget(e.target.value)}
-                              className="field amount-input w-full rounded-2xl px-4 py-3 text-xl"
-                            />
-                            <Hint>{t("goalsTargetHint")}</Hint>
-                          </label>
-                        </>
-                      ) : null}
-
-                      {actionMode === "allocate" ? (
-                        <div className="grid grid-cols-2 gap-2">
-                          <button
-                            type="button"
-                            onClick={() => setFromSource("CURRENT")}
-                            className={`rounded-2xl px-2 py-3 text-sm font-bold ${
-                              fromSource === "CURRENT"
-                                ? "bg-teal-800 text-white shadow"
-                                : "bg-[var(--surface-bg)]"
-                            }`}
-                          >
-                            💵 {t("goalsFromCurrent")}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setFromSource("SAVINGS")}
-                            className={`rounded-2xl px-2 py-3 text-sm font-bold ${
-                              fromSource === "SAVINGS"
-                                ? "bg-teal-800 text-white shadow"
-                                : "bg-[var(--surface-bg)]"
-                            }`}
-                          >
-                            💰 {t("goalsFromSavings")}
-                          </button>
+                      {confirmBuyId === g.id ? (
+                        <div className="space-y-2 rounded-2xl bg-[var(--soft-emerald)] p-3">
+                          <p className="text-sm font-medium text-[var(--accent-a-text)]">
+                            {t("goalsBuyConfirm")}
+                          </p>
+                          <Hint>{t("goalsBuyHint")}</Hint>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              disabled={!!buyingId}
+                              onClick={() => onBuy(g.id)}
+                              className="flex min-h-12 flex-1 items-center justify-center rounded-2xl bg-emerald-700 font-semibold text-white disabled:opacity-60"
+                            >
+                              {buyingId === g.id
+                                ? t("goalsBuying")
+                                : t("goalsBuy")}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmBuyId("")}
+                              className="min-h-12 rounded-2xl bg-[var(--surface-bg)] px-4 font-semibold text-[var(--muted)]"
+                            >
+                              {t("goalsCancel")}
+                            </button>
+                          </div>
                         </div>
                       ) : null}
 
-                      {actionMode === "allocate" ||
-                      actionMode === "release" ? (
-                        <label className="block">
-                          <span className="mb-1 block text-sm font-medium">
-                            {t("goalsActionAmount")}
-                          </span>
-                          <input
-                            inputMode="decimal"
-                            dir="ltr"
-                            required
-                            autoFocus
-                            value={actionAmount}
-                            onChange={(e) => setActionAmount(e.target.value)}
-                            className="field amount-input w-full rounded-2xl px-4 py-3 text-xl"
-                            placeholder="1000"
-                          />
-                          {actionMode === "release" ? (
+                      {isOpen && actionMode ? (
+                        <form
+                          onSubmit={submitAction}
+                          className="space-y-3 rounded-2xl bg-[var(--panel-soft)] p-3"
+                        >
+                          <p className="text-sm font-medium">
+                            {actionMode === "allocate"
+                              ? t("goalsAddMoney")
+                              : actionMode === "release"
+                                ? t("goalsRelease")
+                                : t("goalsEditTitle")}
+                          </p>
+                          <Hint>
+                            {actionMode === "allocate"
+                              ? t("goalsAddMoneyHint")
+                              : actionMode === "release"
+                                ? t("goalsReleaseHint")
+                                : t("goalsEditHint")}
+                          </Hint>
+
+                          {actionMode === "edit" ? (
+                            <>
+                              <label className="block">
+                                <span className="mb-1 block text-sm font-medium">
+                                  {t("goalsName")}
+                                </span>
+                                <input
+                                  required
+                                  autoFocus
+                                  value={editName}
+                                  onChange={(e) =>
+                                    setEditName(e.target.value)
+                                  }
+                                  className="field w-full rounded-2xl px-4 py-3 text-lg"
+                                  dir="auto"
+                                />
+                              </label>
+                              <label className="block">
+                                <span className="mb-1 block text-sm font-medium">
+                                  {t("goalsTarget")}
+                                </span>
+                                <input
+                                  inputMode="decimal"
+                                  dir="ltr"
+                                  required
+                                  value={editTarget}
+                                  onChange={(e) =>
+                                    setEditTarget(e.target.value)
+                                  }
+                                  className="field amount-input w-full rounded-2xl px-4 py-3 text-xl"
+                                />
+                                <Hint>{t("goalsTargetHint")}</Hint>
+                              </label>
+                            </>
+                          ) : null}
+
+                          {actionMode === "allocate" ? (
+                            <div className="grid grid-cols-2 gap-2">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFromSource("CURRENT");
+                                  const available = data?.currentBalance ?? 0;
+                                  const next = Math.min(
+                                    g.remaining,
+                                    available,
+                                  );
+                                  if (next > 0.001) {
+                                    setActionAmount(
+                                      String(Math.round(next * 100) / 100),
+                                    );
+                                  }
+                                }}
+                                className={`rounded-2xl px-2 py-3 text-sm font-bold ${
+                                  fromSource === "CURRENT"
+                                    ? "bg-teal-800 text-white shadow"
+                                    : "bg-[var(--surface-bg)]"
+                                }`}
+                              >
+                                💵 {t("goalsFromCurrent")}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setFromSource("SAVINGS");
+                                  const available = data?.free ?? 0;
+                                  const next = Math.min(
+                                    g.remaining,
+                                    available,
+                                  );
+                                  if (next > 0.001) {
+                                    setActionAmount(
+                                      String(Math.round(next * 100) / 100),
+                                    );
+                                  }
+                                }}
+                                className={`rounded-2xl px-2 py-3 text-sm font-bold ${
+                                  fromSource === "SAVINGS"
+                                    ? "bg-teal-800 text-white shadow"
+                                    : "bg-[var(--surface-bg)]"
+                                }`}
+                              >
+                                💰 {t("goalsFromSavings")}
+                              </button>
+                            </div>
+                          ) : null}
+
+                          {actionMode === "allocate" ||
+                          actionMode === "release" ? (
+                            <label className="block">
+                              <span className="mb-1 block text-sm font-medium">
+                                {t("goalsActionAmount")}
+                              </span>
+                              <input
+                                inputMode="decimal"
+                                dir="ltr"
+                                required
+                                autoFocus
+                                value={actionAmount}
+                                onChange={(e) =>
+                                  setActionAmount(e.target.value)
+                                }
+                                className="field amount-input w-full rounded-2xl px-4 py-3 text-xl"
+                                placeholder="1000"
+                              />
+                              {actionMode === "allocate" &&
+                              g.remaining > 0.001 ? (
+                                <button
+                                  type="button"
+                                  className="mt-2 text-sm font-semibold text-[var(--accent-a-text)]"
+                                  onClick={() => fillRemainingAmount(g)}
+                                >
+                                  {t("goalsFillRemaining")} ·{" "}
+                                  {money(
+                                    Math.min(
+                                      g.remaining,
+                                      fromSource === "SAVINGS"
+                                        ? (data?.free ?? 0)
+                                        : (data?.currentBalance ?? 0),
+                                    ),
+                                    currency,
+                                    locale,
+                                  )}
+                                </button>
+                              ) : null}
+                              {actionMode === "release" ? (
+                                <button
+                                  type="button"
+                                  className="mt-2 text-sm font-semibold text-[var(--accent-a-text)]"
+                                  onClick={() =>
+                                    setActionAmount(String(g.savedAmount))
+                                  }
+                                >
+                                  {t("goalsReclaimAll")} ·{" "}
+                                  {money(g.savedAmount, currency, locale)}
+                                </button>
+                              ) : null}
+                            </label>
+                          ) : null}
+
+                          <div className="flex gap-2">
+                            <button
+                              type="submit"
+                              disabled={actionBusy}
+                              className="flex min-h-12 flex-1 items-center justify-center rounded-2xl bg-teal-800 font-semibold text-white disabled:opacity-60"
+                            >
+                              {actionBusy
+                                ? t("saving")
+                                : actionMode === "edit"
+                                  ? t("goalsEditSave")
+                                  : t("save")}
+                            </button>
                             <button
                               type="button"
-                              className="mt-2 text-sm font-semibold text-[var(--accent-a-text)]"
-                              onClick={() =>
-                                setActionAmount(String(g.savedAmount))
-                              }
+                              onClick={closeAction}
+                              className="min-h-12 rounded-2xl bg-[var(--surface-bg)] px-4 font-semibold text-[var(--muted)]"
                             >
-                              {t("goalsReclaimAll")} ·{" "}
-                              {money(g.savedAmount, currency, locale)}
+                              {t("goalsCancel")}
                             </button>
-                          ) : null}
-                        </label>
+                          </div>
+                        </form>
                       ) : null}
-
-                      <div className="flex gap-2">
-                        <button
-                          type="submit"
-                          disabled={actionBusy}
-                          className="flex min-h-12 flex-1 items-center justify-center rounded-2xl bg-teal-800 font-semibold text-white disabled:opacity-60"
-                        >
-                          {actionBusy
-                            ? t("saving")
-                            : actionMode === "edit"
-                              ? t("goalsEditSave")
-                              : t("save")}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={closeAction}
-                          className="min-h-12 rounded-2xl bg-[var(--surface-bg)] px-4 font-semibold text-[var(--muted)]"
-                        >
-                          {t("goalsCancel")}
-                        </button>
-                      </div>
-                    </form>
+                    </div>
                   ) : null}
                 </li>
               );
