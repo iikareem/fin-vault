@@ -10,6 +10,7 @@ import { useBooks } from "@/components/BooksProvider";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 import { ItemDate } from "@/components/ItemDate";
+import { DateField } from "@/components/DateField";
 import {
   isCashWallet,
   isCurrentWallet,
@@ -241,16 +242,10 @@ export default function OutsideLoansPage() {
               ))}
             </select>
           </label>
-          <label className="block">
+          <div>
             <span className="mb-1 block font-medium">{t("day")}</span>
-            <input
-              type="date"
-              className="field text-lg"
-              value={occurredOn}
-              onChange={(e) => setOccurredOn(e.target.value)}
-              required
-            />
-          </label>
+            <DateField value={occurredOn} onChange={setOccurredOn} />
+          </div>
           <label className="block">
             <span className="mb-1 block font-medium">{t("noteOptional")}</span>
             <input

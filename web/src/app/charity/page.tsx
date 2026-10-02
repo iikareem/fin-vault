@@ -9,6 +9,7 @@ import { useBooks } from "@/components/BooksProvider";
 import { labelFor } from "@/lib/i18n";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
+import { DateField } from "@/components/DateField";
 import { useCalendarClock } from "@/hooks/useCalendarClock";
 import { shiftMonthKey } from "@/lib/calendar";
 import {
@@ -192,14 +193,14 @@ export default function CharityPage() {
         >
           ‹
         </button>
-        <input
-          type="month"
-          value={month}
-          onChange={(e) => {
-            if (e.target.value) setMonth(e.target.value);
-          }}
-          className="min-w-0 flex-1 rounded-2xl border border-stone-200 bg-white px-3 py-2 text-center text-lg font-semibold"
-        />
+        <div className="min-w-0 flex-1">
+          <DateField
+            type="month"
+            align="center"
+            value={month}
+            onChange={setMonth}
+          />
+        </div>
         <button
           type="button"
           className="rounded-2xl bg-white px-4 py-3 text-xl font-bold shadow-sm"
@@ -278,17 +279,15 @@ export default function CharityPage() {
           />
           <Hint>{t("amountHint")}</Hint>
         </label>
-        <label className="block">
+        <div>
           <span className="text-stone-500">{t("day")}</span>
-          <input
-            type="date"
-            required
+          <DateField
+            className="mt-1"
             value={occurredOn}
-            onChange={(e) => setOccurredOn(e.target.value)}
-            className="mt-1 w-full rounded-2xl border border-stone-200 px-3 py-3 text-lg"
+            onChange={setOccurredOn}
           />
           <Hint>{t("dayHint")}</Hint>
-        </label>
+        </div>
         <label className="block">
           <span className="text-stone-500">{t("noteOptional")}</span>
           <input

@@ -23,6 +23,13 @@ import { DateField } from "@/components/DateField";
 
 type Period = "day" | "week" | "month" | "year" | "range";
 type DayRow = { day: string; income: number; expense: number };
+type CatChild = {
+  categoryId: string;
+  name: string;
+  nameAr?: string;
+  emoji?: string;
+  total: number;
+};
 type CatRow = {
   categoryId?: string;
   name: string;
@@ -31,6 +38,7 @@ type CatRow = {
   emoji?: string;
   type: string;
   total: number;
+  children?: CatChild[];
 };
 type MemberRow = { name: string; type: string; total: number };
 type SavingsMonth = {
@@ -223,6 +231,7 @@ export default function AnalyticsPage() {
   const [prevOut, setPrevOut] = useState<number | null>(null);
   const [cats, setCats] = useState<CatRow[]>([]);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
+  const [expandedSubs, setExpandedSubs] = useState<string[]>([]);
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [savingsMonths, setSavingsMonths] = useState<SavingsMonth[]>([]);
   const [savingsOpening, setSavingsOpening] = useState(0);
@@ -267,6 +276,7 @@ export default function AnalyticsPage() {
         setDays(d);
         setCats(c.filter((x) => x.type === "EXPENSE"));
         setSelectedGroups([]);
+        setExpandedSubs([]);
         setMembers(m);
         setSavingsOpening(s.opening);
         setSavingsMonths(s.months);
@@ -1309,6 +1319,199 @@ export default function AnalyticsPage() {
                           </button>
                         ))}
                       </div>
+                    </div>
+                  ) : null}
+
+                  {!hideAggregates &&
+                  selectedCats.some(
+                    (c) => (c.children?.length ?? 0) > 0,
+                  ) ? (
+                    <div className="mt-4 space-y-2.5">
+                      <p className="text-xs font-medium text-[var(--muted)]">
+                        {t("selectionBreakdown")}
+                      </p>
+                      {[...selectedCats]
+                        .sort((a, b) => b.total - a.total)
+                        .map((group) => {
+                          const kids = group.children ?? [];
+                          const gKey = catKey(group);
+                          const groupShare =
+                            selectedTotal > 0
+                              ? Math.round((group.total / selectedTotal) * 100)
+                              : 0;
+                          const expanded = expandedSubs.includes(gKey);
+                          const visible = expanded ? kids : kids.slice(0, 4);
+                          const maxKid = Math.max(
+                            1,
+                            ...kids.map((k) => k.total),
+                          );
+                          const hasRealSubs = kids.some(
+                            (k) => k.categoryId !== group.categoryId,
+                          );
+
+                          return (
+                            <div
+                              key={gKey}
+                              className="overflow-hidden rounded-2xl bg-[var(--surface-bg)]"
+                            >
+                              <div className="flex items-stretch">
+                                <span
+                                  className="w-1.5 shrink-0"
+                                  style={{ background: group.color }}
+                                  aria-hidden
+                                />
+                                <div className="min-w-0 flex-1 px-3 py-2.5">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <p className="truncate text-sm font-bold">
+                                        {group.emoji ? `${group.emoji} ` : ""}
+                                        {categoryLabel(group, locale, t)}
+                                      </p>
+                                      <p className="mt-0.5 text-xs text-[var(--muted)]">
+                                        {fill(t("ofSelection"), {
+                                          pct: String(groupShare),
+                                        })}
+                                      </p>
+                                    </div>
+                                    <p className="shrink-0 text-sm font-semibold tabular-nums text-red-800">
+                                      <Money
+                                        amount={group.total}
+                                        currency={currency}
+                                        locale={locale}
+                                      />
+                                    </p>
+                                  </div>
+
+                                  {kids.length === 0 || !hasRealSubs ? (
+                                    <p className="mt-2 text-xs text-[var(--muted)]">
+                                      {t("allInGroupDirect")}
+                                    </p>
+                                  ) : (
+                                    <ul className="mt-2.5 space-y-1.5">
+                                      {visible.map((kid) => {
+                                        const direct =
+                                          kid.categoryId === group.categoryId;
+                                        const pct =
+                                          group.total > 0
+                                            ? Math.round(
+                                                (kid.total / group.total) * 100,
+                                              )
+                                            : 0;
+                                        const barPct = Math.max(
+                                          6,
+                                          Math.round(
+                                            (kid.total / maxKid) * 100,
+                                          ),
+                                        );
+                                        const label = direct
+                                          ? t("subcategoryDirect")
+                                          : categoryLabel(kid, locale, t);
+                                        const logHref = kid.categoryId
+                                          ? `/analytics/category-log?${new URLSearchParams(
+                                              {
+                                                cats: kid.categoryId,
+                                                from,
+                                                to,
+                                              },
+                                            ).toString()}`
+                                          : null;
+                                        const row = (
+                                          <>
+                                            <span className="flex min-w-0 items-center gap-1.5">
+                                              {kid.emoji && !direct ? (
+                                                <span
+                                                  className="shrink-0 text-xs"
+                                                  aria-hidden
+                                                >
+                                                  {kid.emoji}
+                                                </span>
+                                              ) : (
+                                                <span
+                                                  className="inline-block h-2 w-2 shrink-0 rounded-full"
+                                                  style={{
+                                                    background: group.color,
+                                                    opacity: direct ? 0.45 : 1,
+                                                  }}
+                                                  aria-hidden
+                                                />
+                                              )}
+                                              <span className="min-w-0 truncate text-xs font-medium">
+                                                {label}
+                                              </span>
+                                            </span>
+                                            <span className="flex shrink-0 items-center gap-1.5 tabular-nums">
+                                              <span className="text-xs font-semibold">
+                                                <Money
+                                                  amount={kid.total}
+                                                  currency={currency}
+                                                  locale={locale}
+                                                />
+                                              </span>
+                                              <span className="text-[10px] text-[var(--muted)]">
+                                                {fill(t("ofThisGroup"), {
+                                                  pct: String(pct),
+                                                })}
+                                              </span>
+                                            </span>
+                                            <span
+                                              className="col-span-2 mt-0.5 h-1 overflow-hidden rounded-full bg-[var(--panel-soft)]"
+                                              aria-hidden
+                                            >
+                                              <span
+                                                className="block h-full rounded-full"
+                                                style={{
+                                                  width: `${barPct}%`,
+                                                  background: group.color,
+                                                  opacity: 0.85,
+                                                }}
+                                              />
+                                            </span>
+                                          </>
+                                        );
+                                        return (
+                                          <li key={kid.categoryId}>
+                                            {logHref ? (
+                                              <Link
+                                                href={logHref}
+                                                className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 rounded-xl px-1 py-1 transition hover:bg-[var(--panel-soft)] active:scale-[0.99]"
+                                              >
+                                                {row}
+                                              </Link>
+                                            ) : (
+                                              <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 px-1 py-1">
+                                                {row}
+                                              </div>
+                                            )}
+                                          </li>
+                                        );
+                                      })}
+                                    </ul>
+                                  )}
+
+                                  {hasRealSubs && kids.length > 4 ? (
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        setExpandedSubs((prev) =>
+                                          expanded
+                                            ? prev.filter((k) => k !== gKey)
+                                            : [...prev, gKey],
+                                        )
+                                      }
+                                      className="mt-2 text-xs font-semibold text-[var(--muted)] underline-offset-2 hover:underline"
+                                    >
+                                      {expanded
+                                        ? t("showLessSubs")
+                                        : fill(t("showAllSubs"), {
+                                            n: String(kids.length),
+                                          })}
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                     </div>
                   ) : null}
 

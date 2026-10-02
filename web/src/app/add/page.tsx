@@ -2,7 +2,7 @@
 
 import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api, parseAmount, todayISO } from "@/lib/api";
+import { api, parseAmount, todayISO, yesterdayISO } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/components/I18nProvider";
@@ -10,6 +10,7 @@ import { useBooks } from "@/components/BooksProvider";
 import { householdPath, type Space } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 import { CategoryPicker } from "@/components/CategoryPicker";
+import { DateField } from "@/components/DateField";
 import {
   isCashWallet,
   isCurrentWallet,
@@ -809,17 +810,31 @@ function AddForm() {
             <Hint>{t("pickWalletHint")}</Hint>
           </div>
         ) : null}
-        <label className="block">
+        <div>
           <span className="mb-1 block font-medium">{t("day")}</span>
-          <input
-            type="date"
-            className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-lg"
-            value={occurredOn}
-            onChange={(e) => setOccurredOn(e.target.value)}
-            required
-          />
+          <div className="mb-2 flex gap-2">
+            <button
+              type="button"
+              onClick={() => setOccurredOn(todayISO())}
+              className={`chip flex-1 ${
+                occurredOn === todayISO() ? "chip-active" : ""
+              }`}
+            >
+              {t("today")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setOccurredOn(yesterdayISO())}
+              className={`chip flex-1 ${
+                occurredOn === yesterdayISO() ? "chip-active" : ""
+              }`}
+            >
+              {t("yesterday")}
+            </button>
+          </div>
+          <DateField value={occurredOn} onChange={setOccurredOn} />
           <Hint>{t("dayHint")}</Hint>
-        </label>
+        </div>
         <label className="block">
           <span className="mb-1 block font-medium">{t("noteOptional")}</span>
           <input

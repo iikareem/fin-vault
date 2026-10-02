@@ -11,6 +11,7 @@ import { labelFor, categoryLabel, fill } from "@/lib/i18n";
 import { householdPath } from "@/lib/space";
 import { Money } from "@/components/Money";
 import { ItemDate } from "@/components/ItemDate";
+import { DateField } from "@/components/DateField";
 import { sortByOccurredOnDesc } from "@/lib/calendar";
 
 type Person = { id: string; name: string };
@@ -432,17 +433,11 @@ export default function BetweenPage() {
           />
           <p className="mt-1 text-sm leading-relaxed text-stone-500">{t("amountHint")}</p>
         </label>
-        <label className="block">
+        <div>
           <span className="mb-1 block font-medium">{t("day")}</span>
-          <input
-            type="date"
-            className="w-full rounded-2xl border border-stone-300 px-4 py-3 text-lg"
-            value={occurredOn}
-            onChange={(e) => setOccurredOn(e.target.value)}
-            required
-          />
+          <DateField value={occurredOn} onChange={setOccurredOn} />
           <p className="mt-1 text-sm leading-relaxed text-stone-500">{t("dayHint")}</p>
-        </label>
+        </div>
         <label className="block">
           <span className="mb-1 block font-medium">{t("noteOptional")}</span>
           <input

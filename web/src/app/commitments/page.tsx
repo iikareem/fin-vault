@@ -10,6 +10,7 @@ import { useBooks } from "@/components/BooksProvider";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 import { ItemDate } from "@/components/ItemDate";
+import { DateField } from "@/components/DateField";
 import { CategoryPicker } from "@/components/CategoryPicker";
 import {
   isCashWallet,
@@ -658,14 +659,14 @@ export default function SubscriptionsPage() {
         >
           ‹
         </button>
-        <input
-          type="month"
-          value={period}
-          onChange={(e) => {
-            if (e.target.value) setPeriod(e.target.value);
-          }}
-          className="min-w-0 flex-1 rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-center text-lg font-semibold"
-        />
+        <div className="min-w-0 flex-1">
+          <DateField
+            type="month"
+            align="center"
+            value={period}
+            onChange={setPeriod}
+          />
+        </div>
         <button
           type="button"
           className="rounded-2xl bg-[var(--panel)] px-4 py-3 text-xl font-bold shadow-sm ring-1 ring-[var(--border)]"

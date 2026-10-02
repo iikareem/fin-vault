@@ -130,3 +130,9 @@ export function parseAmount(raw: string) {
 export function todayISO() {
   return isoLocal(new Date());
 }
+
+export function yesterdayISO() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return isoLocal(d);
+}

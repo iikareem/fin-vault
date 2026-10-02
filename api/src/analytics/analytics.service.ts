@@ -416,37 +416,72 @@ export class AnalyticsService {
     const cats = await this.prisma.category.findMany({
       where: { householdId },
     });
-    const totals = new Map<
-      string,
-      {
-        categoryId: string;
-        name: string;
-        nameAr: string;
-        color: string;
-        emoji: string;
-        type: string;
-        total: number;
-      }
-    >();
-    for (const r of rows) {
-      const cat = cats.find((c) => c.id === r.categoryId);
-      const group = cat?.parentId
-        ? cats.find((c) => c.id === cat.parentId)
+    const hasSubs = new Set(
+      cats.filter((c) => c.parentId).map((c) => c.parentId as string),
+    );
+    type ChildAcc = {
+      categoryId: string;
+      name: string;
+      nameAr: string;
+      emoji: string;
+      total: number;
+    };
+    type GroupAcc = {
+      categoryId: string;
+      name: string;
+      nameAr: string;
+      color: string;
+      emoji: string;
+      type: string;
+      total: number;
+      childMap: Map<string, ChildAcc>;
+    };
+    const totals = new Map<string, GroupAcc>();
+
+    const addAmount = (
+      leafId: string,
+      type: string,
+      amount: number,
+    ) => {
+      if (amount === 0) return;
+      const leaf = cats.find((c) => c.id === leafId);
+      const group = leaf?.parentId
+        ? cats.find((c) => c.id === leaf.parentId)
         : undefined;
-      const bucket = group ?? cat;
-      const type = r.type === 'TRACK' ? 'EXPENSE' : r.type;
-      const key = `${bucket?.id ?? r.categoryId}:${type}`;
-      const cur = totals.get(key) ?? {
-        categoryId: bucket?.id ?? r.categoryId,
-        name: bucket?.name ?? 'Unknown',
-        nameAr: bucket?.nameAr ?? '',
-        color: bucket?.color ?? '#64748b',
-        emoji: bucket?.emoji ?? '',
-        type,
-        total: 0,
-      };
-      cur.total += Number(r._sum.amount ?? 0);
+      const bucket = group ?? leaf;
+      const groupId = bucket?.id ?? leafId;
+      const key = `${groupId}:${type}`;
+      const cur =
+        totals.get(key) ??
+        ({
+          categoryId: groupId,
+          name: bucket?.name ?? 'Unknown',
+          nameAr: bucket?.nameAr ?? '',
+          color: bucket?.color ?? '#64748b',
+          emoji: bucket?.emoji ?? '',
+          type,
+          total: 0,
+          childMap: new Map(),
+        } satisfies GroupAcc);
+      cur.total += amount;
+      const childId = leaf?.id ?? leafId;
+      const child =
+        cur.childMap.get(childId) ??
+        ({
+          categoryId: childId,
+          name: leaf?.name ?? 'Unknown',
+          nameAr: leaf?.nameAr ?? '',
+          emoji: leaf?.emoji ?? '',
+          total: 0,
+        } satisfies ChildAcc);
+      child.total += amount;
+      cur.childMap.set(childId, child);
       totals.set(key, cur);
+    };
+
+    for (const r of rows) {
+      const type = r.type === 'TRACK' ? 'EXPENSE' : r.type;
+      addAmount(r.categoryId, type, Number(r._sum.amount ?? 0));
     }
     if (membership.kind === 'HOUSE') {
       const claims = await this.prisma.houseClaim.groupBy({
@@ -458,22 +493,23 @@ export class AnalyticsService {
         _sum: { amount: true },
       });
       for (const r of claims) {
-        const cat = cats.find((c) => c.id === r.categoryId);
-        const key = `${r.categoryId}:EXPENSE`;
-        const cur = totals.get(key) ?? {
-          categoryId: r.categoryId,
-          name: cat?.name ?? 'Unknown',
-          nameAr: cat?.nameAr ?? '',
-          color: cat?.color ?? '#64748b',
-          emoji: cat?.emoji ?? '',
-          type: 'EXPENSE',
-          total: 0,
-        };
-        cur.total += Number(r._sum.amount ?? 0);
-        totals.set(key, cur);
+        addAmount(r.categoryId, 'EXPENSE', Number(r._sum.amount ?? 0));
       }
     }
-    return [...totals.values()].sort((a, b) => b.total - a.total);
+
+    return [...totals.values()]
+      .map(({ childMap, ...row }) => {
+        const children = [...childMap.values()]
+          .filter((c) => c.total > 0)
+          .sort((a, b) => b.total - a.total);
+        // Only attach breakdown when the group has subcategories in the books,
+        // or spend landed on more than one leaf (including direct-on-parent).
+        const attach =
+          hasSubs.has(row.categoryId) ||
+          children.some((c) => c.categoryId !== row.categoryId);
+        return attach ? { ...row, children } : { ...row };
+      })
+      .sort((a, b) => b.total - a.total);
   }
 
   async byMember(membership: MembershipContext, from: string, to: string) {
