@@ -390,6 +390,10 @@ const ar = {
   pickSubCategory: "اختاروا التفصيلة",
   profileTitle: "حسابي",
   profileHint: "غيّروا كلمة السر من هنا. الصفحة دي موجودة في البيت وفي فلوسكم.",
+  iosHomeTipTitle: "افتحوها من الشاشة الرئيسية",
+  iosHomeTipBody:
+    "من Safari: مشاركة ← إضافة إلى الشاشة الرئيسية. هتفتح من غير شريط البحث، أوضح على الآيفون.",
+  iosHomeTipDismiss: "إخفاء",
   myCategories: "فئاتي",
   myCategoriesHint: "ضيفوا وعدّلوا فئات الصرف بتاعتكم بس — مش هتأثر على البيت ولا على حد تاني.",
   myCategoriesLinkHint: "إنشاء وتعديل الفئات والتفاصيل لفلوسكم.",
@@ -1190,6 +1194,10 @@ const en = {
   profileTitle: "My profile",
   profileHint:
     "Change your password here. This page is available in both house and personal books.",
+  iosHomeTipTitle: "Open from the Home Screen",
+  iosHomeTipBody:
+    "In Safari: Share → Add to Home Screen. It opens without the search bar — much clearer on iPhone.",
+  iosHomeTipDismiss: "Dismiss",
   myCategories: "My categories",
   myCategoriesHint:
     "Add and edit spending categories for your money only — it won’t change the house or anyone else.",

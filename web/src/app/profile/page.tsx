@@ -13,6 +13,7 @@ import { budgetMonthRange } from "@/lib/calendar";
 import { CURRENCY_OPTIONS } from "@/lib/currencies";
 import { fill, type MessageKey } from "@/lib/i18n";
 import { THEME_OPTIONS } from "@/lib/themes";
+import { IosHomeScreenTip } from "@/components/IosHomeScreenTip";
 
 const THEME_LABEL: Record<ThemeMode, MessageKey> = {
   light: "themeLight",
@@ -134,6 +135,7 @@ export default function ProfilePage() {
         <p className="mt-2 text-lg font-semibold text-stone-800">{name}</p>
       ) : null}
       <Hint>{t("profileHint")}</Hint>
+      <IosHomeScreenTip />
 
       <Link
         href="/profile/categories"
