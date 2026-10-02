@@ -1,253 +1,269 @@
 # Fin Vault
 
-Personal cash management you can self-host.
+**A bilingual, self-hostable personal finance app for everyday money management.**
 
-Fin Vault is a production web app for tracking personal wallets, income and spending, day-by-day history, analytics, savings goals, and recurring commitments. The interface defaults to English (LTR) with Arabic (RTL) available. Default currency is EGP.
+[![Live App](https://img.shields.io/badge/Live_App-Open-0f766e?style=flat-square)](https://personal-budget-calc.up.railway.app)
+[![Next.js](https://img.shields.io/badge/Next.js-15-000000?style=flat-square&logo=next.js)](https://nextjs.org/)
+[![NestJS](https://img.shields.io/badge/NestJS-11-e0234e?style=flat-square&logo=nestjs)](https://nestjs.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169e1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
-| | |
-| --- | --- |
-| **Production** | [https://personal-budget-calc.up.railway.app](https://personal-budget-calc.up.railway.app) |
-| **Repository** | [https://github.com/iikareem/fin-vault](https://github.com/iikareem/fin-vault) |
-| **Register** | [Create an account](https://personal-budget-calc.up.railway.app/register) |
+Fin Vault brings wallets, spending, income, savings goals, commitments, loans, and analytics into one private workspace. It is English-first, includes full Arabic and RTL support, and is designed to run locally or as a production deployment.
 
-This repository is a monorepo: NestJS API (`api/`), Next.js frontend (`web/`), and PostgreSQL.
+[Open the live app](https://personal-budget-calc.up.railway.app) ·
+[Create an account](https://personal-budget-calc.up.railway.app/register) ·
+[Report an issue](https://github.com/iikareem/fin-vault/issues)
 
----
+## Contents
 
-## What it does
+- [Features](#features)
+- [Architecture](#architecture)
+- [Technology](#technology)
+- [Getting started](#getting-started)
+- [Configuration](#configuration)
+- [Production deployment](#production-deployment)
+- [Development commands](#development-commands)
+- [Contributing](#contributing)
+- [Security](#security)
+- [License](#license)
 
-- Personal cash ledger with current and savings wallets
-- Income, expense, transfer, and track-only entries
-- Editable day history and category-based analytics
-- Savings goals and recurring commitments (subscriptions / installments)
-- Outside loans to people not in the app
-- Public registration that seeds a personal space for each new user
-- Cookie-based JWT sessions (`fb_token`)
-- Bilingual UI (English default, Arabic optional)
+## Features
 
-> **Note:** `main` ships the personal product only (`HOUSE_BOOKS_ENABLED = false`). Household books live on the `house-books` branch and are not part of the public personal app.
-
----
+- **Personal wallets** — manage current and savings balances independently.
+- **Transaction tracking** — record income, expenses, transfers, and track-only entries.
+- **Daily history** — review and edit activity by date.
+- **Analytics** — understand cash flow and spending by period and category.
+- **Flexible categories** — organize transactions with editable categories and subcategories.
+- **Savings goals** — allocate savings toward named targets.
+- **Commitments** — manage subscriptions, installments, and recurring obligations.
+- **Outside loans** — track money lent to people who do not use the app.
+- **Private balances** — hide sensitive totals without leaving the page.
+- **Bilingual interface** — English by default, with Arabic and RTL support.
+- **Self-service accounts** — registration creates a ready-to-use personal workspace.
+- **Installable web app** — standalone PWA behavior on supported mobile devices.
 
 ## Architecture
 
+Fin Vault is a TypeScript monorepo with separate web and API services:
+
 ```text
-Browser (web :3000)
-    │  NEXT_PUBLIC_API_URL=/api
-    ▼
-Next.js route handler  web/src/app/api/[...path]
-    │  API_ORIGIN → Nest API
-    ▼
-NestJS API (api :3001)  ──►  PostgreSQL 16
+Browser
+   │
+   │ /api/*
+   ▼
+Next.js web service
+   │
+   │ API_ORIGIN
+   ▼
+NestJS API
+   │
+   ▼
+PostgreSQL
 ```
 
-- The web app proxies `/api/*` to the Nest service so the browser stays same-origin for cookies in production.
-- CORS on the API allows only `WEB_ORIGIN` and uses `credentials: true`.
-- Prisma owns the schema and migrations under `api/prisma/`.
-
-### Repository layout
+The Next.js route handler proxies browser requests to the API. This keeps authentication same-origin in production while allowing the web and API services to deploy independently. Prisma manages the database schema and migrations.
 
 ```text
 fin-vault/
-├── api/                      # NestJS + Prisma
-│   ├── prisma/               # schema, migrations, optional seeds
-│   ├── src/                  # auth, households, transactions, …
-│   └── railway.toml
-├── web/                      # Next.js App Router + Tailwind
-│   ├── src/app/              # pages and /api proxy
-│   ├── src/components/
-│   ├── src/lib/              # api client, i18n, features
-│   └── railway.toml
-├── docker-compose.yml        # local Postgres on host port 5433
-└── package.json              # convenience scripts
+├── api/
+│   ├── prisma/             # Schema, migrations, and development seeds
+│   ├── src/                # NestJS modules and application logic
+│   └── railway.toml        # API deployment configuration
+├── web/
+│   ├── public/             # Icons and static assets
+│   ├── src/app/            # App Router pages and API proxy
+│   ├── src/components/     # Shared interface components
+│   ├── src/lib/            # API client, i18n, and utilities
+│   └── railway.toml        # Web deployment configuration
+├── docker-compose.yml      # Local PostgreSQL service
+└── package.json            # Root convenience scripts
 ```
 
----
+## Technology
 
-## Stack
-
-| Area | Choice |
+| Layer | Technology |
 | --- | --- |
-| Frontend | Next.js 15, React 19, Tailwind CSS 4 |
-| Backend | NestJS 11, Passport JWT, class-validator |
-| ORM / DB | Prisma 6, PostgreSQL 16 |
-| Auth | Register + login, httpOnly cookie session |
-| Local ports | Web `3000` · API `3001` · Postgres `5433` |
-| Deploy | Railway (Nixpacks), see `*/railway.toml` |
+| Web | Next.js 15, React 19, Tailwind CSS 4 |
+| API | NestJS 11, Passport JWT, class-validator |
+| Data | PostgreSQL 16, Prisma 6 |
+| Authentication | HTTP-only JWT session cookie |
+| Testing | Jest, Supertest |
+| Deployment | Railway, Nixpacks |
 
----
+## Getting started
 
-## Prerequisites
+### Requirements
 
-- Node.js **20.9+**
+- Node.js 20.9 or newer
 - npm
-- Docker (for local PostgreSQL)
+- Docker with Docker Compose
 
----
-
-## Local development
-
-### 1. Clone and configure
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/iikareem/fin-vault.git
 cd fin-vault
+```
 
+### 2. Create local environment files
+
+```bash
 cp api/.env.example api/.env
 cp web/.env.example web/.env.local
 ```
 
-Edit `api/.env` and set a strong `JWT_SECRET`.
+Replace the example `JWT_SECRET` in `api/.env` with a long, random value.
 
-#### API environment (`api/.env`)
-
-| Variable | Required | Description |
-| --- | --- | --- |
-| `DATABASE_URL` | yes | Postgres connection string |
-| `JWT_SECRET` | yes | Signing secret for session tokens |
-| `PORT` | no | API listen port (default `3001`) |
-| `WEB_ORIGIN` | yes | Frontend origin for CORS (local: `http://localhost:3000`) |
-
-#### Web environment (`web/.env.local`)
-
-| Variable | Required | Description |
-| --- | --- | --- |
-| `NEXT_PUBLIC_API_URL` | no | Browser API base (default `/api`) |
-| `API_ORIGIN` | no | Server-side Nest origin (default `http://localhost:3001`) |
-
-### 2. Start Postgres
+### 3. Start PostgreSQL
 
 ```bash
-docker compose up -d
-# or: npm run db:up
+npm run db:up
 ```
 
-### 3. Run the API
+The development database is exposed on `localhost:5433`.
+
+### 4. Install dependencies and prepare the database
 
 ```bash
-cd api
-npm install
-npx prisma migrate deploy
-npm run start:dev
+npm install --prefix api
+npm install --prefix web
+npm exec --prefix api -- prisma migrate deploy
 ```
 
-API: [http://localhost:3001](http://localhost:3001)
+### 5. Start the application
 
-### 4. Run the web app
+Run the API and web app in separate terminals:
 
 ```bash
-cd web
-npm install
-npm run dev
+npm run api
 ```
 
-App: [http://localhost:3000](http://localhost:3000)
+```bash
+npm run web
+```
 
-Register at `/register`, then sign in. Registration creates the user and seeds personal books automatically — no household seed file is required on `main`.
+Open [http://localhost:3000](http://localhost:3000), create an account at `/register`, and sign in. Registration automatically creates the user's personal workspace and default categories.
 
-### Useful scripts
+## Configuration
 
-| Command | Where | Purpose |
-| --- | --- | --- |
-| `npm run db:up` | repo root | Start Postgres via Docker |
-| `npm run start:dev` | `api/` | API with watch mode |
-| `npm run dev` | `web/` | Next.js dev server |
-| `npx prisma migrate deploy` | `api/` | Apply migrations |
-| `npx prisma migrate dev` | `api/` | Create a migration while developing |
-| `npm run lint` | `api/` or `web/` | ESLint |
-| `npm test` | `api/` | Jest unit tests |
-| `npm run build` | `api/` or `web/` | Production build |
+### API
 
----
+Configure these values in `api/.env`:
+
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `DATABASE_URL` | Yes | — | PostgreSQL connection string |
+| `JWT_SECRET` | Yes | — | Signs authentication tokens |
+| `PORT` | No | `3001` | API listening port |
+| `WEB_ORIGIN` | Yes | `http://localhost:3000` | Allowed browser origin for CORS |
+
+### Web
+
+Configure these values in `web/.env.local`:
+
+| Variable | Required | Default | Purpose |
+| --- | --- | --- | --- |
+| `NEXT_PUBLIC_API_URL` | No | `/api` | Browser-facing API path |
+| `API_ORIGIN` | No | `http://localhost:3001` | Server-side API origin used by the proxy |
+
+Keep `NEXT_PUBLIC_API_URL=/api` for the standard same-origin production setup.
 
 ## Production deployment
 
-The public instance runs on Railway as two services plus Postgres:
+The included Railway configuration supports three production resources:
 
-1. **Postgres** — managed database; provide `DATABASE_URL` to the API.
-2. **API** — builds with Prisma generate + Nest build; starts with `npm run start:prod` (runs `prisma migrate deploy` then `node dist/main.js`).
-3. **WEB** — Next.js build; starts with `npx next start --hostname ::`. Set `API_ORIGIN` to the private/internal API URL Railway gives the API service.
+1. **PostgreSQL** — stores application data.
+2. **API service** — applies Prisma migrations and starts the compiled NestJS server.
+3. **Web service** — serves the Next.js application and proxies requests to the API.
 
-### Required production variables
+### Production variables
 
-**API**
+Set the following variables on the **API service**:
 
-| Variable | Example / notes |
+| Variable | Value |
 | --- | --- |
-| `DATABASE_URL` | Railway Postgres URL |
-| `JWT_SECRET` | Long random secret; never commit |
-| `WEB_ORIGIN` | Public web URL, e.g. `https://personal-budget-calc.up.railway.app` |
-| `PORT` | Usually set by the platform |
+| `DATABASE_URL` | PostgreSQL connection URL |
+| `JWT_SECRET` | Unique production secret |
+| `WEB_ORIGIN` | Public web origin, without a trailing slash |
+| `PORT` | Platform-provided service port |
 
-**WEB**
+Set the following variables on the **web service**:
 
-| Variable | Example / notes |
+| Variable | Value |
 | --- | --- |
-| `API_ORIGIN` | Internal API base URL used by the `/api` proxy |
-| `NEXT_PUBLIC_API_URL` | Keep `/api` so the browser talks to the Next proxy |
+| `API_ORIGIN` | Internal or private URL of the API service |
+| `NEXT_PUBLIC_API_URL` | `/api` |
 
-### First deploy checklist
+### Deployment checklist
 
-1. Create Postgres and wire `DATABASE_URL` into the API service.
-2. Set `JWT_SECRET` and `WEB_ORIGIN` on the API.
-3. Set `API_ORIGIN` on the web service.
-4. Deploy API (migrations run on start via `start:prod`).
-5. Deploy web and open the public domain.
-6. Create the first account at `/register`.
+- Provision PostgreSQL and connect `DATABASE_URL` to the API.
+- Generate a production-only `JWT_SECRET`.
+- Set `WEB_ORIGIN` to the exact public web origin.
+- Point `API_ORIGIN` to the API service.
+- Deploy the API; `npm run start:prod` applies pending migrations at startup.
+- Deploy the web service and verify registration, login, and transaction creation.
 
-Do not commit `.env`, `.env.local`, production URLs with secrets, or seed credentials.
+The current public deployment is available at
+[personal-budget-calc.up.railway.app](https://personal-budget-calc.up.railway.app).
 
----
+## Development commands
+
+| Command | Location | Description |
+| --- | --- | --- |
+| `npm run db:up` | repository root | Start local PostgreSQL |
+| `npm run api` | repository root | Start the API in watch mode |
+| `npm run web` | repository root | Start the Next.js development server |
+| `npm run lint` | `api/` or `web/` | Run ESLint |
+| `npm run build` | `api/` or `web/` | Create a production build |
+| `npm test` | `api/` | Run API unit tests |
+| `npm run test:e2e` | `api/` | Run API end-to-end tests |
+| `npx prisma migrate dev --name <name>` | `api/` | Create a development migration |
+| `npx prisma migrate deploy` | `api/` | Apply existing migrations |
 
 ## Contributing
 
-Contributions that improve the personal product on `main` are welcome. For household/house-books work, use the `house-books` branch.
+Contributions are welcome when they are focused, tested, and consistent with the personal-finance scope of `main`.
 
-### Workflow
+### Recommended workflow
 
-1. Fork the repository (or create a branch from latest `main`).
-2. Create a focused branch: `feat/…`, `fix/…`, or `docs/…`.
-3. Keep changes scoped — prefer small PRs over large mixed ones.
-4. Run the local stack and exercise the flow you changed (register / login / add / history / analytics as relevant).
-5. Lint and build before opening a PR:
+1. Fork the repository and create a branch from the latest `main`.
+2. Use a descriptive branch name such as `feat/savings-chart` or `fix/login-timeout`.
+3. Keep each pull request limited to one coherent change.
+4. Add or update English and Arabic copy for user-facing features.
+5. Add a Prisma migration for schema changes; never modify an applied migration.
+6. Verify the affected workflow locally.
+7. Run the checks below before opening a pull request:
 
 ```bash
-cd api && npm run lint && npm run build
-cd ../web && npm run lint && npm run build
+cd api
+npm run lint
+npm test
+npm run build
+
+cd ../web
+npm run lint
+npm run build
 ```
 
-6. Open a pull request against `main` with:
-   - **What** changed
-   - **Why** it is needed
-   - **How** you verified it (steps or screenshots for UI)
+A pull request should explain:
 
-### Guidelines
+- what changed and why;
+- how the change was tested;
+- any database or environment changes;
+- screenshots or recordings for visible interface changes.
 
-- Match existing TypeScript, Nest, and Next.js patterns in the folders you touch.
-- Prefer clear, product-facing copy in both English and Arabic when you add UI strings (`web/src/lib/i18n.ts`).
-- Do not enable house books on `main` unless the change is explicitly about that feature flag and discussed in the PR.
-- Never commit secrets, real seed data, or local env files.
-- Database changes go through Prisma migrations in `api/prisma/migrations/` — do not edit applied migrations.
-
-### Reporting issues
-
-Open a GitHub issue with:
-
-- Expected vs actual behavior
-- Steps to reproduce
-- Environment (production URL vs local, browser, approx. commit/date)
-
----
+Please do not commit secrets, generated build output, local environment files, or real financial data.
 
 ## Security
 
-- Sessions use an httpOnly cookie (`fb_token`); `secure` is enabled when `NODE_ENV=production`.
-- Keep `JWT_SECRET` unique per environment and rotate if leaked.
-- Restrict `WEB_ORIGIN` to the real frontend origin in production.
-- Treat `api/.env` and `web/.env.local` as private; only `*.example` files belong in git.
+- Authentication uses an HTTP-only `fb_token` cookie.
+- Production cookies are marked `secure` when `NODE_ENV=production`.
+- CORS is restricted to `WEB_ORIGIN`.
+- `JWT_SECRET` must be unique, private, and rotated if exposed.
+- Environment files and production credentials must never be committed.
 
----
+For a sensitive vulnerability, contact the repository owner privately instead of opening a public issue.
 
 ## License
 
-The API package is marked `UNLICENSED` in `package.json`. Unless a license file is added, treat the project as source-available for personal use and contribution via pull request — do not assume redistribution rights beyond what GitHub’s terms and the repository settings allow.
+No open-source license has been published for this repository. The source is available for evaluation and contribution, but no permission to copy, modify, or redistribute it is granted beyond applicable platform terms.
