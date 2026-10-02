@@ -68,6 +68,10 @@ type SubsHome = {
   paidCount: number;
   subscriptions: { id: string }[];
 };
+type OutsideHome = {
+  owedToYou: number;
+  open: { id: string }[];
+};
 type Tx = {
   id: string;
   type: "INCOME" | "EXPENSE" | "REIMBURSEMENT" | "TRACK";
@@ -128,6 +132,7 @@ export default function HomePage() {
   const [gold, setGold] = useState<GoldHome | null>(null);
   const [goals, setGoals] = useState<GoalsHome | null>(null);
   const [subs, setSubs] = useState<SubsHome | null>(null);
+  const [outside, setOutside] = useState<OutsideHome | null>(null);
   const [claims, setClaims] = useState<Claim[]>([]);
   const [covers, setCovers] = useState<Cover[]>([]);
   const [payingId, setPayingId] = useState("");
@@ -194,6 +199,9 @@ export default function HomePage() {
         api<GoldHome>(householdPath(active.householdId, "/gold")),
         api<GoalsHome>(householdPath(active.householdId, "/savings-goals")),
         api<SubsHome>(householdPath(active.householdId, "/subscriptions")),
+        api<OutsideHome>(
+          householdPath(active.householdId, "/outside-loans"),
+        ),
       );
     }
     Promise.all(jobs)
@@ -214,10 +222,12 @@ export default function HomePage() {
           setGold(null);
           setGoals(null);
           setSubs(null);
+          setOutside(null);
         } else {
           setGold(result[3] as GoldHome);
           setGoals(result[4] as GoalsHome);
           setSubs(result[5] as SubsHome);
+          setOutside(result[6] as OutsideHome);
         }
       })
       .catch((e) => setError(e.message));
@@ -1426,14 +1436,15 @@ export default function HomePage() {
           </span>
         </Link>
       ) : (
-        <>
-        <Link
-          href="/goals"
-          className="surface mt-4 flex flex-col rounded-[1.75rem] p-4"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xl font-semibold">🎯 {t("navGoals")}</span>
-            <span className="font-semibold">
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <Link
+            href="/goals"
+            className="surface flex min-h-[7.5rem] flex-col rounded-[1.5rem] p-3.5 transition hover:bg-[var(--panel-soft)]"
+          >
+            <span className="text-sm font-semibold text-stone-700">
+              🎯 {t("navGoals")}
+            </span>
+            <span className="mt-2 text-lg font-bold leading-tight tabular-nums">
               {goals ? (
                 <PrivateMoney
                   amount={goals.allocated}
@@ -1442,36 +1453,25 @@ export default function HomePage() {
                   visible={moneyVisible}
                 />
               ) : (
-                ""
+                "…"
               )}
             </span>
-          </div>
-          {goals && goals.goals.length > 0 ? (
-            <p className="mt-1 text-sm text-stone-500">
-              {goals.goals.length === 1
-                ? t("goalsCountOne")
-                : fill(t("goalsCount"), {
-                    n: String(goals.goals.length),
-                  })}
-              {" · "}
-              {t("goalsFree")}:{" "}
-              <PrivateMoney
-                amount={goals.free}
-                currency={currency}
-                locale={locale}
-                visible={moneyVisible}
-              />
-            </p>
-          ) : null}
-          <Hint>{t("goalsHomeHint")}</Hint>
-        </Link>
-        <Link
-          href="/commitments"
-          className="surface mt-3 flex flex-col rounded-[1.75rem] p-4"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xl font-semibold">📌 {t("navSubs")}</span>
-            <span className="font-semibold">
+            <span className="mt-auto pt-2 text-xs leading-snug text-stone-500">
+              {goals && goals.goals.length > 0
+                ? goals.goals.length === 1
+                  ? t("goalsCountOne")
+                  : fill(t("goalsCount"), { n: String(goals.goals.length) })
+                : t("goalsHomeHint")}
+            </span>
+          </Link>
+          <Link
+            href="/commitments"
+            className="surface flex min-h-[7.5rem] flex-col rounded-[1.5rem] p-3.5 transition hover:bg-[var(--panel-soft)]"
+          >
+            <span className="text-sm font-semibold text-stone-700">
+              📌 {t("navSubs")}
+            </span>
+            <span className="mt-2 text-lg font-bold leading-tight tabular-nums">
               {subs ? (
                 <PrivateMoney
                   amount={
@@ -1482,30 +1482,29 @@ export default function HomePage() {
                   visible={moneyVisible}
                 />
               ) : (
-                ""
+                "…"
               )}
             </span>
-          </div>
-          {subs && subs.subscriptions.length > 0 ? (
-            <p className="mt-1 text-sm text-stone-500">
-              {subs.unpaidCount === 0
-                ? t("subsHomeAllPaid")
-                : subs.unpaidCount === 1
-                  ? t("subsHomeUnpaidOne")
-                  : fill(t("subsHomeUnpaid"), {
-                      n: String(subs.unpaidCount),
-                    })}
-            </p>
-          ) : null}
-          <Hint>{t("subsHomeHint")}</Hint>
-        </Link>
-        <Link
-          href="/gold"
-          className="surface mt-3 flex flex-col rounded-[1.75rem] p-4"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xl font-semibold">🥇 {t("navGold")}</span>
-            <span className="font-semibold">
+            <span className="mt-auto pt-2 text-xs leading-snug text-stone-500">
+              {subs && subs.subscriptions.length > 0
+                ? subs.unpaidCount === 0
+                  ? t("subsHomeAllPaid")
+                  : subs.unpaidCount === 1
+                    ? t("subsHomeUnpaidOne")
+                    : fill(t("subsHomeUnpaid"), {
+                        n: String(subs.unpaidCount),
+                      })
+                : t("subsHomeHint")}
+            </span>
+          </Link>
+          <Link
+            href="/gold"
+            className="surface flex min-h-[7.5rem] flex-col rounded-[1.5rem] p-3.5 transition hover:bg-[var(--panel-soft)]"
+          >
+            <span className="text-sm font-semibold text-stone-700">
+              🥇 {t("navGold")}
+            </span>
+            <span className="mt-2 text-lg font-bold leading-tight tabular-nums">
               {gold ? (
                 <PrivateMoney
                   amount={gold.totalValue}
@@ -1514,49 +1513,66 @@ export default function HomePage() {
                   visible={moneyVisible}
                 />
               ) : (
-                ""
+                "…"
               )}
             </span>
-          </div>
-          {gold?.totalGainLoss != null ? (
-            <p
-              className={`mt-1 text-sm font-semibold ${
-                moneyVisible
+            <span
+              className={`mt-auto pt-2 text-xs font-semibold leading-snug ${
+                gold?.totalGainLoss != null && moneyVisible
                   ? gold.totalGainLoss >= 0
                     ? "text-emerald-800"
                     : "text-red-800"
                   : "text-stone-500"
               }`}
             >
-              {t("goldTotalGainLoss")}:{" "}
-              <PrivateMoney
-                amount={gold.totalGainLoss}
-                currency={currency}
-                locale={locale}
-                visible={moneyVisible}
-                extraSign={gold.totalGainLoss >= 0 ? "+" : "−"}
-              />
-              {moneyVisible && gold.totalGainLossPct != null ? (
-                <span>
-                  {" "}
-                  ({gold.totalGainLossPct >= 0 ? "+" : ""}
-                  {gold.totalGainLossPct}%)
-                </span>
-              ) : null}
-            </p>
-          ) : null}
-          <Hint>{t("goldHomeHint")}</Hint>
-        </Link>
-        <Link
-          href="/outside-loans"
-          className="surface mt-3 flex flex-col rounded-[1.75rem] p-4"
-        >
-          <span className="text-xl font-semibold">
-            🤝 {t("navOutsideLoans")}
-          </span>
-          <Hint>{t("outsideLoansHomeHint")}</Hint>
-        </Link>
-        </>
+              {gold?.totalGainLoss != null ? (
+                <>
+                  <PrivateMoney
+                    amount={gold.totalGainLoss}
+                    currency={currency}
+                    locale={locale}
+                    visible={moneyVisible}
+                    extraSign={gold.totalGainLoss >= 0 ? "+" : "−"}
+                  />
+                  {moneyVisible && gold.totalGainLossPct != null ? (
+                    <span>
+                      {" "}
+                      ({gold.totalGainLossPct >= 0 ? "+" : ""}
+                      {gold.totalGainLossPct}%)
+                    </span>
+                  ) : null}
+                </>
+              ) : (
+                t("goldHomeHint")
+              )}
+            </span>
+          </Link>
+          <Link
+            href="/outside-loans"
+            className="surface flex min-h-[7.5rem] flex-col rounded-[1.5rem] p-3.5 transition hover:bg-[var(--panel-soft)]"
+          >
+            <span className="text-sm font-semibold text-stone-700">
+              🤝 {t("navOutsideLoans")}
+            </span>
+            <span className="mt-2 text-lg font-bold leading-tight tabular-nums">
+              {outside ? (
+                <PrivateMoney
+                  amount={outside.owedToYou}
+                  currency={currency}
+                  locale={locale}
+                  visible={moneyVisible}
+                />
+              ) : (
+                "…"
+              )}
+            </span>
+            <span className="mt-auto pt-2 text-xs leading-snug text-stone-500">
+              {outside && outside.open.length > 0
+                ? t("outsideOwedToYou")
+                : t("outsideLoansHomeHint")}
+            </span>
+          </Link>
+        </div>
       )}
 
       {isHouse ? (
