@@ -650,7 +650,6 @@ export default function GoalsPage() {
                                 </span>
                                 <input
                                   required
-                                  autoFocus
                                   value={editName}
                                   onChange={(e) =>
                                     setEditName(e.target.value)
@@ -739,7 +738,6 @@ export default function GoalsPage() {
                                 inputMode="decimal"
                                 dir="ltr"
                                 required
-                                autoFocus
                                 value={actionAmount}
                                 onChange={(e) =>
                                   setActionAmount(e.target.value)
