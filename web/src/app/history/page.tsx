@@ -9,12 +9,12 @@ import { PageShell } from "@/components/PageShell";
 import { Money } from "@/components/Money";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
-import { labelFor, categoryLabel, type MessageKey } from "@/lib/i18n";
+import { labelFor, categoryLabel, fill, type MessageKey } from "@/lib/i18n";
 import { CategoryPicker } from "@/components/CategoryPicker";
 import { useCalendarClock } from "@/hooks/useCalendarClock";
-import { formatItemDate, isoLocal } from "@/lib/calendar";
+import { isoLocal } from "@/lib/calendar";
 import { householdPath } from "@/lib/space";
-import { Hint } from "@/components/Hint";
+import { DateField } from "@/components/DateField";
 import { HIDDEN_EXPENSE_CATEGORIES, HIDDEN_INCOME_CATEGORIES } from "@/lib/category-visibility";
 
 type Tx = {
@@ -280,9 +280,13 @@ function HistoryInner() {
   const expenseCats = categories.filter(
     (c) => c.kind === "EXPENSE" && !HIDDEN_EXPENSE_CATEGORIES.has(c.name),
   );
-  const empty =
-    !log ||
-    (log.txs.length === 0 && log.claims.length === 0 && log.gifts.length === 0);
+  const moveCount =
+    (log?.txs.length ?? 0) + (log?.claims.length ?? 0) + (log?.gifts.length ?? 0);
+  const empty = !log || moveCount === 0;
+  const income = log?.income ?? 0;
+  const expense = log?.expense ?? 0;
+  const net = income - expense;
+  const isToday = day === cal.today;
 
   return (
     <PageShell>
@@ -294,114 +298,130 @@ function HistoryInner() {
           ← {t("backToCategoryLogs")}
         </Link>
       ) : null}
-      <h1 className={`page-title ${backTo ? "mt-2" : ""}`}>{t("eachDay")}</h1>
-      <Hint>{t("daysHint")}</Hint>
-      <div className="mt-4 flex items-center gap-2">
+      <h1 className={`text-lg font-semibold ${backTo ? "mt-2" : ""}`}>
+        {t("eachDay")}
+      </h1>
+
+      <div className="mt-3 flex items-center gap-2">
         <button
           type="button"
           aria-label={t("pickDayHint")}
-          className="icon-btn px-5 text-3xl"
+          className="icon-btn shrink-0 px-3 text-xl"
           onClick={() => goDay(shiftDay(day, -1))}
         >
           ‹
         </button>
-        <label className="surface relative flex min-h-16 min-w-0 flex-1 cursor-pointer flex-col items-center justify-center rounded-3xl px-3 py-2">
-          <time
-            dateTime={day}
-            className="text-center text-xl font-bold leading-tight text-stone-900 sm:text-2xl"
-          >
-            {formatItemDate(day, locale)}
-          </time>
-          <span className="mt-0.5 text-xs font-medium text-stone-500">
-            {day}
-          </span>
-          <input
-            type="date"
-            className="absolute inset-0 cursor-pointer opacity-0"
-            value={day}
-            onChange={(e) => {
-              if (e.target.value) goDay(e.target.value);
-            }}
-            aria-label={t("pickDayHint")}
-          />
-        </label>
+        <div className="min-w-0 flex-1">
+          <DateField align="center" value={day} onChange={goDay} />
+        </div>
         <button
           type="button"
           aria-label={t("pickDayHint")}
-          className="icon-btn px-5 text-3xl"
+          className="icon-btn shrink-0 px-3 text-xl"
           onClick={() => goDay(shiftDay(day, 1))}
         >
           ›
         </button>
       </div>
-      <Hint>{t("pickDayHint")}</Hint>
+      {!isToday ? (
+        <div className="mt-2 flex justify-center">
+          <button
+            type="button"
+            onClick={() => goDay(cal.today)}
+            className="chip text-sm"
+          >
+            {t("jumpToday")}
+          </button>
+        </div>
+      ) : null}
+
       {hideAggregates ? (
-        <p className="surface mt-4 rounded-3xl px-4 py-3 text-sm text-stone-500">
+        <p className="surface mt-4 rounded-2xl px-4 py-3 text-sm text-[var(--muted)]">
           {t("aggregatesAdminOnly")}
         </p>
       ) : (
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className="surface flex flex-col rounded-3xl p-4">
-            <p className="text-lg text-stone-500">{t("in")}</p>
-            <p className="text-2xl font-bold text-emerald-800">
-              <Money
-                amount={log?.income ?? 0}
-                currency={currency}
-                locale={locale}
-              />
-            </p>
-            {prevLog ? (
-              <HistoryCompareChip
-                current={log?.income ?? 0}
-                previous={prevLog.income}
-                kind="in"
-                label={t("vsSameDayLastMonth")}
-                t={t}
-              />
-            ) : (
-              <Hint>{t("dayInHint")}</Hint>
-            )}
+        <section className="surface mt-4 rounded-[1.5rem] p-3.5">
+          <div className="grid grid-cols-3 gap-2">
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-[var(--muted)]">{t("in")}</p>
+              <p className="mt-0.5 truncate text-lg font-bold tabular-nums text-emerald-800">
+                <Money amount={income} currency={currency} locale={locale} />
+              </p>
+              {prevLog ? (
+                <HistoryCompareChip
+                  current={income}
+                  previous={prevLog.income}
+                  kind="in"
+                  label={t("vsSameDayShort")}
+                  t={t}
+                />
+              ) : null}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-medium text-[var(--muted)]">{t("out")}</p>
+              <p className="mt-0.5 truncate text-lg font-bold tabular-nums text-red-800">
+                <Money amount={expense} currency={currency} locale={locale} />
+              </p>
+              {prevLog ? (
+                <HistoryCompareChip
+                  current={expense}
+                  previous={prevLog.expense}
+                  kind="out"
+                  label={t("vsSameDayShort")}
+                  t={t}
+                />
+              ) : null}
+            </div>
+            <div className="min-w-0 border-s border-[var(--surface-border)] ps-2">
+              <p className="text-xs font-medium text-[var(--muted)]">{t("dayNet")}</p>
+              <p
+                className={`mt-0.5 truncate text-lg font-bold tabular-nums ${
+                  net > 0.001
+                    ? "text-emerald-800"
+                    : net < -0.001
+                      ? "text-red-800"
+                      : "text-[var(--foreground)]"
+                }`}
+              >
+                <Money
+                  amount={Math.abs(net)}
+                  currency={currency}
+                  locale={locale}
+                  extraSign={net > 0.001 ? "+" : net < -0.001 ? "−" : undefined}
+                />
+              </p>
+              <p className="mt-2 text-[11px] font-medium text-[var(--muted)]">
+                {fill(t("dayMoves"), { n: String(moveCount) })}
+              </p>
+            </div>
           </div>
-          <div className="surface flex flex-col rounded-3xl p-4">
-            <p className="text-lg text-stone-500">{t("out")}</p>
-            <p className="text-2xl font-bold text-red-800">
-              <Money
-                amount={log?.expense ?? 0}
-                currency={currency}
-                locale={locale}
-              />
-            </p>
-            {prevLog ? (
-              <HistoryCompareChip
-                current={log?.expense ?? 0}
-                previous={prevLog.expense}
-                kind="out"
-                label={t("vsSameDayLastMonth")}
-                t={t}
-              />
-            ) : (
-              <Hint>{t("dayOutHint")}</Hint>
-            )}
-          </div>
-        </div>
+        </section>
       )}
-      {error ? <p className="mt-3 text-lg text-red-700">{error}</p> : null}
+
+      {error ? <p className="mt-3 text-base text-red-700">{error}</p> : null}
 
       {empty ? (
-        <p className="mt-8 text-xl text-stone-500">{t("nothingThisDay")}</p>
+        <div className="mt-10 text-center">
+          <p className="text-base text-[var(--muted)]">{t("nothingThisDay")}</p>
+        </div>
       ) : (
-        <>
-        <Hint>{t("daysListHint")}</Hint>
-        <ul className="mt-6 space-y-3">
+        <ul className="mt-5 space-y-2">
           {log?.txs.map((tx) => {
             const editing = openId === tx.id;
+            const editable =
+              canEditHouse && tx.type !== "REIMBURSEMENT";
             return (
-              <li key={tx.id} className="surface rounded-3xl p-4">
+              <li
+                key={tx.id}
+                className={`list-row overflow-hidden !p-0 ${
+                  editing ? "ring-2 ring-[var(--input-focus)]" : ""
+                }`}
+              >
                 <button
                   type="button"
-                  className="w-full text-start"
+                  className="w-full px-3.5 py-3 text-start"
                   onClick={() =>
-                    canEditHouse && tx.type !== "REIMBURSEMENT"
+                    editable
                       ? startEdit(
                           tx.id,
                           tx.amount,
@@ -411,23 +431,42 @@ function HistoryInner() {
                       : undefined
                   }
                 >
-                  <div className="money-row text-xl">
-                    <span className="font-bold" dir="auto">
-                      {categoryLabel(tx.category, locale, t)}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-bold" dir="auto">
+                        {categoryLabel(tx.category, locale, t)}
+                      </p>
                       {tx.type === "TRACK" ? (
-                        <span className="ms-2 text-sm font-medium text-stone-500">
-                          ({t("trackOnlyBadge")})
+                        <span className="mt-1 inline-flex rounded-full bg-[var(--panel-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--muted)]">
+                          {t("trackOnlyBadge")}
                         </span>
                       ) : null}
-                    </span>
+                      {(() => {
+                        const showUser =
+                          active?.kind === "HOUSE" && tx.user.name !== "House";
+                        const parts = [
+                          showUser ? labelFor(tx.user.name, t) : null,
+                          tx.note || null,
+                        ].filter(Boolean);
+                        if (parts.length === 0) return null;
+                        return (
+                          <p
+                            className="mt-1 truncate text-sm text-[var(--muted)]"
+                            dir="auto"
+                          >
+                            {parts.join(" · ")}
+                          </p>
+                        );
+                      })()}
+                    </div>
                     <span
-                      className={
+                      className={`shrink-0 text-base font-bold tabular-nums ${
                         tx.type === "INCOME"
-                          ? "font-bold text-emerald-800"
+                          ? "text-emerald-800"
                           : tx.type === "TRACK"
-                            ? "font-bold text-stone-700"
-                            : "font-bold text-red-800"
-                      }
+                            ? "text-[var(--foreground)]"
+                            : "text-red-800"
+                      }`}
                     >
                       <Money
                         amount={tx.amount}
@@ -443,48 +482,36 @@ function HistoryInner() {
                       />
                     </span>
                   </div>
-                  {(() => {
-                    const showUser =
-                      active?.kind === "HOUSE" && tx.user.name !== "House";
-                    const parts = [
-                      showUser ? labelFor(tx.user.name, t) : null,
-                      tx.note || null,
-                    ].filter(Boolean);
-                    if (parts.length === 0) return null;
-                    return (
-                      <p className="mt-1 text-start text-stone-500" dir="auto">
-                        {parts.join(" · ")}
-                      </p>
-                    );
-                  })()}
                 </button>
                 {editing ? (
-                  <EditFields
-                    amount={amount}
-                    note={note}
-                    categoryId={categoryId}
-                    categories={
-                      tx.type === "INCOME"
-                        ? categories.filter(
-                            (c) =>
-                              c.kind === "INCOME" &&
-                              !HIDDEN_INCOME_CATEGORIES.has(c.name),
-                          )
-                        : expenseCats
-                    }
-                    t={t}
-                    setAmount={setAmount}
-                    setNote={setNote}
-                    setCategoryId={setCategoryId}
-                    busy={busy}
-                    confirm={confirmId === tx.id}
-                    onSave={() => saveTx(tx.id)}
-                    onDelete={() =>
-                      confirmId === tx.id
-                        ? remove(`/transactions/${tx.id}`)
-                        : setConfirmId(tx.id)
-                    }
-                  />
+                  <div className="border-t border-[var(--surface-border)] px-3.5 pb-3.5">
+                    <EditFields
+                      amount={amount}
+                      note={note}
+                      categoryId={categoryId}
+                      categories={
+                        tx.type === "INCOME"
+                          ? categories.filter(
+                              (c) =>
+                                c.kind === "INCOME" &&
+                                !HIDDEN_INCOME_CATEGORIES.has(c.name),
+                            )
+                          : expenseCats
+                      }
+                      t={t}
+                      setAmount={setAmount}
+                      setNote={setNote}
+                      setCategoryId={setCategoryId}
+                      busy={busy}
+                      confirm={confirmId === tx.id}
+                      onSave={() => saveTx(tx.id)}
+                      onDelete={() =>
+                        confirmId === tx.id
+                          ? remove(`/transactions/${tx.id}`)
+                          : setConfirmId(tx.id)
+                      }
+                    />
+                  </div>
                 ) : null}
               </li>
             );
@@ -493,22 +520,39 @@ function HistoryInner() {
             const editing = openId === c.id;
             const mine = c.memberId === userId || canEditHouse;
             return (
-              <li key={c.id} className="rounded-3xl bg-amber-50 p-4 shadow-sm">
+              <li
+                key={c.id}
+                className={`overflow-hidden rounded-2xl border border-amber-200/80 bg-amber-50/90 shadow-sm ${
+                  editing ? "ring-2 ring-amber-400" : ""
+                }`}
+              >
                 <button
                   type="button"
-                  className="w-full text-start"
+                  className="w-full px-3.5 py-3 text-start"
                   onClick={() =>
                     mine && c.remaining > 0.001
                       ? startEdit(c.id, c.amount, c.note, c.categoryId)
                       : undefined
                   }
                 >
-                  <p className="text-lg font-bold">{t("pocketThatDay")}</p>
-                  <div className="money-row text-xl">
-                    <span dir="auto">
-                      {c.member.name} · {categoryLabel(c.category, locale, t)}
-                    </span>
-                    <span className="font-bold">
+                  <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-900">
+                    {t("pocketThatDay")}
+                  </span>
+                  <div className="mt-1.5 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-bold" dir="auto">
+                        {c.member.name} · {categoryLabel(c.category, locale, t)}
+                      </p>
+                      {c.note ? (
+                        <p
+                          className="mt-1 truncate text-sm text-amber-900/70"
+                          dir="auto"
+                        >
+                          {c.note}
+                        </p>
+                      ) : null}
+                    </div>
+                    <span className="shrink-0 text-base font-bold tabular-nums text-amber-950">
                       <Money
                         amount={c.amount}
                         currency={currency}
@@ -516,27 +560,28 @@ function HistoryInner() {
                       />
                     </span>
                   </div>
-                  {c.note ? <p className="text-stone-600">{c.note}</p> : null}
                 </button>
                 {editing ? (
-                  <EditFields
-                    amount={amount}
-                    note={note}
-                    categoryId={categoryId}
-                    categories={expenseCats}
-                    t={t}
-                    setAmount={setAmount}
-                    setNote={setNote}
-                    setCategoryId={setCategoryId}
-                    busy={busy}
-                    confirm={confirmId === c.id}
-                    onSave={() => saveClaim(c.id)}
-                    onDelete={() =>
-                      confirmId === c.id
-                        ? remove(`/claims/${c.id}`)
-                        : setConfirmId(c.id)
-                    }
-                  />
+                  <div className="border-t border-amber-200/80 px-3.5 pb-3.5">
+                    <EditFields
+                      amount={amount}
+                      note={note}
+                      categoryId={categoryId}
+                      categories={expenseCats}
+                      t={t}
+                      setAmount={setAmount}
+                      setNote={setNote}
+                      setCategoryId={setCategoryId}
+                      busy={busy}
+                      confirm={confirmId === c.id}
+                      onSave={() => saveClaim(c.id)}
+                      onDelete={() =>
+                        confirmId === c.id
+                          ? remove(`/claims/${c.id}`)
+                          : setConfirmId(c.id)
+                      }
+                    />
+                  </div>
                 ) : null}
               </li>
             );
@@ -545,20 +590,27 @@ function HistoryInner() {
             const editing = openId === g.id;
             const mine = g.memberId === userId || canEditHouse;
             return (
-              <li key={g.id} className="rounded-3xl bg-teal-50 p-4 shadow-sm">
+              <li
+                key={g.id}
+                className={`overflow-hidden rounded-2xl border border-teal-200/80 bg-teal-50/90 shadow-sm ${
+                  editing ? "ring-2 ring-teal-400" : ""
+                }`}
+              >
                 <button
                   type="button"
-                  className="w-full text-start"
+                  className="w-full px-3.5 py-3 text-start"
                   onClick={() =>
                     mine ? startEdit(g.id, g.amount, g.note) : undefined
                   }
                 >
-                  <p className="text-lg font-bold">{t("charityThatDay")}</p>
-                  <div className="money-row text-xl">
-                    <span dir="auto">
+                  <span className="inline-flex rounded-full bg-teal-100 px-2 py-0.5 text-[10px] font-bold text-teal-900">
+                    {t("charityThatDay")}
+                  </span>
+                  <div className="mt-1.5 flex items-start justify-between gap-3">
+                    <p className="min-w-0 truncate text-base font-bold" dir="auto">
                       {labelFor(g.member.name, t)} · {labelFor(g.type.name, t)}
-                    </span>
-                    <span className="font-bold">
+                    </p>
+                    <span className="shrink-0 text-base font-bold tabular-nums text-teal-950">
                       <Money
                         amount={g.amount}
                         currency={currency}
@@ -568,30 +620,31 @@ function HistoryInner() {
                   </div>
                 </button>
                 {editing ? (
-                  <EditFields
-                    amount={amount}
-                    note={note}
-                    categoryId=""
-                    categories={[]}
-                    t={t}
-                    setAmount={setAmount}
-                    setNote={setNote}
-                    setCategoryId={setCategoryId}
-                    busy={busy}
-                    confirm={confirmId === g.id}
-                    onSave={() => saveGift(g.id)}
-                    onDelete={() =>
-                      confirmId === g.id
-                        ? remove(`/charity/gifts/${g.id}`)
-                        : setConfirmId(g.id)
-                    }
-                  />
+                  <div className="border-t border-teal-200/80 px-3.5 pb-3.5">
+                    <EditFields
+                      amount={amount}
+                      note={note}
+                      categoryId=""
+                      categories={[]}
+                      t={t}
+                      setAmount={setAmount}
+                      setNote={setNote}
+                      setCategoryId={setCategoryId}
+                      busy={busy}
+                      confirm={confirmId === g.id}
+                      onSave={() => saveGift(g.id)}
+                      onDelete={() =>
+                        confirmId === g.id
+                          ? remove(`/charity/gifts/${g.id}`)
+                          : setConfirmId(g.id)
+                      }
+                    />
+                  </div>
                 ) : null}
               </li>
             );
           })}
         </ul>
-        </>
       )}
       <BottomNav />
     </PageShell>
@@ -634,11 +687,11 @@ function EditFields({
   onDelete: () => void;
 }) {
   return (
-    <div className="mt-4 space-y-3 border-t border-stone-200 pt-4">
+    <div className="mt-3 space-y-3 pt-3">
       <input
         inputMode="decimal"
         dir="ltr"
-        className="amount-input w-full rounded-2xl border border-stone-300 px-4 py-4 text-3xl"
+        className="amount-input field text-2xl"
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
         aria-label={t("amount")}
@@ -651,27 +704,29 @@ function EditFields({
         />
       ) : null}
       <input
-        className="w-full rounded-2xl border border-stone-300 px-4 py-4 text-xl"
+        className="field text-base"
         value={note}
         onChange={(e) => setNote(e.target.value)}
         placeholder={t("noteOptional")}
       />
-      <button
-        type="button"
-        disabled={busy}
-        onClick={onSave}
-        className="flex min-h-14 w-full items-center justify-center rounded-2xl bg-stone-900 text-xl font-bold text-white"
-      >
-        {busy ? t("saving") : t("save")}
-      </button>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={onDelete}
-        className="flex min-h-14 w-full items-center justify-center rounded-2xl bg-red-800 text-xl font-bold text-white"
-      >
-        {confirm ? t("confirmDelete") : t("deleteItem")}
-      </button>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onSave}
+          className="flex min-h-12 items-center justify-center rounded-2xl bg-stone-900 text-base font-bold text-white disabled:opacity-60"
+        >
+          {busy ? t("saving") : t("save")}
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onDelete}
+          className="flex min-h-12 items-center justify-center rounded-2xl bg-red-800 text-base font-bold text-white disabled:opacity-60"
+        >
+          {confirm ? t("confirmDelete") : t("deleteItem")}
+        </button>
+      </div>
     </div>
   );
 }
