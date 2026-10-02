@@ -15,6 +15,7 @@ import {
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
 import { PaySubscriptionDto } from './dto/pay-subscription.dto';
+import { UnpaySubscriptionDto } from './dto/unpay-subscription.dto';
 
 const SUB_COLORS = [
   '#4f46e5',
@@ -25,6 +26,10 @@ const SUB_COLORS = [
   '#7c3aed',
 ] as const;
 
+const PERIOD_KEY_RE = /^\d{4}-\d{2}$/;
+
+type SubStatus = 'paid' | 'due' | 'upcoming' | 'overdue' | 'scheduled';
+
 type SubRow = {
   id: string;
   name: string;
@@ -33,6 +38,7 @@ type SubRow = {
   kind: SubscriptionKind;
   totalInstallments: number | null;
   installmentsPaid: number;
+  startPeriodKey: string;
   categoryId: string;
   accountId: string;
   note: string;
@@ -55,9 +61,24 @@ type SubRow = {
   }[];
 };
 
+type PeriodCtx = {
+  startDay: number;
+  periodKey: string;
+  periodFrom: string;
+  periodTo: string;
+  today: string;
+};
+
 @Injectable()
 export class SubscriptionsService {
   constructor(private prisma: PrismaService) {}
+
+  private assertPeriodKey(key: string) {
+    if (!PERIOD_KEY_RE.test(key)) {
+      throw new BadRequestException('Pick a valid month (YYYY-MM)');
+    }
+    return key;
+  }
 
   private dueDateInPeriod(
     periodFrom: string,
@@ -82,20 +103,34 @@ export class SubscriptionsService {
     paid: boolean,
     dueOn: string,
     today: string,
-  ): 'paid' | 'due' | 'upcoming' | 'overdue' {
+    periodFrom: string,
+    periodTo: string,
+    startPeriodKey: string,
+    periodKey: string,
+  ): SubStatus {
+    if (periodKey < startPeriodKey) return 'scheduled';
     if (paid) return 'paid';
+    if (today < periodFrom) return 'upcoming';
+    if (today > periodTo) return 'overdue';
     if (today > dueOn) return 'overdue';
     if (today === dueOn) return 'due';
     return 'upcoming';
   }
 
-  private async periodContext(userId: string, now = new Date()) {
+  private async periodContext(
+    userId: string,
+    periodKey?: string,
+    now = new Date(),
+  ): Promise<PeriodCtx> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { budgetMonthStartDay: true },
     });
     const startDay = clampBudgetStartDay(user?.budgetMonthStartDay ?? 1);
-    const range = budgetMonthRange(now, startDay);
+    const key = periodKey
+      ? this.assertPeriodKey(periodKey)
+      : budgetMonthRange(now, startDay).key;
+    const range = budgetMonthRange(key, startDay);
     const today = isoLocal(now);
     return {
       startDay,
@@ -139,16 +174,7 @@ export class SubscriptionsService {
     }
   }
 
-  private shape(
-    sub: SubRow,
-    ctx: {
-      startDay: number;
-      periodKey: string;
-      periodFrom: string;
-      periodTo: string;
-      today: string;
-    },
-  ) {
+  private shape(sub: SubRow, ctx: PeriodCtx) {
     const payment = sub.payments.find((p) => p.periodKey === ctx.periodKey);
     const dueOn = this.dueDateInPeriod(
       ctx.periodFrom,
@@ -156,7 +182,15 @@ export class SubscriptionsService {
       sub.billingDay,
       ctx.startDay,
     );
-    const status = this.statusFor(Boolean(payment), dueOn, ctx.today);
+    const status = this.statusFor(
+      Boolean(payment),
+      dueOn,
+      ctx.today,
+      ctx.periodFrom,
+      ctx.periodTo,
+      sub.startPeriodKey,
+      ctx.periodKey,
+    );
     const remainingInstallments =
       sub.kind === SubscriptionKind.INSTALLMENT && sub.totalInstallments != null
         ? Math.max(0, sub.totalInstallments - sub.installmentsPaid)
@@ -170,6 +204,7 @@ export class SubscriptionsService {
       totalInstallments: sub.totalInstallments,
       installmentsPaid: sub.installmentsPaid,
       remainingInstallments,
+      startPeriodKey: sub.startPeriodKey,
       categoryId: sub.categoryId,
       accountId: sub.accountId,
       note: sub.note,
@@ -218,16 +253,22 @@ export class SubscriptionsService {
     });
   }
 
-  async summary(householdId: string, userId: string) {
-    const ctx = await this.periodContext(userId);
+  async summary(
+    householdId: string,
+    userId: string,
+    periodKey?: string,
+  ) {
+    const ctx = await this.periodContext(userId, periodKey);
     const rows = await this.loadVisible(householdId, ctx.periodKey);
-    const subscriptions = rows.map((s) => this.shape(s, ctx));
+    const subscriptions = rows.map((s) => this.shape(s as SubRow, ctx));
     const open = subscriptions.filter((s) => s.active);
+    // Only count commitments that have started in this period
+    const dueNow = open.filter((s) => s.status !== 'scheduled');
 
     const monthlyTotal =
-      Math.round(open.reduce((s, r) => s + r.amount, 0) * 100) / 100;
-    const paid = open.filter((s) => s.status === 'paid');
-    const unpaid = open.filter((s) => s.status !== 'paid');
+      Math.round(dueNow.reduce((s, r) => s + r.amount, 0) * 100) / 100;
+    const paid = dueNow.filter((s) => s.status === 'paid');
+    const unpaid = dueNow.filter((s) => s.status !== 'paid');
     const paidAmount =
       Math.round(paid.reduce((s, r) => s + r.amount, 0) * 100) / 100;
     const dueAmount =
@@ -286,6 +327,7 @@ export class SubscriptionsService {
     householdId: string,
     userId: string,
     dto: CreateSubscriptionDto,
+    viewPeriodKey?: string,
   ) {
     const name = dto.name.trim();
     if (!name) throw new BadRequestException('Name is required');
@@ -294,6 +336,11 @@ export class SubscriptionsService {
     const fields = this.normalizeKindFields(kind, dto.totalInstallments);
     await this.assertCategory(householdId, dto.categoryId);
     await this.assertAccount(householdId, dto.accountId);
+
+    const current = await this.periodContext(userId);
+    const startPeriodKey = dto.startPeriodKey
+      ? this.assertPeriodKey(dto.startPeriodKey)
+      : current.periodKey;
 
     await this.prisma.subscription.create({
       data: {
@@ -305,13 +352,14 @@ export class SubscriptionsService {
         kind: fields.kind,
         totalInstallments: fields.totalInstallments,
         installmentsPaid: 0,
+        startPeriodKey,
         categoryId: dto.categoryId,
         accountId: dto.accountId,
         note: dto.note?.trim() ?? '',
         color: dto.color ?? (await this.nextColor(householdId)),
       },
     });
-    return this.summary(householdId, userId);
+    return this.summary(householdId, userId, viewPeriodKey);
   }
 
   async update(
@@ -319,6 +367,7 @@ export class SubscriptionsService {
     userId: string,
     id: string,
     dto: UpdateSubscriptionDto,
+    viewPeriodKey?: string,
   ) {
     const existing = await this.requireOwn(householdId, userId, id);
     if (dto.name !== undefined && !dto.name.trim()) {
@@ -357,6 +406,11 @@ export class SubscriptionsService {
       }
     }
 
+    const startPeriodKey =
+      dto.startPeriodKey !== undefined
+        ? this.assertPeriodKey(dto.startPeriodKey)
+        : undefined;
+
     await this.prisma.subscription.update({
       where: { id },
       data: {
@@ -368,6 +422,7 @@ export class SubscriptionsService {
           ? { billingDay: clampBudgetStartDay(dto.billingDay) }
           : {}),
         ...kindPatch,
+        ...(startPeriodKey !== undefined ? { startPeriodKey } : {}),
         ...(dto.categoryId !== undefined
           ? { categoryId: dto.categoryId }
           : {}),
@@ -377,10 +432,15 @@ export class SubscriptionsService {
         ...(dto.active !== undefined ? { active: dto.active } : {}),
       },
     });
-    return this.summary(householdId, userId);
+    return this.summary(householdId, userId, viewPeriodKey);
   }
 
-  async remove(householdId: string, userId: string, id: string) {
+  async remove(
+    householdId: string,
+    userId: string,
+    id: string,
+    viewPeriodKey?: string,
+  ) {
     await this.requireOwn(householdId, userId, id);
     const payments = await this.prisma.subscriptionPayment.count({
       where: { subscriptionId: id },
@@ -393,7 +453,7 @@ export class SubscriptionsService {
     } else {
       await this.prisma.subscription.delete({ where: { id } });
     }
-    return this.summary(householdId, userId);
+    return this.summary(householdId, userId, viewPeriodKey);
   }
 
   async pay(
@@ -405,7 +465,13 @@ export class SubscriptionsService {
     const sub = await this.requireOwn(householdId, userId, id);
     if (!sub.active) throw new BadRequestException('Commitment is archived');
 
-    const ctx = await this.periodContext(userId);
+    const ctx = await this.periodContext(userId, dto.periodKey);
+    if (ctx.periodKey < sub.startPeriodKey) {
+      throw new BadRequestException(
+        'This commitment has not started yet for that month',
+      );
+    }
+
     const existing = await this.prisma.subscriptionPayment.findUnique({
       where: {
         subscriptionId_periodKey: {
@@ -422,9 +488,19 @@ export class SubscriptionsService {
     await this.assertAccount(householdId, accountId);
     await this.assertCategory(householdId, sub.categoryId);
 
+    const dueOn = this.dueDateInPeriod(
+      ctx.periodFrom,
+      ctx.periodTo,
+      sub.billingDay,
+      ctx.startDay,
+    );
     const paidOn = dto.occurredOn
       ? new Date(dto.occurredOn)
-      : new Date(ctx.today);
+      : new Date(
+          ctx.today >= ctx.periodFrom && ctx.today <= ctx.periodTo
+            ? ctx.today
+            : dueOn,
+        );
     const note =
       dto.note?.trim() ||
       `${this.notePrefix(sub.kind)}: ${sub.name} (${ctx.periodKey})`;
@@ -471,12 +547,17 @@ export class SubscriptionsService {
       }
     });
 
-    return this.summary(householdId, userId);
+    return this.summary(householdId, userId, ctx.periodKey);
   }
 
-  async unpay(householdId: string, userId: string, id: string) {
+  async unpay(
+    householdId: string,
+    userId: string,
+    id: string,
+    dto: UnpaySubscriptionDto = {},
+  ) {
     const sub = await this.requireOwn(householdId, userId, id);
-    const ctx = await this.periodContext(userId);
+    const ctx = await this.periodContext(userId, dto.periodKey);
     const payment = await this.prisma.subscriptionPayment.findUnique({
       where: {
         subscriptionId_periodKey: {
@@ -510,6 +591,6 @@ export class SubscriptionsService {
       }
     });
 
-    return this.summary(householdId, userId);
+    return this.summary(householdId, userId, ctx.periodKey);
   }
 }

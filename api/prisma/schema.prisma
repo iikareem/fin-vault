@@ -501,6 +501,8 @@ model Subscription {
   totalInstallments Int?
   /** For INSTALLMENT: how many payments have been marked paid. */
   installmentsPaid  Int              @default(0)
+  /** First budget period (YYYY-MM) this commitment is due. Before this it is scheduled only. */
+  startPeriodKey String
   categoryId  String
   category    Category               @relation(fields: [categoryId], references: [id])
   accountId   String

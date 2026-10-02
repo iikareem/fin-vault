@@ -36,6 +36,12 @@ export class CreateSubscriptionDto {
   @Max(360)
   totalInstallments?: number;
 
+  /** First budget period YYYY-MM. Defaults to the current period. */
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{4}-\d{2}$/)
+  startPeriodKey?: string;
+
   @IsString()
   categoryId: string;
 

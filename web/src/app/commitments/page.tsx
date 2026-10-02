@@ -18,6 +18,8 @@ import {
 } from "@/lib/wallets";
 import { fill, categoryLabel, type MessageKey } from "@/lib/i18n";
 import { HIDDEN_EXPENSE_CATEGORIES } from "@/lib/category-visibility";
+import { useCalendarClock } from "@/hooks/useCalendarClock";
+import { shiftBudgetMonthKey } from "@/lib/calendar";
 
 type Account = { id: string; name: string; type?: string };
 type Category = {
@@ -30,7 +32,7 @@ type Category = {
   emoji?: string | null;
 };
 
-type SubStatus = "paid" | "due" | "upcoming" | "overdue";
+type SubStatus = "paid" | "due" | "upcoming" | "overdue" | "scheduled";
 type SubKind = "SUBSCRIPTION" | "INSTALLMENT" | "CHARITY" | "OTHER";
 
 const KIND_OPTIONS: SubKind[] = [
@@ -49,6 +51,7 @@ type Subscription = {
   totalInstallments: number | null;
   installmentsPaid: number;
   remainingInstallments: number | null;
+  startPeriodKey: string;
   categoryId: string;
   accountId: string;
   note: string;
@@ -153,6 +156,8 @@ function statusTone(status: SubStatus) {
       return "bg-red-500/15 text-red-800 dark:text-red-300";
     case "due":
       return "bg-amber-500/15 text-amber-900 dark:text-amber-300";
+    case "scheduled":
+      return "bg-sky-500/15 text-sky-900 dark:text-sky-300";
     default:
       return "bg-[var(--panel-soft)] text-[var(--muted)]";
   }
@@ -163,6 +168,22 @@ function kindLabel(kind: SubKind, t: (key: MessageKey) => string) {
   if (kind === "CHARITY") return t("subsKindCharity");
   if (kind === "OTHER") return t("subsKindOther");
   return t("subsKindSubscription");
+}
+
+function monthLabel(key: string, locale: string) {
+  const [y, m] = key.split("-").map(Number);
+  return new Date(y, m - 1, 1).toLocaleDateString(
+    locale === "ar" ? "ar" : "en",
+    { month: "long", year: "numeric" },
+  );
+}
+
+function periodOptionsAround(center: string, before = 18, after = 12) {
+  const keys: string[] = [];
+  for (let i = -before; i <= after; i += 1) {
+    keys.push(shiftBudgetMonthKey(center, i));
+  }
+  return keys;
 }
 
 /** Prefer the matching seeded category for each commitment kind. */
@@ -187,10 +208,12 @@ function categoryIdForKind(kind: SubKind, cats: Category[]): string | undefined 
 
 export default function SubscriptionsPage() {
   const { t, locale } = useI18n();
-  const { personal, setKind } = useBooks();
+  const { personal, setKind, budgetMonthStartDay } = useBooks();
   const currency = personal?.currency ?? "EGP";
   const hid = personal?.householdId ?? "";
+  const cal = useCalendarClock(budgetMonthStartDay);
 
+  const [period, setPeriod] = useState(cal.monthKey);
   const [data, setData] = useState<SubsSummary | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -202,6 +225,7 @@ export default function SubscriptionsPage() {
   const [billingDay, setBillingDay] = useState(1);
   const [kind, setKindForm] = useState<SubKind>("SUBSCRIPTION");
   const [totalInstallments, setTotalInstallments] = useState("");
+  const [startPeriodKey, setStartPeriodKey] = useState(cal.monthKey);
   const [categoryId, setCategoryId] = useState("");
   const [accountId, setAccountId] = useState("");
   const [note, setNote] = useState("");
@@ -219,6 +243,7 @@ export default function SubscriptionsPage() {
   const [editDay, setEditDay] = useState(1);
   const [editKind, setEditKind] = useState<SubKind>("SUBSCRIPTION");
   const [editTotalInstallments, setEditTotalInstallments] = useState("");
+  const [editStartPeriodKey, setEditStartPeriodKey] = useState(cal.monthKey);
   const [editCategoryId, setEditCategoryId] = useState("");
   const [editAccountId, setEditAccountId] = useState("");
   const [editNote, setEditNote] = useState("");
@@ -226,6 +251,10 @@ export default function SubscriptionsPage() {
   const [deletingId, setDeletingId] = useState("");
   const [togglingId, setTogglingId] = useState("");
 
+  const startMonthChoices = useMemo(
+    () => periodOptionsAround(cal.monthKey),
+    [cal.monthKey],
+  );
   const expenseCats = useMemo(
     () =>
       categories.filter(
@@ -255,9 +284,11 @@ export default function SubscriptionsPage() {
     if (next !== "INSTALLMENT") setEditTotalInstallments("");
   }
 
-  function load(householdId: string) {
+  function load(householdId: string, periodKey: string) {
     return Promise.all([
-      api<SubsSummary>(householdPath(householdId, "/subscriptions")),
+      api<SubsSummary>(
+        householdPath(householdId, `/subscriptions?period=${periodKey}`),
+      ),
       api<Account[]>(householdPath(householdId, "/accounts")),
       api<Category[]>(householdPath(householdId, "/categories")),
     ]).then(([summary, list, cats]) => {
@@ -284,20 +315,35 @@ export default function SubscriptionsPage() {
   }
 
   useEffect(() => {
+    setPeriod(cal.monthKey);
+    setStartPeriodKey((prev) => prev || cal.monthKey);
+  }, [cal.monthKey]);
+
+  useEffect(() => {
     if (!personal) return;
     setKind("PERSONAL");
-    load(personal.householdId).catch((e) => setError(e.message));
-  }, [personal?.householdId]);
+    load(personal.householdId, period).catch((e) => setError(e.message));
+  }, [personal?.householdId, period]);
 
   const unpaid = useMemo(
     () =>
       (data?.subscriptions ?? [])
-        .filter((s) => s.active && s.status !== "paid")
+        .filter(
+          (s) =>
+            s.active && s.status !== "paid" && s.status !== "scheduled",
+        )
         .sort((a, b) => {
           const rank = (s: SubStatus) =>
             s === "overdue" ? 0 : s === "due" ? 1 : 2;
           return rank(a.status) - rank(b.status) || a.dueOn.localeCompare(b.dueOn);
         }),
+    [data],
+  );
+  const scheduled = useMemo(
+    () =>
+      (data?.subscriptions ?? []).filter(
+        (s) => s.active && s.status === "scheduled",
+      ),
     [data],
   );
   const paid = useMemo(
@@ -319,7 +365,13 @@ export default function SubscriptionsPage() {
     if (status === "paid") return t("subsStatusPaid");
     if (status === "overdue") return t("subsStatusOverdue");
     if (status === "due") return t("subsStatusDue");
+    if (status === "scheduled") return t("subsStatusScheduled");
     return t("subsStatusUpcoming");
+  }
+
+  function withPeriod(path: string) {
+    const sep = path.includes("?") ? "&" : "?";
+    return `${path}${sep}period=${encodeURIComponent(period)}`;
   }
 
   async function onAdd(e: FormEvent) {
@@ -355,7 +407,7 @@ export default function SubscriptionsPage() {
     setError("");
     try {
       const next = await api<SubsSummary>(
-        householdPath(personal.householdId, "/subscriptions"),
+        withPeriod(householdPath(personal.householdId, "/subscriptions")),
         {
           method: "POST",
           body: JSON.stringify({
@@ -363,6 +415,7 @@ export default function SubscriptionsPage() {
             amount: amt,
             billingDay,
             kind,
+            startPeriodKey,
             ...(kind === "INSTALLMENT" && installments
               ? { totalInstallments: installments }
               : {}),
@@ -379,6 +432,7 @@ export default function SubscriptionsPage() {
       setNote("");
       setKindForm("SUBSCRIPTION");
       setTotalInstallments("");
+      setStartPeriodKey(cal.monthKey);
       applyKindCategory("SUBSCRIPTION", setCategoryId);
       setShowAdd(false);
       setColor(
@@ -409,7 +463,8 @@ export default function SubscriptionsPage() {
           method: "POST",
           body: JSON.stringify({
             accountId: payAccountId || undefined,
-            occurredOn: todayISO(),
+            periodKey: period,
+            ...(period === cal.monthKey ? { occurredOn: todayISO() } : {}),
           }),
         },
       );
@@ -429,7 +484,10 @@ export default function SubscriptionsPage() {
     try {
       const next = await api<SubsSummary>(
         householdPath(personal.householdId, `/subscriptions/${id}/unpay`),
-        { method: "POST", body: JSON.stringify({}) },
+        {
+          method: "POST",
+          body: JSON.stringify({ periodKey: period }),
+        },
       );
       setData(next);
       setConfirmUnpayId("");
@@ -449,6 +507,7 @@ export default function SubscriptionsPage() {
     setEditTotalInstallments(
       sub.totalInstallments != null ? String(sub.totalInstallments) : "",
     );
+    setEditStartPeriodKey(sub.startPeriodKey || period);
     setEditCategoryId(sub.categoryId);
     setEditAccountId(sub.accountId);
     setEditNote(sub.note);
@@ -482,7 +541,9 @@ export default function SubscriptionsPage() {
     setError("");
     try {
       const next = await api<SubsSummary>(
-        householdPath(personal.householdId, `/subscriptions/${editId}`),
+        withPeriod(
+          householdPath(personal.householdId, `/subscriptions/${editId}`),
+        ),
         {
           method: "PATCH",
           body: JSON.stringify({
@@ -490,6 +551,7 @@ export default function SubscriptionsPage() {
             amount: amt,
             billingDay: editDay,
             kind: editKind,
+            startPeriodKey: editStartPeriodKey,
             totalInstallments: editKind === "INSTALLMENT" ? installments : null,
             categoryId: editCategoryId,
             accountId: editAccountId,
@@ -513,7 +575,9 @@ export default function SubscriptionsPage() {
     setError("");
     try {
       const next = await api<SubsSummary>(
-        householdPath(personal.householdId, `/subscriptions/${id}`),
+        withPeriod(
+          householdPath(personal.householdId, `/subscriptions/${id}`),
+        ),
         {
           method: "PATCH",
           body: JSON.stringify({ active }),
@@ -535,7 +599,9 @@ export default function SubscriptionsPage() {
     setError("");
     try {
       const next = await api<SubsSummary>(
-        householdPath(personal.householdId, `/subscriptions/${id}`),
+        withPeriod(
+          householdPath(personal.householdId, `/subscriptions/${id}`),
+        ),
         { method: "DELETE" },
       );
       setData(next);
@@ -583,6 +649,32 @@ export default function SubscriptionsPage() {
     <PageShell>
       <p className="page-title">📌 {t("navSubs")}</p>
       <Hint>{t("subsPageHint")}</Hint>
+
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <button
+          type="button"
+          className="rounded-2xl bg-[var(--panel)] px-4 py-3 text-xl font-bold shadow-sm ring-1 ring-[var(--border)]"
+          onClick={() => setPeriod((m) => shiftBudgetMonthKey(m, -1))}
+        >
+          ‹
+        </button>
+        <input
+          type="month"
+          value={period}
+          onChange={(e) => {
+            if (e.target.value) setPeriod(e.target.value);
+          }}
+          className="min-w-0 flex-1 rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-center text-lg font-semibold"
+        />
+        <button
+          type="button"
+          className="rounded-2xl bg-[var(--panel)] px-4 py-3 text-xl font-bold shadow-sm ring-1 ring-[var(--border)]"
+          onClick={() => setPeriod((m) => shiftBudgetMonthKey(m, 1))}
+        >
+          ›
+        </button>
+      </div>
+      <Hint>{t("subsMonthNavHint")}</Hint>
 
       {error ? (
         <p className="mt-3 rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-800">
@@ -654,7 +746,12 @@ export default function SubscriptionsPage() {
 
       <button
         type="button"
-        onClick={() => setShowAdd((v) => !v)}
+        onClick={() => {
+          setShowAdd((v) => {
+            if (!v) setStartPeriodKey(period);
+            return !v;
+          });
+        }}
         className="mt-4 flex min-h-12 w-full items-center justify-center rounded-3xl bg-stone-900 text-base font-semibold text-white shadow-md"
       >
         {showAdd ? t("subsCancel") : `＋ ${t("subsAdd")}`}
@@ -716,6 +813,22 @@ export default function SubscriptionsPage() {
               </select>
             </label>
           </div>
+          <label className="block text-sm font-medium">
+            {t("subsStartMonth")}
+            <select
+              className="mt-1 w-full rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5"
+              value={startPeriodKey}
+              onChange={(e) => setStartPeriodKey(e.target.value)}
+            >
+              {startMonthChoices.map((key) => (
+                <option key={key} value={key}>
+                  {monthLabel(key, locale)}
+                  {key === cal.monthKey ? ` · ${t("subsThisPeriod")}` : ""}
+                </option>
+              ))}
+            </select>
+            <Hint>{t("subsStartMonthHint")}</Hint>
+          </label>
           {kind === "INSTALLMENT" ? (
             <label className="block text-sm font-medium">
               {t("subsTotalInstallments")}
@@ -984,6 +1097,24 @@ export default function SubscriptionsPage() {
                             <Hint>{t("subsInstallmentsHint")}</Hint>
                           </label>
                         ) : null}
+                        <label className="block text-sm font-medium">
+                          {t("subsStartMonth")}
+                          <select
+                            className="mt-1 w-full rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2"
+                            value={editStartPeriodKey}
+                            onChange={(e) =>
+                              setEditStartPeriodKey(e.target.value)
+                            }
+                          >
+                            {periodOptionsAround(editStartPeriodKey).map(
+                              (key) => (
+                                <option key={key} value={key}>
+                                  {monthLabel(key, locale)}
+                                </option>
+                              ),
+                            )}
+                          </select>
+                        </label>
                         {expenseCats.length > 0 ? (
                           <CategoryPicker
                             categories={expenseCats}
@@ -1051,6 +1182,64 @@ export default function SubscriptionsPage() {
                         </div>
                       </form>
                     ) : null}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {scheduled.length > 0 ? (
+        <section className="mt-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">
+            {t("subsStatusScheduled")}
+          </h2>
+          <ul className="mt-2 space-y-2">
+            {scheduled.map((sub) => (
+              <li
+                key={sub.id}
+                className="surface overflow-hidden rounded-[1.5rem]"
+              >
+                <div className="flex items-stretch gap-0">
+                  <div
+                    className="w-1.5 shrink-0"
+                    style={{ backgroundColor: sub.color }}
+                  />
+                  <div className="min-w-0 flex-1 p-3.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-semibold">
+                          {sub.category.emoji ? `${sub.category.emoji} ` : ""}
+                          {sub.name}
+                        </p>
+                        <p className="mt-0.5 text-sm text-[var(--muted)]">
+                          {kindLabel(sub.kind ?? "SUBSCRIPTION", t)} ·{" "}
+                          {categoryLabel(sub.category, locale, t)}
+                        </p>
+                        <p className="mt-1 text-xs font-medium text-sky-800">
+                          {fill(t("subsStartsIn"), {
+                            month: monthLabel(sub.startPeriodKey, locale),
+                          })}
+                        </p>
+                      </div>
+                      <p className="shrink-0 text-base font-semibold tabular-nums">
+                        <Money
+                          amount={sub.amount}
+                          currency={currency}
+                          locale={locale}
+                        />
+                      </p>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openEdit(sub)}
+                        className="min-h-10 rounded-2xl bg-[var(--panel-soft)] px-3 text-sm font-semibold"
+                      >
+                        {t("subsEdit")}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </li>
@@ -1225,6 +1414,24 @@ export default function SubscriptionsPage() {
                           <Hint>{t("subsInstallmentsHint")}</Hint>
                         </label>
                       ) : null}
+                      <label className="block text-sm font-medium">
+                        {t("subsStartMonth")}
+                        <select
+                          className="mt-1 w-full rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2"
+                          value={editStartPeriodKey}
+                          onChange={(e) =>
+                            setEditStartPeriodKey(e.target.value)
+                          }
+                        >
+                          {periodOptionsAround(editStartPeriodKey).map(
+                            (key) => (
+                              <option key={key} value={key}>
+                                {monthLabel(key, locale)}
+                              </option>
+                            ),
+                          )}
+                        </select>
+                      </label>
                       <div className="flex flex-wrap gap-2">
                         <button
                           type="submit"

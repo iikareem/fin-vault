@@ -41,6 +41,11 @@ export class UpdateSubscriptionDto {
 
   @IsOptional()
   @IsString()
+  @Matches(/^\d{4}-\d{2}$/)
+  startPeriodKey?: string;
+
+  @IsOptional()
+  @IsString()
   categoryId?: string;
 
   @IsOptional()

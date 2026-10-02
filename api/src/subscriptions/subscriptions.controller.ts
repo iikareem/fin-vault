@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { SubscriptionsService } from './subscriptions.service';
@@ -19,6 +20,7 @@ import { MembershipContext } from '../households/membership-context';
 import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
 import { PaySubscriptionDto } from './dto/pay-subscription.dto';
+import { UnpaySubscriptionDto } from './dto/unpay-subscription.dto';
 
 @Controller('households/:householdId/subscriptions')
 @UseGuards(JwtAuthGuard, HouseholdGuard, PersonalKindGuard)
@@ -29,8 +31,13 @@ export class SubscriptionsController {
   summary(
     @CurrentMembership() membership: MembershipContext,
     @CurrentUser() user: AuthUser,
+    @Query('period') period?: string,
   ) {
-    return this.subscriptions.summary(membership.householdId, user.id);
+    return this.subscriptions.summary(
+      membership.householdId,
+      user.id,
+      period,
+    );
   }
 
   @Post()
@@ -38,8 +45,14 @@ export class SubscriptionsController {
     @CurrentMembership() membership: MembershipContext,
     @CurrentUser() user: AuthUser,
     @Body() dto: CreateSubscriptionDto,
+    @Query('period') period?: string,
   ) {
-    return this.subscriptions.create(membership.householdId, user.id, dto);
+    return this.subscriptions.create(
+      membership.householdId,
+      user.id,
+      dto,
+      period,
+    );
   }
 
   @Patch(':id')
@@ -48,8 +61,15 @@ export class SubscriptionsController {
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
     @Body() dto: UpdateSubscriptionDto,
+    @Query('period') period?: string,
   ) {
-    return this.subscriptions.update(membership.householdId, user.id, id, dto);
+    return this.subscriptions.update(
+      membership.householdId,
+      user.id,
+      id,
+      dto,
+      period,
+    );
   }
 
   @Delete(':id')
@@ -57,8 +77,14 @@ export class SubscriptionsController {
     @CurrentMembership() membership: MembershipContext,
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
+    @Query('period') period?: string,
   ) {
-    return this.subscriptions.remove(membership.householdId, user.id, id);
+    return this.subscriptions.remove(
+      membership.householdId,
+      user.id,
+      id,
+      period,
+    );
   }
 
   @Post(':id/pay')
@@ -76,7 +102,8 @@ export class SubscriptionsController {
     @CurrentMembership() membership: MembershipContext,
     @CurrentUser() user: AuthUser,
     @Param('id') id: string,
+    @Body() dto: UnpaySubscriptionDto,
   ) {
-    return this.subscriptions.unpay(membership.householdId, user.id, id);
+    return this.subscriptions.unpay(membership.householdId, user.id, id, dto);
   }
 }
