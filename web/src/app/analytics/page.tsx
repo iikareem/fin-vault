@@ -159,6 +159,53 @@ function monthLabel(key: string, locale: string) {
   });
 }
 
+function CompareChip({
+  current,
+  previous,
+  kind,
+  label,
+  t,
+}: {
+  current: number;
+  previous: number;
+  kind: "in" | "out";
+  label: string;
+  t: (key: "vsNew" | "vsFlat") => string;
+}) {
+  const diff = current - previous;
+  const flat = Math.abs(diff) < 0.001;
+  const up = diff > 0.001;
+  // Income up is good; expense up is bad.
+  const good = kind === "in" ? up : !up && !flat;
+  const bad = kind === "in" ? !up && !flat : up;
+  const pct =
+    previous > 0.001 ? Math.round((diff / previous) * 100) : null;
+
+  let text: string;
+  if (flat) text = t("vsFlat");
+  else if (previous < 0.001 && current > 0.001) text = t("vsNew");
+  else if (pct != null) text = `${up ? "↑" : "↓"} ${Math.abs(pct)}%`;
+  else text = `${up ? "↑" : "↓"}`;
+
+  return (
+    <span
+      className={`mt-2 inline-flex max-w-full items-center rounded-full px-2 py-0.5 text-[11px] font-semibold leading-snug ${
+        flat
+          ? "bg-stone-100 text-stone-600"
+          : good
+            ? "bg-emerald-50 text-emerald-800"
+            : bad
+              ? "bg-red-50 text-red-800"
+              : "bg-stone-100 text-stone-600"
+      }`}
+    >
+      <span className="truncate">
+        {text} · {label}
+      </span>
+    </span>
+  );
+}
+
 export default function AnalyticsPage() {
   const { t, locale } = useI18n();
   const { active, house, budgetMonthStartDay } = useBooks();
@@ -172,6 +219,8 @@ export default function AnalyticsPage() {
   });
   const [rangeTo, setRangeTo] = useState(() => isoLocal(new Date()));
   const [days, setDays] = useState<DayRow[]>([]);
+  const [prevIn, setPrevIn] = useState<number | null>(null);
+  const [prevOut, setPrevOut] = useState<number | null>(null);
   const [cats, setCats] = useState<CatRow[]>([]);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [members, setMembers] = useState<MemberRow[]>([]);
@@ -225,6 +274,35 @@ export default function AnalyticsPage() {
       .catch((e) => setError(e.message));
   }, [active?.householdId, from, to]);
 
+  useEffect(() => {
+    if (!active || period === "range") {
+      setPrevIn(null);
+      setPrevOut(null);
+      return;
+    }
+    const prevCursor = shift(period, cursor, -1, startDay);
+    const prev = rangeFor(period, prevCursor, startDay);
+    const q = `from=${prev.from}&to=${prev.to}`;
+    let cancelled = false;
+    api<DayRow[]>(
+      householdPath(active.householdId, `/analytics/by-day?${q}`),
+    )
+      .then((rows) => {
+        if (cancelled) return;
+        setPrevIn(rows.reduce((s, d) => s + d.income, 0));
+        setPrevOut(rows.reduce((s, d) => s + d.expense, 0));
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setPrevIn(null);
+          setPrevOut(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [active?.householdId, period, cursor, startDay]);
+
   function catKey(c: CatRow) {
     return c.categoryId ?? c.name;
   }
@@ -274,6 +352,17 @@ export default function AnalyticsPage() {
   const totalOut =
     days.reduce((s, d) => s + d.expense, 0) ||
     cats.reduce((s, c) => s + c.total, 0);
+
+  const compareLabel =
+    period === "month"
+      ? t("vsLastMonth")
+      : period === "week"
+        ? t("vsLastWeek")
+        : period === "day"
+          ? t("vsYesterday")
+          : period === "year"
+            ? t("vsLastYear")
+            : "";
 
   type ChartBar = {
     key: string;
@@ -698,7 +787,7 @@ export default function AnalyticsPage() {
       ) : null}
 
       <div className="mt-5 grid grid-cols-2 gap-3">
-        <div className="surface rounded-2xl p-4">
+        <div className="surface flex flex-col rounded-2xl p-4">
           <p className="text-[var(--muted)]">{t("periodTotalIn")}</p>
           <p className="text-xl font-semibold text-emerald-800">
             {hideAggregates ? (
@@ -707,8 +796,17 @@ export default function AnalyticsPage() {
               <Money amount={totalIn} currency={currency} locale={locale} />
             )}
           </p>
+          {!hideAggregates && prevIn != null && compareLabel ? (
+            <CompareChip
+              current={totalIn}
+              previous={prevIn}
+              kind="in"
+              label={compareLabel}
+              t={t}
+            />
+          ) : null}
         </div>
-        <div className="surface rounded-2xl p-4">
+        <div className="surface flex flex-col rounded-2xl p-4">
           <p className="text-[var(--muted)]">{t("periodTotalOut")}</p>
           <p className="text-xl font-semibold text-red-800">
             {hideAggregates ? (
@@ -717,6 +815,15 @@ export default function AnalyticsPage() {
               <Money amount={totalOut} currency={currency} locale={locale} />
             )}
           </p>
+          {!hideAggregates && prevOut != null && compareLabel ? (
+            <CompareChip
+              current={totalOut}
+              previous={prevOut}
+              kind="out"
+              label={compareLabel}
+              t={t}
+            />
+          ) : null}
         </div>
       </div>
       <Hint>

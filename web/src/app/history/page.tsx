@@ -55,6 +55,52 @@ type DayLog = {
 };
 type Category = { id: string; name: string; kind: string; parentId?: string | null; color?: string | null };
 
+function HistoryCompareChip({
+  current,
+  previous,
+  kind,
+  label,
+  t,
+}: {
+  current: number;
+  previous: number;
+  kind: "in" | "out";
+  label: string;
+  t: (key: "vsNew" | "vsFlat") => string;
+}) {
+  const diff = current - previous;
+  const flat = Math.abs(diff) < 0.001;
+  const up = diff > 0.001;
+  const good = kind === "in" ? up : !up && !flat;
+  const bad = kind === "in" ? !up && !flat : up;
+  const pct =
+    previous > 0.001 ? Math.round((diff / previous) * 100) : null;
+
+  let text: string;
+  if (flat) text = t("vsFlat");
+  else if (previous < 0.001 && current > 0.001) text = t("vsNew");
+  else if (pct != null) text = `${up ? "↑" : "↓"} ${Math.abs(pct)}%`;
+  else text = `${up ? "↑" : "↓"}`;
+
+  return (
+    <span
+      className={`mt-2 inline-flex max-w-full items-center rounded-full px-2 py-0.5 text-[11px] font-semibold leading-snug ${
+        flat
+          ? "bg-stone-100 text-stone-600"
+          : good
+            ? "bg-emerald-50 text-emerald-800"
+            : bad
+              ? "bg-red-50 text-red-800"
+              : "bg-stone-100 text-stone-600"
+      }`}
+    >
+      <span className="truncate">
+        {text} · {label}
+      </span>
+    </span>
+  );
+}
+
 function shiftDay(day: string, dir: number) {
   const d = new Date(`${day}T12:00:00`);
   d.setDate(d.getDate() + dir);
@@ -89,6 +135,7 @@ function HistoryInner() {
     isIsoDay(onParam) ? onParam : cal.today,
   );
   const [log, setLog] = useState<DayLog | null>(null);
+  const [prevLog, setPrevLog] = useState<DayLog | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [openId, setOpenId] = useState("");
   const [amount, setAmount] = useState("");
@@ -102,11 +149,16 @@ function HistoryInner() {
   const hideAggregates = active?.kind === "HOUSE" && house?.role !== "ADMIN";
 
   function load(hid: string, on: string) {
+    const prev = new Date(`${on}T12:00:00`);
+    prev.setMonth(prev.getMonth() - 1);
+    const prevOn = isoLocal(prev);
     return Promise.all([
       api<DayLog>(householdPath(hid, `/analytics/day?on=${on}`)),
+      api<DayLog>(householdPath(hid, `/analytics/day?on=${prevOn}`)),
       api<Category[]>(householdPath(hid, "/categories")),
-    ]).then(([d, c]) => {
+    ]).then(([d, prevDay, c]) => {
       setLog(d);
+      setPrevLog(prevDay);
       setCategories(c);
     });
   }
@@ -289,7 +341,7 @@ function HistoryInner() {
         </p>
       ) : (
         <div className="mt-4 grid grid-cols-2 gap-3">
-          <div className="surface rounded-3xl p-4">
+          <div className="surface flex flex-col rounded-3xl p-4">
             <p className="text-lg text-stone-500">{t("in")}</p>
             <p className="text-2xl font-bold text-emerald-800">
               <Money
@@ -298,9 +350,19 @@ function HistoryInner() {
                 locale={locale}
               />
             </p>
-            <Hint>{t("dayInHint")}</Hint>
+            {prevLog ? (
+              <HistoryCompareChip
+                current={log?.income ?? 0}
+                previous={prevLog.income}
+                kind="in"
+                label={t("vsSameDayLastMonth")}
+                t={t}
+              />
+            ) : (
+              <Hint>{t("dayInHint")}</Hint>
+            )}
           </div>
-          <div className="surface rounded-3xl p-4">
+          <div className="surface flex flex-col rounded-3xl p-4">
             <p className="text-lg text-stone-500">{t("out")}</p>
             <p className="text-2xl font-bold text-red-800">
               <Money
@@ -309,7 +371,17 @@ function HistoryInner() {
                 locale={locale}
               />
             </p>
-            <Hint>{t("dayOutHint")}</Hint>
+            {prevLog ? (
+              <HistoryCompareChip
+                current={log?.expense ?? 0}
+                previous={prevLog.expense}
+                kind="out"
+                label={t("vsSameDayLastMonth")}
+                t={t}
+              />
+            ) : (
+              <Hint>{t("dayOutHint")}</Hint>
+            )}
           </div>
         </div>
       )}
