@@ -19,7 +19,7 @@ import {
 import { fill, categoryLabel, type MessageKey } from "@/lib/i18n";
 import { HIDDEN_EXPENSE_CATEGORIES } from "@/lib/category-visibility";
 import { useCalendarClock } from "@/hooks/useCalendarClock";
-import { shiftBudgetMonthKey } from "@/lib/calendar";
+import { budgetMonthRange, shiftBudgetMonthKey } from "@/lib/calendar";
 
 type Account = { id: string; name: string; type?: string };
 type Category = {
@@ -178,6 +178,21 @@ function monthLabel(key: string, locale: string) {
   );
 }
 
+function shortDayMonth(iso: string, locale: string) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(
+    locale === "ar" ? "ar" : "en",
+    { day: "numeric", month: "short" },
+  );
+}
+
+/** Human label for a budget period key (respects payday start day). */
+function periodLabel(key: string, startDay: number, locale: string) {
+  if (startDay <= 1) return monthLabel(key, locale);
+  const { from, to } = budgetMonthRange(key, startDay);
+  return `${shortDayMonth(from, locale)} – ${shortDayMonth(to, locale)}`;
+}
+
 function periodOptionsAround(center: string, before = 18, after = 12) {
   const keys: string[] = [];
   for (let i = -before; i <= after; i += 1) {
@@ -186,87 +201,86 @@ function periodOptionsAround(center: string, before = 18, after = 12) {
   return keys;
 }
 
-/** Visible month label + period-key select (avoids native type=month off-by-one). */
+/**
+ * Budget-period month control.
+ * Uses visible arrows + a real select (no invisible overlay) so iOS can’t
+ * pick the neighboring month by mistake.
+ */
 function PeriodMonthPicker({
   value,
   onChange,
   locale,
+  startDay,
   choices,
   currentKey,
   thisPeriodLabel,
-  from,
-  to,
-  withArrows = false,
+  withArrows = true,
 }: {
   value: string;
   onChange: (key: string) => void;
   locale: "ar" | "en";
+  startDay: number;
   choices: string[];
   currentKey?: string;
   thisPeriodLabel?: string;
-  from?: string;
-  to?: string;
   withArrows?: boolean;
 }) {
   const options = choices.includes(value)
     ? choices
     : periodOptionsAround(value);
+  const title = periodLabel(value, startDay, locale);
 
   return (
-    <div className={`flex items-center gap-2 ${withArrows ? "" : "w-full"}`}>
-      {withArrows ? (
-        <button
-          type="button"
-          aria-label="Previous month"
-          className="icon-btn shrink-0 px-3 text-xl"
-          onClick={() => onChange(shiftBudgetMonthKey(value, -1))}
-        >
-          ‹
-        </button>
-      ) : null}
-      <label className="field relative flex min-h-[3.25rem] min-w-0 flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 !py-1.5">
-        <span className="text-center text-base font-bold leading-tight">
-          {monthLabel(value, locale)}
-        </span>
-        {from && to ? (
-          <span className="text-center text-[11px] font-medium text-[var(--muted)]">
-            <ItemDate value={from} locale={locale} />
-            {" – "}
-            <ItemDate value={to} locale={locale} />
-          </span>
-        ) : currentKey && value === currentKey && thisPeriodLabel ? (
-          <span className="text-[11px] font-semibold text-[var(--muted)]">
-            {thisPeriodLabel}
-          </span>
+    <div className="w-full space-y-1.5">
+      <div className="flex items-center gap-2">
+        {withArrows ? (
+          <button
+            type="button"
+            aria-label="Previous period"
+            className="icon-btn shrink-0 px-3 text-xl"
+            onClick={() => onChange(shiftBudgetMonthKey(value, -1))}
+          >
+            ‹
+          </button>
         ) : null}
-        <select
-          className="absolute inset-0 z-10 cursor-pointer opacity-0"
-          value={value}
-          onChange={(e) => {
-            if (e.target.value) onChange(e.target.value);
-          }}
-          aria-label={monthLabel(value, locale)}
-        >
-          {options.map((key) => (
-            <option key={key} value={key}>
-              {monthLabel(key, locale)}
-              {currentKey && key === currentKey && thisPeriodLabel
-                ? ` · ${thisPeriodLabel}`
-                : ""}
-            </option>
-          ))}
-        </select>
-      </label>
-      {withArrows ? (
-        <button
-          type="button"
-          aria-label="Next month"
-          className="icon-btn shrink-0 px-3 text-xl"
-          onClick={() => onChange(shiftBudgetMonthKey(value, 1))}
-        >
-          ›
-        </button>
-      ) : null}
+        <div className="field flex min-h-[3.25rem] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 !py-1.5">
+          <span className="text-center text-base font-bold leading-tight tabular-nums">
+            {title}
+          </span>
+          {currentKey && value === currentKey && thisPeriodLabel ? (
+            <span className="text-[11px] font-semibold text-[var(--muted)]">
+              {thisPeriodLabel}
+            </span>
+          ) : null}
+        </div>
+        {withArrows ? (
+          <button
+            type="button"
+            aria-label="Next period"
+            className="icon-btn shrink-0 px-3 text-xl"
+            onClick={() => onChange(shiftBudgetMonthKey(value, 1))}
+          >
+            ›
+          </button>
+        ) : null}
+      </div>
+      <select
+        className="field w-full text-sm"
+        value={value}
+        onChange={(e) => {
+          if (e.target.value) onChange(e.target.value);
+        }}
+        aria-label={title}
+      >
+        {options.map((key) => (
+          <option key={key} value={key}>
+            {periodLabel(key, startDay, locale)}
+            {currentKey && key === currentKey && thisPeriodLabel
+              ? ` · ${thisPeriodLabel}`
+              : ""}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -736,33 +750,16 @@ export default function SubscriptionsPage() {
       <p className="page-title">📌 {t("navSubs")}</p>
       <Hint>{t("subsPageHint")}</Hint>
 
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <button
-          type="button"
-          className="rounded-2xl bg-[var(--panel)] px-4 py-3 text-xl font-bold shadow-sm ring-1 ring-[var(--border)]"
-          onClick={() => setPeriod((m) => shiftBudgetMonthKey(m, -1))}
-        >
-          ‹
-        </button>
-        <div className="min-w-0 flex-1">
-          <PeriodMonthPicker
-            value={period}
-            onChange={setPeriod}
-            locale={locale}
-            choices={startMonthChoices}
-            currentKey={cal.monthKey}
-            thisPeriodLabel={t("subsThisPeriod")}
-            from={data?.periodFrom}
-            to={data?.periodTo}
-          />
-        </div>
-        <button
-          type="button"
-          className="rounded-2xl bg-[var(--panel)] px-4 py-3 text-xl font-bold shadow-sm ring-1 ring-[var(--border)]"
-          onClick={() => setPeriod((m) => shiftBudgetMonthKey(m, 1))}
-        >
-          ›
-        </button>
+      <div className="mt-4">
+        <PeriodMonthPicker
+          value={period}
+          onChange={setPeriod}
+          locale={locale}
+          startDay={budgetMonthStartDay}
+          choices={startMonthChoices}
+          currentKey={cal.monthKey}
+          thisPeriodLabel={t("subsThisPeriod")}
+        />
       </div>
       <Hint>{t("subsMonthNavHint")}</Hint>
 
@@ -909,10 +906,10 @@ export default function SubscriptionsPage() {
               value={startPeriodKey}
               onChange={setStartPeriodKey}
               locale={locale}
+              startDay={budgetMonthStartDay}
               choices={startMonthChoices}
               currentKey={cal.monthKey}
               thisPeriodLabel={t("subsThisPeriod")}
-              withArrows
             />
             <Hint>{t("subsStartMonthHint")}</Hint>
           </div>
@@ -1192,10 +1189,10 @@ export default function SubscriptionsPage() {
                             value={editStartPeriodKey}
                             onChange={setEditStartPeriodKey}
                             locale={locale}
+                            startDay={budgetMonthStartDay}
                             choices={periodOptionsAround(editStartPeriodKey)}
                             currentKey={cal.monthKey}
                             thisPeriodLabel={t("subsThisPeriod")}
-                            withArrows
                           />
                         </div>
                         {expenseCats.length > 0 ? (
@@ -1302,7 +1299,11 @@ export default function SubscriptionsPage() {
                         </p>
                         <p className="mt-1 text-xs font-medium text-sky-800">
                           {fill(t("subsStartsIn"), {
-                            month: monthLabel(sub.startPeriodKey, locale),
+                            month: periodLabel(
+                              sub.startPeriodKey,
+                              budgetMonthStartDay,
+                              locale,
+                            ),
                           })}
                         </p>
                       </div>
@@ -1505,10 +1506,10 @@ export default function SubscriptionsPage() {
                           value={editStartPeriodKey}
                           onChange={setEditStartPeriodKey}
                           locale={locale}
+                          startDay={budgetMonthStartDay}
                           choices={periodOptionsAround(editStartPeriodKey)}
                           currentKey={cal.monthKey}
                           thisPeriodLabel={t("subsThisPeriod")}
-                          withArrows
                         />
                       </div>
                       <div className="flex flex-wrap gap-2">

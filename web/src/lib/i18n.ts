@@ -772,8 +772,9 @@ const ar = {
   subsStatusOverdue: "متأخر",
   subsStatusScheduled: "لسه ما بدأش",
   subsStartMonth: "شهر البداية",
-  subsStartMonthHint: "اختاروا أول شهر الالتزام — سابق أو الحالي أو الجاي.",
-  subsMonthNavHint: "تنقّلوا بين الشهور عشان تشوفوا وتسجّلوا الدفع.",
+  subsStartMonthHint:
+    "أول فترة للالتزام حسب شهر الراتب عندكم — التواريخ ظاهرة تحت الاختيار.",
+  subsMonthNavHint: "تنقّلوا بين فترات الراتب عشان تشوفوا وتسجّلوا الدفع.",
   subsStartsIn: "يبدأ {month}",
   subsEmpty: "لسه مفيش التزامات. زوّدوا أول واحد.",
   subsUndoPay: "ارجع الدفع",
@@ -1580,8 +1581,9 @@ const en = {
   subsStatusOverdue: "Overdue",
   subsStatusScheduled: "Not started yet",
   subsStartMonth: "Start month",
-  subsStartMonthHint: "Pick the first month — past, current, or upcoming.",
-  subsMonthNavHint: "Browse months to review and record payments.",
+  subsStartMonthHint:
+    "First period for this commitment — dates follow your payday month.",
+  subsMonthNavHint: "Browse payday periods to review and record payments.",
   subsStartsIn: "Starts {month}",
   subsEmpty: "No commitments yet. Add your first one.",
   subsUndoPay: "Undo payment",
