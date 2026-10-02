@@ -8,7 +8,6 @@ import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
 import { householdPath, type Space } from "@/lib/space";
-import { Hint } from "@/components/Hint";
 import { CategoryPicker } from "@/components/CategoryPicker";
 import { DateField } from "@/components/DateField";
 import {
@@ -400,12 +399,63 @@ function AddForm() {
     }
   }
 
+  const today = todayISO();
+  const yesterday = yesterdayISO();
+  const modeHint = withdrawMode
+    ? t("cashWithdrawHint")
+    : transferMode
+      ? t("transferWalletsHint")
+      : coverMode
+        ? t("housePaidForHint")
+        : claimMode
+          ? t("paidFromMyMoneyHint")
+          : type === "GIVE"
+            ? t("giveFromHouseHint")
+            : type === "INCOME"
+              ? t("moneyInHint")
+              : personalPaid && trackOnly
+                ? t("spendTrackOnlyHint")
+                : t("paidHint");
+
+  function modeBtn(
+    active: boolean,
+    tone: "red" | "emerald" | "teal" | "indigo" | "amber" | "stone",
+  ) {
+    const on =
+      tone === "red"
+        ? "bg-red-800 text-white shadow-md"
+        : tone === "emerald"
+          ? "bg-emerald-800 text-white shadow-md"
+          : tone === "teal"
+            ? "bg-teal-800 text-white shadow-md"
+            : tone === "indigo"
+              ? "bg-indigo-800 text-white shadow-md"
+              : tone === "amber"
+                ? "bg-amber-800 text-white shadow-md"
+                : "bg-stone-800 text-white shadow-md";
+    return `min-h-11 rounded-2xl px-2 text-sm font-semibold transition ${
+      active
+        ? on
+        : "bg-[var(--surface-bg)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
+    }`;
+  }
+
+  function walletBtn(active: boolean, tone: "stone" | "emerald" = "emerald") {
+    return `rounded-2xl px-3 py-2.5 text-sm font-bold transition ${
+      active
+        ? tone === "stone"
+          ? "bg-stone-900 text-white shadow"
+          : "bg-emerald-800 text-white shadow"
+        : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
+    }`;
+  }
+
   return (
     <PageShell>
-      <h1 className="page-title">➕ {t("navAdd")}</h1>
-      <Hint>{t("addPageHint")}</Hint>
+      <h1 className="text-lg font-semibold">➕ {t("navAdd")}</h1>
+
       {houseAdmin ? (
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="mt-3 grid grid-cols-2 gap-1.5">
           <button
             type="button"
             onClick={() => {
@@ -413,11 +463,10 @@ function AddForm() {
               setType("EXPENSE");
               setTrackOnly(false);
             }}
-            className={`min-h-16 rounded-3xl px-2 text-lg font-semibold transition ${
-              !claimMode && !coverMode && type === "EXPENSE"
-                ? "bg-red-800 text-white shadow-md"
-                : "bg-[var(--surface-bg)] text-stone-700 ring-1 ring-[var(--input-border)]"
-            }`}
+            className={modeBtn(
+              !claimMode && !coverMode && type === "EXPENSE",
+              "red",
+            )}
           >
             🧾 {t("paid")}
           </button>
@@ -428,11 +477,10 @@ function AddForm() {
               setType("INCOME");
               setTrackOnly(false);
             }}
-            className={`min-h-16 rounded-3xl px-2 text-lg font-semibold transition ${
-              !claimMode && !coverMode && type === "INCOME"
-                ? "bg-emerald-800 text-white shadow-md"
-                : "bg-[var(--surface-bg)] text-stone-700 ring-1 ring-[var(--input-border)]"
-            }`}
+            className={modeBtn(
+              !claimMode && !coverMode && type === "INCOME",
+              "emerald",
+            )}
           >
             📈 {t("moneyIn")}
           </button>
@@ -443,11 +491,10 @@ function AddForm() {
               setType("GIVE");
               setTrackOnly(false);
             }}
-            className={`min-h-16 rounded-3xl px-2 text-lg font-semibold transition ${
-              !claimMode && !coverMode && type === "GIVE"
-                ? "bg-teal-800 text-white shadow-md"
-                : "bg-[var(--surface-bg)] text-stone-700 ring-1 ring-[var(--input-border)]"
-            }`}
+            className={modeBtn(
+              !claimMode && !coverMode && type === "GIVE",
+              "teal",
+            )}
           >
             💵 {t("giveFromHouse")}
           </button>
@@ -457,11 +504,7 @@ function AddForm() {
               setMode("cover");
               setTrackOnly(false);
             }}
-            className={`min-h-16 rounded-3xl px-2 text-lg font-semibold transition ${
-              coverMode
-                ? "bg-indigo-800 text-white shadow-md"
-                : "bg-[var(--surface-bg)] text-stone-700 ring-1 ring-[var(--input-border)]"
-            }`}
+            className={modeBtn(coverMode, "indigo")}
           >
             🏠 {t("housePaidForTitle")}
           </button>
@@ -471,28 +514,23 @@ function AddForm() {
               setMode("claim");
               setTrackOnly(false);
             }}
-            className={`min-h-16 rounded-3xl px-2 text-lg font-semibold transition ${
-              claimMode
-                ? "bg-amber-800 text-white shadow-md"
-                : "bg-[var(--surface-bg)] text-stone-700 ring-1 ring-[var(--input-border)]"
-            }`}
+            className={`${modeBtn(claimMode, "amber")} col-span-2`}
           >
             👛 {t("paidFromMyMoneyTitle")}
           </button>
         </div>
       ) : claimMode ? null : (
-        <div className="mt-4 grid grid-cols-2 gap-2">
+        <div className="mt-3 grid grid-cols-2 gap-1.5">
           <button
             type="button"
             onClick={() => {
               setMode("wallet");
               setType("EXPENSE");
             }}
-            className={`min-h-16 rounded-3xl text-lg font-semibold transition ${
-              !transferMode && !withdrawMode && type === "EXPENSE"
-                ? "bg-red-800 text-white shadow-md"
-                : "bg-[var(--surface-bg)] text-stone-700 ring-1 ring-[var(--input-border)]"
-            }`}
+            className={modeBtn(
+              !transferMode && !withdrawMode && type === "EXPENSE",
+              "red",
+            )}
           >
             🧾 {t("paid")}
           </button>
@@ -503,11 +541,10 @@ function AddForm() {
               setType("INCOME");
               setTrackOnly(false);
             }}
-            className={`min-h-16 rounded-3xl text-lg font-semibold transition ${
-              !transferMode && !withdrawMode && type === "INCOME"
-                ? "bg-emerald-800 text-white shadow-md"
-                : "bg-[var(--surface-bg)] text-stone-700 ring-1 ring-[var(--input-border)]"
-            }`}
+            className={modeBtn(
+              !transferMode && !withdrawMode && type === "INCOME",
+              "emerald",
+            )}
           >
             📈 {t("moneyIn")}
           </button>
@@ -519,11 +556,7 @@ function AddForm() {
                   setMode("transfer");
                   setTrackOnly(false);
                 }}
-                className={`min-h-14 rounded-3xl text-lg font-semibold transition ${
-                  transferMode
-                    ? "bg-stone-800 text-white shadow-md"
-                    : "bg-[var(--surface-bg)] text-stone-700 ring-1 ring-[var(--input-border)]"
-                }`}
+                className={modeBtn(transferMode, "stone")}
               >
                 🔁 {t("transferWallets")}
               </button>
@@ -533,11 +566,7 @@ function AddForm() {
                   setMode("withdraw");
                   setTrackOnly(false);
                 }}
-                className={`min-h-14 rounded-3xl text-lg font-semibold transition ${
-                  withdrawMode
-                    ? "bg-teal-800 text-white shadow-md"
-                    : "bg-[var(--surface-bg)] text-stone-700 ring-1 ring-[var(--input-border)]"
-                }`}
+                className={modeBtn(withdrawMode, "teal")}
               >
                 💵 {t("cashWithdraw")}
               </button>
@@ -545,28 +574,15 @@ function AddForm() {
           ) : null}
         </div>
       )}
-      <Hint>
-        {withdrawMode
-          ? t("cashWithdrawHint")
-          : transferMode
-          ? t("transferWalletsHint")
-          : coverMode
-          ? t("housePaidForHint")
-          : claimMode
-            ? t("paidFromMyMoneyHint")
-            : type === "GIVE"
-              ? t("giveFromHouseHint")
-              : type === "INCOME"
-                ? t("moneyInHint")
-                : personalPaid && trackOnly
-                  ? t("spendTrackOnlyHint")
-                  : t("paidHint")}
-      </Hint>
-      <form onSubmit={onSubmit} className="mt-6 space-y-4">
+      <p className="mt-2 text-sm leading-snug text-[var(--muted)]">{modeHint}</p>
+
+      <form onSubmit={onSubmit} className="mt-4 space-y-3.5">
         {transferMode ? (
-          <>
+          <section className="surface space-y-3 rounded-[1.5rem] p-3.5">
             <div>
-              <p className="mb-1 font-medium">{t("transferFrom")}</p>
+              <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">
+                {t("transferFrom")}
+              </p>
               <div className="grid grid-cols-2 gap-2">
                 {accounts.map((a) => (
                   <button
@@ -579,11 +595,7 @@ function AddForm() {
                         if (other) setToAccountId(other.id);
                       }
                     }}
-                    className={`rounded-2xl px-3 py-3 font-semibold ${
-                      accountId === a.id
-                        ? "bg-stone-900 text-white"
-                        : "bg-white text-stone-700"
-                    }`}
+                    className={walletBtn(accountId === a.id, "stone")}
                   >
                     {isSavingsWallet(a)
                       ? "💰 " + t("savingsWallet")
@@ -593,7 +605,9 @@ function AddForm() {
               </div>
             </div>
             <div>
-              <p className="mb-1 font-medium">{t("transferTo")}</p>
+              <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">
+                {t("transferTo")}
+              </p>
               <div className="grid grid-cols-2 gap-2">
                 {accounts.map((a) => (
                   <button
@@ -606,11 +620,7 @@ function AddForm() {
                         if (other) setAccountId(other.id);
                       }
                     }}
-                    className={`rounded-2xl px-3 py-3 font-semibold ${
-                      toAccountId === a.id
-                        ? "bg-emerald-800 text-white"
-                        : "bg-white text-stone-700"
-                    }`}
+                    className={walletBtn(toAccountId === a.id)}
                   >
                     {isSavingsWallet(a)
                       ? "💰 " + t("savingsWallet")
@@ -620,39 +630,46 @@ function AddForm() {
               </div>
             </div>
             <label className="block">
-              <span className="mb-1 block font-medium">{t("amount")}</span>
+              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
+                {t("amount")}
+              </span>
               <input
                 inputMode="decimal"
                 dir="ltr"
-                className="amount-input w-full rounded-2xl border border-stone-300 bg-white px-4 py-4 text-2xl"
+                className="amount-input field text-3xl font-bold"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder={t("payBackAmount")}
                 required
               />
             </label>
-          </>
+          </section>
         ) : null}
+
         {withdrawMode ? (
           <label className="block">
-            <span className="mb-1 block font-medium">{t("amount")}</span>
+            <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
+              {t("amount")}
+            </span>
             <input
               inputMode="decimal"
               dir="ltr"
-              className="amount-input w-full rounded-2xl border border-stone-300 bg-white px-4 py-4 text-2xl"
+              className="amount-input field text-3xl font-bold"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0"
               required
             />
-            <Hint>{t("cashWithdrawHint")}</Hint>
           </label>
         ) : null}
+
         {!transferMode && !withdrawMode && (giveMode || coverMode) ? (
           <label className="block">
-            <span className="mb-1 block font-medium">{t("giveTo")}</span>
+            <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
+              {t("giveTo")}
+            </span>
             <select
-              className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-4 text-xl"
+              className="field text-base"
               value={toUserId}
               onChange={(e) => setToUserId(e.target.value)}
               required
@@ -663,106 +680,108 @@ function AddForm() {
                 </option>
               ))}
             </select>
-            <Hint>{t("giveToHint")}</Hint>
           </label>
         ) : null}
+
         {!transferMode &&
         !withdrawMode &&
         (claimMode || coverMode || type !== "INCOME") ? (
           <label className="block">
-            <span className="mb-1 block font-medium">{t("amount")}</span>
+            <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
+              {t("amount")}
+            </span>
             <input
               inputMode="decimal"
               dir="ltr"
-              className="amount-input w-full rounded-2xl border border-stone-300 bg-white px-4 py-4 text-2xl"
+              className="amount-input field text-3xl font-bold"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               placeholder="0"
               required
+              autoFocus
             />
-            <Hint>{t("amountHint")}</Hint>
           </label>
         ) : null}
+
         {personalPaid ? (
           <div>
-            <p className="mb-1 font-medium">{t("spendHowLabel")}</p>
+            <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">
+              {t("spendHowLabel")}
+            </p>
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => setTrackOnly(false)}
-                className={`rounded-2xl px-3 py-3 text-lg font-bold ${
-                  !trackOnly
-                    ? "bg-emerald-800 text-white shadow"
-                    : "bg-white text-stone-700"
-                }`}
+                className={walletBtn(!trackOnly)}
               >
                 💸 {t("spendAffectsCash")}
               </button>
               <button
                 type="button"
                 onClick={() => setTrackOnly(true)}
-                className={`rounded-2xl px-3 py-3 text-lg font-bold ${
-                  trackOnly
-                    ? "bg-stone-900 text-white shadow"
-                    : "bg-white text-stone-700"
-                }`}
+                className={walletBtn(trackOnly, "stone")}
               >
                 📋 {t("spendTrackOnly")}
               </button>
             </div>
-            <p className="mt-2 text-sm leading-relaxed text-stone-500">
-              {trackOnly ? t("spendTrackOnlyHint") : t("spendAffectsCashHint")}
-            </p>
           </div>
         ) : null}
-        {!transferMode && !withdrawMode && !claimMode && !coverMode && type === "INCOME" ? (
-          <div className="space-y-3">
-            <Hint>{t("splitIncomeHint")}</Hint>
+
+        {!transferMode &&
+        !withdrawMode &&
+        !claimMode &&
+        !coverMode &&
+        type === "INCOME" ? (
+          <section className="surface space-y-3 rounded-[1.5rem] p-3.5">
+            <p className="text-xs font-medium text-[var(--muted)]">
+              {t("splitIncomeHint")}
+            </p>
             <label className="block">
-              <span className="mb-1 block font-medium">
+              <span className="mb-1 block text-sm font-semibold">
                 💵 {t("incomeToCurrent")}
               </span>
               <input
                 inputMode="decimal"
                 dir="ltr"
-                className="amount-input w-full rounded-2xl border border-stone-300 bg-white px-4 py-4 text-2xl"
+                className="amount-input field text-2xl font-bold"
                 value={currentAmt}
                 onChange={(e) => setCurrentAmt(e.target.value)}
                 placeholder="0"
               />
-              <Hint>{t("currentHint")}</Hint>
             </label>
             <label className="block">
-              <span className="mb-1 block font-medium">
+              <span className="mb-1 block text-sm font-semibold">
                 💰 {t("incomeToSavings")}
               </span>
               <input
                 inputMode="decimal"
                 dir="ltr"
-                className="amount-input w-full rounded-2xl border border-stone-300 bg-white px-4 py-4 text-2xl"
+                className="amount-input field text-2xl font-bold"
                 value={savingsAmt}
                 onChange={(e) => setSavingsAmt(e.target.value)}
                 placeholder="0"
               />
-              <Hint>{t("savingsHint")}</Hint>
             </label>
-          </div>
+          </section>
         ) : null}
+
         {!transferMode && !withdrawMode && !giveMode ? (
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {recentCats.length > 0 ? (
               <div>
-                <p className="mb-1 font-medium">{t("addRecentCategories")}</p>
-                <div className="flex flex-wrap gap-2">
+                <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">
+                  {t("addRecentCategories")}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
                   {recentCats.map((c) => (
                     <button
                       key={c.id}
                       type="button"
                       onClick={() => setCategoryId(c.id)}
-                      className={`rounded-2xl px-3 py-2 text-sm font-semibold transition ${
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                         categoryId === c.id
                           ? "bg-emerald-800 text-white shadow"
-                          : "bg-white text-stone-700 ring-1 ring-[var(--input-border)]"
+                          : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
                       }`}
                     >
                       {categoryLabel(c, locale, t)}
@@ -778,12 +797,15 @@ function AddForm() {
             />
           </div>
         ) : null}
+
         {!transferMode &&
         !withdrawMode &&
         !(claimMode || (!coverMode && type === "INCOME")) &&
         !(personalPaid && trackOnly) ? (
           <div>
-            <p className="mb-1 font-medium">{t("pickWalletSpend")}</p>
+            <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">
+              {t("pickWalletSpend")}
+            </p>
             <div className="grid grid-cols-2 gap-2">
               {accounts.map((a) => (
                 <button
@@ -795,11 +817,7 @@ function AddForm() {
                       writeLastWalletId(space.householdId, a.id);
                     }
                   }}
-                  className={`rounded-2xl px-3 py-3 text-lg font-bold ${
-                    accountId === a.id
-                      ? "bg-emerald-800 text-white shadow"
-                      : "bg-white text-stone-700"
-                  }`}
+                  className={walletBtn(accountId === a.id)}
                 >
                   {isSavingsWallet(a)
                     ? "💰 " + t("savingsWallet")
@@ -807,58 +825,51 @@ function AddForm() {
                 </button>
               ))}
             </div>
-            <Hint>{t("pickWalletHint")}</Hint>
           </div>
         ) : null}
-        <div>
-          <span className="mb-1 block font-medium">{t("day")}</span>
-          <div className="mb-2 flex gap-2">
+
+        <div className="surface rounded-[1.5rem] p-3.5">
+          <div className="flex gap-1.5">
             <button
               type="button"
-              onClick={() => setOccurredOn(todayISO())}
-              className={`chip flex-1 ${
-                occurredOn === todayISO() ? "chip-active" : ""
-              }`}
+              onClick={() => setOccurredOn(today)}
+              className={`chip flex-1 ${occurredOn === today ? "chip-active" : ""}`}
             >
               {t("today")}
             </button>
             <button
               type="button"
-              onClick={() => setOccurredOn(yesterdayISO())}
+              onClick={() => setOccurredOn(yesterday)}
               className={`chip flex-1 ${
-                occurredOn === yesterdayISO() ? "chip-active" : ""
+                occurredOn === yesterday ? "chip-active" : ""
               }`}
             >
               {t("yesterday")}
             </button>
           </div>
-          <DateField value={occurredOn} onChange={setOccurredOn} />
-          <Hint>{t("dayHint")}</Hint>
+          <DateField className="mt-2" value={occurredOn} onChange={setOccurredOn} />
         </div>
+
         <label className="block">
-          <span className="mb-1 block font-medium">{t("noteOptional")}</span>
+          <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
+            {t("noteOptional")}
+          </span>
           <input
-            className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-3 text-lg"
+            className="field text-base"
             value={note}
             onChange={(e) => setNote(e.target.value)}
             placeholder={t("notePlaceholder")}
           />
-          <Hint>{t("noteHint")}</Hint>
         </label>
-        {error ? <p className="text-red-700">{error}</p> : null}
+
+        {error ? <p className="text-sm text-red-700">{error}</p> : null}
+
         <button
           disabled={busy}
-          className="w-full rounded-3xl bg-emerald-800 px-4 py-4 text-lg font-semibold text-white disabled:opacity-60"
+          className="w-full rounded-3xl bg-emerald-800 px-4 py-3.5 text-base font-semibold text-white disabled:opacity-60"
         >
           {busy ? t("saving") : `✅ ${t("save")}`}
         </button>
-        <Hint>
-          {withdrawMode
-            ? t("cashWithdrawHint")
-            : personalPaid && trackOnly
-              ? t("spendTrackOnlyHint")
-              : t("addSaveHint")}
-        </Hint>
       </form>
       <BottomNav />
     </PageShell>
