@@ -10,7 +10,6 @@ import { useBooks } from "@/components/BooksProvider";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 import { ItemDate } from "@/components/ItemDate";
-import { DateField } from "@/components/DateField";
 import { CategoryPicker } from "@/components/CategoryPicker";
 import {
   isCashWallet,
@@ -187,6 +186,91 @@ function periodOptionsAround(center: string, before = 18, after = 12) {
   return keys;
 }
 
+/** Visible month label + period-key select (avoids native type=month off-by-one). */
+function PeriodMonthPicker({
+  value,
+  onChange,
+  locale,
+  choices,
+  currentKey,
+  thisPeriodLabel,
+  from,
+  to,
+  withArrows = false,
+}: {
+  value: string;
+  onChange: (key: string) => void;
+  locale: "ar" | "en";
+  choices: string[];
+  currentKey?: string;
+  thisPeriodLabel?: string;
+  from?: string;
+  to?: string;
+  withArrows?: boolean;
+}) {
+  const options = choices.includes(value)
+    ? choices
+    : periodOptionsAround(value);
+
+  return (
+    <div className={`flex items-center gap-2 ${withArrows ? "" : "w-full"}`}>
+      {withArrows ? (
+        <button
+          type="button"
+          aria-label="Previous month"
+          className="icon-btn shrink-0 px-3 text-xl"
+          onClick={() => onChange(shiftBudgetMonthKey(value, -1))}
+        >
+          ‹
+        </button>
+      ) : null}
+      <label className="field relative flex min-h-[3.25rem] min-w-0 flex-1 cursor-pointer flex-col items-center justify-center gap-0.5 !py-1.5">
+        <span className="text-center text-base font-bold leading-tight">
+          {monthLabel(value, locale)}
+        </span>
+        {from && to ? (
+          <span className="text-center text-[11px] font-medium text-[var(--muted)]">
+            <ItemDate value={from} locale={locale} />
+            {" – "}
+            <ItemDate value={to} locale={locale} />
+          </span>
+        ) : currentKey && value === currentKey && thisPeriodLabel ? (
+          <span className="text-[11px] font-semibold text-[var(--muted)]">
+            {thisPeriodLabel}
+          </span>
+        ) : null}
+        <select
+          className="absolute inset-0 z-10 cursor-pointer opacity-0"
+          value={value}
+          onChange={(e) => {
+            if (e.target.value) onChange(e.target.value);
+          }}
+          aria-label={monthLabel(value, locale)}
+        >
+          {options.map((key) => (
+            <option key={key} value={key}>
+              {monthLabel(key, locale)}
+              {currentKey && key === currentKey && thisPeriodLabel
+                ? ` · ${thisPeriodLabel}`
+                : ""}
+            </option>
+          ))}
+        </select>
+      </label>
+      {withArrows ? (
+        <button
+          type="button"
+          aria-label="Next month"
+          className="icon-btn shrink-0 px-3 text-xl"
+          onClick={() => onChange(shiftBudgetMonthKey(value, 1))}
+        >
+          ›
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
 /** Prefer the matching seeded category for each commitment kind. */
 function categoryIdForKind(kind: SubKind, cats: Category[]): string | undefined {
   const preferred: Record<SubKind, string[]> = {
@@ -316,9 +400,10 @@ export default function SubscriptionsPage() {
   }
 
   useEffect(() => {
+    // Sync when payday setting loads/changes — don't yank browsing on clock ticks.
     setPeriod(cal.monthKey);
-    setStartPeriodKey((prev) => prev || cal.monthKey);
-  }, [cal.monthKey]);
+    setStartPeriodKey(cal.monthKey);
+  }, [budgetMonthStartDay, personal?.householdId]);
 
   useEffect(() => {
     if (!personal) return;
@@ -660,11 +745,15 @@ export default function SubscriptionsPage() {
           ‹
         </button>
         <div className="min-w-0 flex-1">
-          <DateField
-            type="month"
-            align="center"
+          <PeriodMonthPicker
             value={period}
             onChange={setPeriod}
+            locale={locale}
+            choices={startMonthChoices}
+            currentKey={cal.monthKey}
+            thisPeriodLabel={t("subsThisPeriod")}
+            from={data?.periodFrom}
+            to={data?.periodTo}
           />
         </div>
         <button
@@ -814,22 +903,19 @@ export default function SubscriptionsPage() {
               </select>
             </label>
           </div>
-          <label className="block text-sm font-medium">
-            {t("subsStartMonth")}
-            <select
-              className="mt-1 w-full rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2.5"
+          <div>
+            <p className="mb-1 text-sm font-medium">{t("subsStartMonth")}</p>
+            <PeriodMonthPicker
               value={startPeriodKey}
-              onChange={(e) => setStartPeriodKey(e.target.value)}
-            >
-              {startMonthChoices.map((key) => (
-                <option key={key} value={key}>
-                  {monthLabel(key, locale)}
-                  {key === cal.monthKey ? ` · ${t("subsThisPeriod")}` : ""}
-                </option>
-              ))}
-            </select>
+              onChange={setStartPeriodKey}
+              locale={locale}
+              choices={startMonthChoices}
+              currentKey={cal.monthKey}
+              thisPeriodLabel={t("subsThisPeriod")}
+              withArrows
+            />
             <Hint>{t("subsStartMonthHint")}</Hint>
-          </label>
+          </div>
           {kind === "INSTALLMENT" ? (
             <label className="block text-sm font-medium">
               {t("subsTotalInstallments")}
@@ -1098,24 +1184,20 @@ export default function SubscriptionsPage() {
                             <Hint>{t("subsInstallmentsHint")}</Hint>
                           </label>
                         ) : null}
-                        <label className="block text-sm font-medium">
-                          {t("subsStartMonth")}
-                          <select
-                            className="mt-1 w-full rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2"
+                        <div>
+                          <p className="mb-1 text-sm font-medium">
+                            {t("subsStartMonth")}
+                          </p>
+                          <PeriodMonthPicker
                             value={editStartPeriodKey}
-                            onChange={(e) =>
-                              setEditStartPeriodKey(e.target.value)
-                            }
-                          >
-                            {periodOptionsAround(editStartPeriodKey).map(
-                              (key) => (
-                                <option key={key} value={key}>
-                                  {monthLabel(key, locale)}
-                                </option>
-                              ),
-                            )}
-                          </select>
-                        </label>
+                            onChange={setEditStartPeriodKey}
+                            locale={locale}
+                            choices={periodOptionsAround(editStartPeriodKey)}
+                            currentKey={cal.monthKey}
+                            thisPeriodLabel={t("subsThisPeriod")}
+                            withArrows
+                          />
+                        </div>
                         {expenseCats.length > 0 ? (
                           <CategoryPicker
                             categories={expenseCats}
@@ -1415,24 +1497,20 @@ export default function SubscriptionsPage() {
                           <Hint>{t("subsInstallmentsHint")}</Hint>
                         </label>
                       ) : null}
-                      <label className="block text-sm font-medium">
-                        {t("subsStartMonth")}
-                        <select
-                          className="mt-1 w-full rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-3 py-2"
+                      <div>
+                        <p className="mb-1 text-sm font-medium">
+                          {t("subsStartMonth")}
+                        </p>
+                        <PeriodMonthPicker
                           value={editStartPeriodKey}
-                          onChange={(e) =>
-                            setEditStartPeriodKey(e.target.value)
-                          }
-                        >
-                          {periodOptionsAround(editStartPeriodKey).map(
-                            (key) => (
-                              <option key={key} value={key}>
-                                {monthLabel(key, locale)}
-                              </option>
-                            ),
-                          )}
-                        </select>
-                      </label>
+                          onChange={setEditStartPeriodKey}
+                          locale={locale}
+                          choices={periodOptionsAround(editStartPeriodKey)}
+                          currentKey={cal.monthKey}
+                          thisPeriodLabel={t("subsThisPeriod")}
+                          withArrows
+                        />
+                      </div>
                       <div className="flex flex-wrap gap-2">
                         <button
                           type="submit"
