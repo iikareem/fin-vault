@@ -42,6 +42,7 @@ export default function ProfilePage() {
     budgetMonthStartDay,
     setPreferences,
     house,
+    personalOnly,
   } = useBooks();
   const [currencyBusy, setCurrencyBusy] = useState(false);
   const [themeBusy, setThemeBusy] = useState(false);
@@ -178,7 +179,7 @@ export default function ProfilePage() {
             ))}
           </select>
           <Hint>
-            {house?.role === "ADMIN"
+            {!personalOnly && house?.role === "ADMIN"
               ? t("currencyPrefHintAdmin")
               : t("currencyPrefHint")}
           </Hint>

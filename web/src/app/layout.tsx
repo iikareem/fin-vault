@@ -9,8 +9,8 @@ const arabic = Noto_Sans_Arabic({
 });
 
 export const metadata: Metadata = {
-  title: "Fin Vault · مال البيت",
-  description: "Fin Vault — house and personal cash, spending, and day-by-day history",
+  title: "Fin Vault",
+  description: "Fin Vault — personal cash, spending, goals, and day-by-day history",
   applicationName: "Fin Vault",
   icons: {
     icon: [

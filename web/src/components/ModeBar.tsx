@@ -3,13 +3,14 @@
 import { usePathname } from "next/navigation";
 import { useI18n } from "./I18nProvider";
 import { useBooks } from "./BooksProvider";
+import { HOUSE_BOOKS_ENABLED } from "@/lib/features";
 
 export function ModeBar() {
   const path = usePathname();
   const { t } = useI18n();
   const { house, personal, active, setKind, personalOnly } = useBooks();
   if (path === "/login" || path === "/register") return null;
-  if (personalOnly) return null;
+  if (!HOUSE_BOOKS_ENABLED || personalOnly) return null;
   if (!house || !personal) return null;
   const kind = active?.kind ?? "PERSONAL";
 

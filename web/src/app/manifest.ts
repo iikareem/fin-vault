@@ -5,8 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Fin Vault",
     short_name: "Fin Vault",
-    description:
-      "House and personal cash, spending, and day-by-day history",
+    description: "Personal cash, spending, goals, and day-by-day history",
     start_url: "/",
     scope: "/",
     display: "standalone",

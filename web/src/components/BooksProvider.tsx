@@ -105,7 +105,9 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       setName(me.name);
       const h = me.spaces.find((s) => s.kind === "HOUSE") ?? null;
       const p = me.spaces.find((s) => s.kind === "PERSONAL") ?? null;
-      const only = me.personalOnly ?? isPersonalOnly(me.spaces);
+      const only =
+        !HOUSE_BOOKS_ENABLED ||
+        (me.personalOnly ?? isPersonalOnly(me.spaces));
       setHouse(h);
       setPersonal(p);
       setPersonalOnly(only);
