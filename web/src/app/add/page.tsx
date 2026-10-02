@@ -401,6 +401,12 @@ function AddForm() {
 
   const today = todayISO();
   const yesterday = yesterdayISO();
+  const currentWallet = accounts.find(isCurrentWallet);
+  const savingsWallet = accounts.find(isSavingsWallet);
+  const paidFromCurrent =
+    personalPaid && !trackOnly && !!currentWallet && accountId === currentWallet.id;
+  const paidFromSavings =
+    personalPaid && !trackOnly && !!savingsWallet && accountId === savingsWallet.id;
   const modeHint = withdrawMode
     ? t("cashWithdrawHint")
     : transferMode
@@ -417,27 +423,16 @@ function AddForm() {
                 ? t("spendTrackOnlyHint")
                 : t("paidHint");
 
-  function modeBtn(
-    active: boolean,
-    tone: "red" | "emerald" | "teal" | "indigo" | "amber" | "stone",
-  ) {
-    const on =
-      tone === "red"
-        ? "bg-red-800 text-white shadow-md"
-        : tone === "emerald"
-          ? "bg-emerald-800 text-white shadow-md"
-          : tone === "teal"
-            ? "bg-teal-800 text-white shadow-md"
-            : tone === "indigo"
-              ? "bg-indigo-800 text-white shadow-md"
-              : tone === "amber"
-                ? "bg-amber-800 text-white shadow-md"
-                : "bg-stone-800 text-white shadow-md";
-    return `min-h-11 rounded-2xl px-2 text-sm font-semibold transition ${
-      active
-        ? on
-        : "bg-[var(--surface-bg)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
-    }`;
+  function setPaidFrom(source: "current" | "savings" | "track") {
+    if (source === "track") {
+      setTrackOnly(true);
+      return;
+    }
+    setTrackOnly(false);
+    const wallet = source === "savings" ? savingsWallet : currentWallet;
+    if (!wallet) return;
+    setAccountId(wallet.id);
+    if (space) writeLastWalletId(space.householdId, wallet.id);
   }
 
   function walletBtn(active: boolean, tone: "stone" | "emerald" = "emerald") {
@@ -450,12 +445,16 @@ function AddForm() {
     }`;
   }
 
+  const modeChip = (active: boolean) =>
+    `chip shrink-0 whitespace-nowrap ${active ? "chip-active" : ""}`;
+
   return (
     <PageShell>
       <h1 className="text-lg font-semibold">➕ {t("navAdd")}</h1>
+      <p className="mt-1 text-sm text-[var(--muted)]">{t("whatHappened")}</p>
 
       {houseAdmin ? (
-        <div className="mt-3 grid grid-cols-2 gap-1.5">
+        <div className="mt-3 -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
           <button
             type="button"
             onClick={() => {
@@ -463,10 +462,7 @@ function AddForm() {
               setType("EXPENSE");
               setTrackOnly(false);
             }}
-            className={modeBtn(
-              !claimMode && !coverMode && type === "EXPENSE",
-              "red",
-            )}
+            className={modeChip(!claimMode && !coverMode && type === "EXPENSE")}
           >
             🧾 {t("paid")}
           </button>
@@ -477,10 +473,7 @@ function AddForm() {
               setType("INCOME");
               setTrackOnly(false);
             }}
-            className={modeBtn(
-              !claimMode && !coverMode && type === "INCOME",
-              "emerald",
-            )}
+            className={modeChip(!claimMode && !coverMode && type === "INCOME")}
           >
             📈 {t("moneyIn")}
           </button>
@@ -491,10 +484,7 @@ function AddForm() {
               setType("GIVE");
               setTrackOnly(false);
             }}
-            className={modeBtn(
-              !claimMode && !coverMode && type === "GIVE",
-              "teal",
-            )}
+            className={modeChip(!claimMode && !coverMode && type === "GIVE")}
           >
             💵 {t("giveFromHouse")}
           </button>
@@ -504,7 +494,7 @@ function AddForm() {
               setMode("cover");
               setTrackOnly(false);
             }}
-            className={modeBtn(coverMode, "indigo")}
+            className={modeChip(coverMode)}
           >
             🏠 {t("housePaidForTitle")}
           </button>
@@ -514,22 +504,21 @@ function AddForm() {
               setMode("claim");
               setTrackOnly(false);
             }}
-            className={`${modeBtn(claimMode, "amber")} col-span-2`}
+            className={modeChip(claimMode)}
           >
             👛 {t("paidFromMyMoneyTitle")}
           </button>
         </div>
       ) : claimMode ? null : (
-        <div className="mt-3 grid grid-cols-2 gap-1.5">
+        <div className="mt-3 -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
           <button
             type="button"
             onClick={() => {
               setMode("wallet");
               setType("EXPENSE");
             }}
-            className={modeBtn(
+            className={modeChip(
               !transferMode && !withdrawMode && type === "EXPENSE",
-              "red",
             )}
           >
             🧾 {t("paid")}
@@ -541,9 +530,8 @@ function AddForm() {
               setType("INCOME");
               setTrackOnly(false);
             }}
-            className={modeBtn(
+            className={modeChip(
               !transferMode && !withdrawMode && type === "INCOME",
-              "emerald",
             )}
           >
             📈 {t("moneyIn")}
@@ -556,7 +544,7 @@ function AddForm() {
                   setMode("transfer");
                   setTrackOnly(false);
                 }}
-                className={modeBtn(transferMode, "stone")}
+                className={modeChip(transferMode)}
               >
                 🔁 {t("transferWallets")}
               </button>
@@ -566,7 +554,7 @@ function AddForm() {
                   setMode("withdraw");
                   setTrackOnly(false);
                 }}
-                className={modeBtn(withdrawMode, "teal")}
+                className={modeChip(withdrawMode)}
               >
                 💵 {t("cashWithdraw")}
               </button>
@@ -706,20 +694,39 @@ function AddForm() {
         {personalPaid ? (
           <div>
             <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">
-              {t("spendHowLabel")}
+              {t("addPaidFrom")}
             </p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="seg grid-cols-3">
               <button
                 type="button"
-                onClick={() => setTrackOnly(false)}
-                className={walletBtn(!trackOnly)}
+                onClick={() => setPaidFrom("current")}
+                className={`rounded-2xl px-1 py-2.5 text-center text-xs font-bold transition sm:text-sm ${
+                  paidFromCurrent
+                    ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
+                    : "text-[var(--muted)]"
+                }`}
               >
-                💸 {t("spendAffectsCash")}
+                💵 {t("currentWallet")}
               </button>
               <button
                 type="button"
-                onClick={() => setTrackOnly(true)}
-                className={walletBtn(trackOnly, "stone")}
+                onClick={() => setPaidFrom("savings")}
+                className={`rounded-2xl px-1 py-2.5 text-center text-xs font-bold transition sm:text-sm ${
+                  paidFromSavings
+                    ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
+                    : "text-[var(--muted)]"
+                }`}
+              >
+                💰 {t("savingsWallet")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaidFrom("track")}
+                className={`rounded-2xl px-1 py-2.5 text-center text-xs font-bold transition sm:text-sm ${
+                  trackOnly
+                    ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
+                    : "text-[var(--muted)]"
+                }`}
               >
                 📋 {t("spendTrackOnly")}
               </button>
@@ -800,13 +807,13 @@ function AddForm() {
 
         {!transferMode &&
         !withdrawMode &&
-        !(claimMode || (!coverMode && type === "INCOME")) &&
-        !(personalPaid && trackOnly) ? (
+        !personalPaid &&
+        !(claimMode || (!coverMode && type === "INCOME")) ? (
           <div>
             <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">
               {t("pickWalletSpend")}
             </p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="seg grid-cols-2">
               {accounts.map((a) => (
                 <button
                   key={a.id}
@@ -817,7 +824,11 @@ function AddForm() {
                       writeLastWalletId(space.householdId, a.id);
                     }
                   }}
-                  className={walletBtn(accountId === a.id)}
+                  className={`rounded-2xl px-2 py-2.5 text-center text-sm font-bold transition ${
+                    accountId === a.id
+                      ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
+                      : "text-[var(--muted)]"
+                  }`}
                 >
                   {isSavingsWallet(a)
                     ? "💰 " + t("savingsWallet")
