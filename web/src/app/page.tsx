@@ -67,8 +67,25 @@ type SubsHome = {
   dueAmount: number;
   monthlyTotal: number;
   paidCount: number;
-  subscriptions: { id: string }[];
+  subscriptions: {
+    id: string;
+    amount: number;
+    dueOn: string;
+    status: "paid" | "due" | "upcoming" | "overdue" | "scheduled";
+  }[];
 };
+
+/** Calendar-day gap from `from` to `to` (YYYY-MM-DD). */
+function daysUntilIso(from: string, to: string) {
+  const [fy, fm, fd] = from.split("-").map(Number);
+  const [ty, tm, td] = to.split("-").map(Number);
+  const a = new Date(fy, fm - 1, fd);
+  const b = new Date(ty, tm - 1, td);
+  return Math.round((b.getTime() - a.getTime()) / 86_400_000);
+}
+
+/** Show home attention only when overdue or due within this many days. */
+const COMMITMENT_ATTENTION_DAYS = 3;
 type OutsideHome = {
   owedToYou: number;
   open: { id: string }[];
@@ -470,15 +487,39 @@ export default function HomePage() {
     }
   }
 
+  const urgentCommitments = !isHouse
+    ? (subs?.subscriptions ?? []).filter((s) => {
+        if (s.status === "overdue") return true;
+        if (s.status === "due") {
+          const days = daysUntilIso(cal.today, s.dueOn);
+          return days >= 0 && days <= COMMITMENT_ATTENTION_DAYS;
+        }
+        return false;
+      })
+    : [];
+  const overdueCommitments = urgentCommitments.filter(
+    (s) => s.status === "overdue",
+  );
   const personalAttention =
-    !isHouse && subs && subs.unpaidCount > 0
+    urgentCommitments.length > 0
       ? {
           href: "/commitments",
           title:
-            subs.unpaidCount === 1
-              ? t("subsHomeUnpaidOne")
-              : fill(t("subsHomeUnpaid"), { n: String(subs.unpaidCount) }),
-          amount: subs.dueAmount,
+            overdueCommitments.length > 0
+              ? overdueCommitments.length === 1
+                ? t("subsAttentionOverdueOne")
+                : fill(t("subsAttentionOverdue"), {
+                    n: String(overdueCommitments.length),
+                  })
+              : urgentCommitments.length === 1
+                ? t("subsAttentionDueSoonOne")
+                : fill(t("subsAttentionDueSoon"), {
+                    n: String(urgentCommitments.length),
+                  }),
+          amount:
+            Math.round(
+              urgentCommitments.reduce((sum, s) => sum + s.amount, 0) * 100,
+            ) / 100,
         }
       : null;
 
@@ -1573,141 +1614,147 @@ export default function HomePage() {
         </Link>
       ) : (
         <div className="mt-5 grid grid-cols-2 gap-3">
-          <Link
-            href="/goals"
-            className="surface flex min-h-[7.5rem] flex-col rounded-[1.5rem] p-3.5 transition hover:bg-[var(--panel-soft)]"
-          >
-            <span className="text-sm font-semibold text-[var(--foreground)]">
-              {t("navGoals")}
-            </span>
-            <span className="mt-2 text-lg font-bold leading-tight tabular-nums">
-              {goals ? (
-                <PrivateMoney
-                  amount={goals.allocated}
-                  currency={currency}
-                  locale={locale}
-                  visible={moneyVisible}
-                />
-              ) : (
-                "…"
-              )}
-            </span>
-            <span className="mt-auto pt-2 text-xs leading-snug text-[var(--muted)]">
-              {goals && goals.goals.length > 0
-                ? goals.goals.length === 1
-                  ? t("goalsCountOne")
-                  : fill(t("goalsCount"), { n: String(goals.goals.length) })
-                : t("goalsHomeHint")}
-            </span>
-          </Link>
-          <Link
-            href="/commitments"
-            className="surface flex min-h-[7.5rem] flex-col rounded-[1.5rem] p-3.5 transition hover:bg-[var(--panel-soft)]"
-          >
-            <span className="text-sm font-semibold text-[var(--foreground)]">
-              {t("navSubs")}
-            </span>
-            <span className="mt-2 text-lg font-bold leading-tight tabular-nums">
-              {subs ? (
-                <PrivateMoney
-                  amount={
-                    subs.unpaidCount > 0 ? subs.dueAmount : subs.monthlyTotal
-                  }
-                  currency={currency}
-                  locale={locale}
-                  visible={moneyVisible}
-                />
-              ) : (
-                "…"
-              )}
-            </span>
-            <span className="mt-auto pt-2 text-xs leading-snug text-[var(--muted)]">
-              {subs && subs.subscriptions.length > 0
-                ? subs.unpaidCount === 0
-                  ? t("subsHomeAllPaid")
-                  : subs.unpaidCount === 1
-                    ? t("subsHomeUnpaidOne")
-                    : fill(t("subsHomeUnpaid"), {
-                        n: String(subs.unpaidCount),
-                      })
-                : t("subsHomeHint")}
-            </span>
-          </Link>
-          <Link
-            href="/gold"
-            className="surface flex min-h-[7.5rem] flex-col rounded-[1.5rem] p-3.5 transition hover:bg-[var(--panel-soft)]"
-          >
-            <span className="text-sm font-semibold text-[var(--foreground)]">
-              {t("navGold")}
-            </span>
-            <span className="mt-2 text-lg font-bold leading-tight tabular-nums">
-              {gold ? (
-                <PrivateMoney
-                  amount={gold.totalValue}
-                  currency={currency}
-                  locale={locale}
-                  visible={moneyVisible}
-                />
-              ) : (
-                "…"
-              )}
-            </span>
-            <span
-              className={`mt-auto pt-2 text-xs font-semibold leading-snug ${
-                gold?.totalGainLoss != null && moneyVisible
-                  ? gold.totalGainLoss >= 0
-                    ? "text-emerald-800"
-                    : "text-red-800"
-                  : "text-[var(--muted)]"
-              }`}
+          {(
+            [
+              {
+                href: "/goals",
+                emoji: "🎯",
+                soft: "var(--soft-emerald)",
+                accent: "var(--accent-a)",
+                title: t("navGoals"),
+                amount: goals?.allocated,
+                hint:
+                  goals && goals.goals.length > 0
+                    ? goals.goals.length === 1
+                      ? t("goalsCountOne")
+                      : fill(t("goalsCount"), {
+                          n: String(goals.goals.length),
+                        })
+                    : t("goalsHomeHint"),
+                hintClass: "text-[var(--muted)]",
+              },
+              {
+                href: "/commitments",
+                emoji: "📌",
+                soft: "var(--soft-indigo)",
+                accent: "var(--accent-b)",
+                title: t("navSubs"),
+                amount: subs
+                  ? subs.unpaidCount > 0
+                    ? subs.dueAmount
+                    : subs.monthlyTotal
+                  : undefined,
+                hint:
+                  subs && subs.subscriptions.length > 0
+                    ? subs.unpaidCount === 0
+                      ? t("subsHomeAllPaid")
+                      : subs.unpaidCount === 1
+                        ? t("subsHomeUnpaidOne")
+                        : fill(t("subsHomeUnpaid"), {
+                            n: String(subs.unpaidCount),
+                          })
+                    : t("subsHomeHint"),
+                hintClass:
+                  subs && subs.unpaidCount > 0
+                    ? "font-semibold text-amber-800"
+                    : "text-[var(--muted)]",
+              },
+              {
+                href: "/gold",
+                emoji: "🥇",
+                soft: "var(--soft-amber)",
+                accent: "#d97706",
+                title: t("navGold"),
+                amount: gold?.totalValue,
+                hint:
+                  gold?.totalGainLoss != null ? null : t("goldHomeHint"),
+                hintNode:
+                  gold?.totalGainLoss != null ? (
+                    <>
+                      <PrivateMoney
+                        amount={gold.totalGainLoss}
+                        currency={currency}
+                        locale={locale}
+                        visible={moneyVisible}
+                        extraSign={gold.totalGainLoss >= 0 ? "+" : "−"}
+                      />
+                      {moneyVisible && gold.totalGainLossPct != null ? (
+                        <span>
+                          {" "}
+                          ({gold.totalGainLossPct >= 0 ? "+" : ""}
+                          {gold.totalGainLossPct}%)
+                        </span>
+                      ) : null}
+                    </>
+                  ) : null,
+                hintClass:
+                  gold?.totalGainLoss != null && moneyVisible
+                    ? gold.totalGainLoss >= 0
+                      ? "font-semibold text-emerald-800"
+                      : "font-semibold text-red-800"
+                    : "text-[var(--muted)]",
+              },
+              {
+                href: "/outside-loans",
+                emoji: "🤝",
+                soft: "var(--soft-sky)",
+                accent: "#0284c7",
+                title: t("navOutsideLoans"),
+                amount: outside?.owedToYou,
+                hint:
+                  outside && outside.open.length > 0
+                    ? t("outsideOwedToYou")
+                    : t("outsideLoansHomeHint"),
+                hintClass: "text-[var(--muted)]",
+              },
+            ] as const
+          ).map((tile) => (
+            <Link
+              key={tile.href}
+              href={tile.href}
+              className="relative flex min-h-[7.5rem] flex-col overflow-hidden rounded-[1.5rem] p-3.5 shadow-sm transition hover:opacity-95 active:scale-[0.99]"
+              style={{ background: tile.soft }}
             >
-              {gold?.totalGainLoss != null ? (
-                <>
+              <span
+                className="absolute inset-x-0 top-0 h-1"
+                style={{ background: tile.accent }}
+                aria-hidden
+              />
+              <span className="flex items-center gap-2">
+                <span
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-base"
+                  style={{
+                    background: "color-mix(in srgb, var(--surface-bg) 72%, transparent)",
+                  }}
+                  aria-hidden
+                >
+                  {tile.emoji}
+                </span>
+                <span className="min-w-0 text-sm font-semibold leading-snug text-[var(--foreground)]">
+                  {tile.title}
+                </span>
+              </span>
+              <span className="mt-2 text-lg font-bold leading-tight tabular-nums text-[var(--foreground)]">
+                {tile.amount != null ? (
                   <PrivateMoney
-                    amount={gold.totalGainLoss}
+                    amount={tile.amount}
                     currency={currency}
                     locale={locale}
                     visible={moneyVisible}
-                    extraSign={gold.totalGainLoss >= 0 ? "+" : "−"}
                   />
-                  {moneyVisible && gold.totalGainLossPct != null ? (
-                    <span>
-                      {" "}
-                      ({gold.totalGainLossPct >= 0 ? "+" : ""}
-                      {gold.totalGainLossPct}%)
-                    </span>
-                  ) : null}
-                </>
-              ) : (
-                t("goldHomeHint")
-              )}
-            </span>
-          </Link>
-          <Link
-            href="/outside-loans"
-            className="surface flex min-h-[7.5rem] flex-col rounded-[1.5rem] p-3.5 transition hover:bg-[var(--panel-soft)]"
-          >
-            <span className="text-sm font-semibold text-[var(--foreground)]">
-              {t("navOutsideLoans")}
-            </span>
-            <span className="mt-2 text-lg font-bold leading-tight tabular-nums">
-              {outside ? (
-                <PrivateMoney
-                  amount={outside.owedToYou}
-                  currency={currency}
-                  locale={locale}
-                  visible={moneyVisible}
-                />
-              ) : (
-                "…"
-              )}
-            </span>
-            <span className="mt-auto pt-2 text-xs leading-snug text-[var(--muted)]">
-              {outside && outside.open.length > 0
-                ? t("outsideOwedToYou")
-                : t("outsideLoansHomeHint")}
-            </span>
-          </Link>
+                ) : (
+                  "…"
+                )}
+              </span>
+              <span
+                className={`mt-auto pt-2 text-xs leading-snug ${tile.hintClass}`}
+              >
+                {"hintNode" in tile && tile.hintNode
+                  ? tile.hintNode
+                  : tile.hint}
+              </span>
+            </Link>
+          ))}
         </div>
       )}
 
