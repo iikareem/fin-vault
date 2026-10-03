@@ -12,6 +12,7 @@ import {
 import { usePathname, useRouter } from "next/navigation";
 import { AUTH_REQUIRED, api } from "@/lib/api";
 import { HOUSE_BOOKS_ENABLED } from "@/lib/features";
+import { personLabel } from "@/lib/i18n";
 import {
   isPersonalOnly,
   loadSpace,
@@ -25,12 +26,17 @@ import {
   type ThemeId,
 } from "@/lib/themes";
 import { applyUiPrefs, readUiPrefs } from "@/lib/uiPrefs";
+import { useI18n } from "./I18nProvider";
 
 export type ThemeMode = ThemeId;
 
 type BooksValue = {
   userId: string;
+  /** English canonical name from the API. */
   name: string;
+  nameAr: string;
+  /** Locale-aware display name for greetings and profile. */
+  displayName: string;
   house: Space | null;
   personal: Space | null;
   active: Space | null;
@@ -80,9 +86,11 @@ function applyTheme(theme: ThemeMode) {
 export function BooksProvider({ children }: { children: ReactNode }) {
   const path = usePathname();
   const router = useRouter();
+  const { locale } = useI18n();
   const onAuthPage = path === "/login" || path === "/register";
   const [userId, setUserId] = useState("");
   const [name, setName] = useState("");
+  const [nameAr, setNameAr] = useState("");
   const [house, setHouse] = useState<Space | null>(null);
   const [personal, setPersonal] = useState<Space | null>(null);
   const [active, setActive] = useState<Space | null>(null);
@@ -96,6 +104,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
     (me: {
       id: string;
       name: string;
+      nameAr?: string;
       preferredCurrency?: string;
       theme?: string;
       budgetMonthStartDay?: number;
@@ -105,6 +114,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
     }) => {
       setUserId(me.id);
       setName(me.name);
+      setNameAr(me.nameAr?.trim() || "");
       const h = me.spaces.find((s) => s.kind === "HOUSE") ?? null;
       const p = me.spaces.find((s) => s.kind === "PERSONAL") ?? null;
       const only =
@@ -216,10 +226,14 @@ export function BooksProvider({ children }: { children: ReactNode }) {
     [refreshSpaces],
   );
 
+  const displayName = personLabel({ name, nameAr }, locale);
+
   const value = useMemo(
     () => ({
       userId,
       name,
+      nameAr,
+      displayName,
       house,
       personal,
       active,
@@ -235,6 +249,8 @@ export function BooksProvider({ children }: { children: ReactNode }) {
     [
       userId,
       name,
+      nameAr,
+      displayName,
       house,
       personal,
       active,

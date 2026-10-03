@@ -531,10 +531,15 @@ const ar = {
   themeSlate: "رمادي",
   themePrefHint: "اختاروا شكل التطبيق اللي يناسبكم.",
   themeSection: "المظهر",
+  themeSectionHint: "الثيم واللغة.",
   moneySection: "الفلوس والفترة",
+  moneySectionHint: "العملة وبداية الشهر الشخصي.",
   privacySection: "الخصوصية والراحة",
+  privacySectionHint: "إخفاء الأرصدة، تقليل الحركة، والواجهة المضغوطة.",
   securitySection: "الأمان",
+  securitySectionHint: "تغيير كلمة السر.",
   accountSection: "الحساب",
+  accountSectionHint: "بيانات الحساب وتسجيل الخروج.",
   languagePref: "اللغة",
   languagePrefHint: "واجهة التطبيق. تقدروا تغيّروها في أي وقت.",
   hideBalancesPref: "إخفاء الأرصدة تلقائيًا",
@@ -544,6 +549,7 @@ const ar = {
   compactUiPref: "واجهة مضغوطة",
   compactUiHint: "مسافات أصغر عشان تشوفوا أكتر في الشاشة.",
   settingsQuickLinks: "اختصارات",
+  settingsBack: "الإعدادات",
   settingsCurrentTheme: "المختار: {name}",
   settingsPaydaySummary: "الشهر بيبدأ يوم {n}",
   prefsSaved: "اتحفظت الإعدادات",
@@ -1368,10 +1374,15 @@ const en = {
   themeSlate: "Slate",
   themePrefHint: "Pick the look that suits you.",
   themeSection: "Appearance",
+  themeSectionHint: "Theme and language.",
   moneySection: "Money & period",
+  moneySectionHint: "Currency and personal month start.",
   privacySection: "Privacy & comfort",
+  privacySectionHint: "Hide balances, reduce motion, and compact layout.",
   securitySection: "Security",
+  securitySectionHint: "Change your password.",
   accountSection: "Account",
+  accountSectionHint: "Account details and sign out.",
   languagePref: "Language",
   languagePrefHint: "App language. You can change it anytime.",
   hideBalancesPref: "Hide balances by default",
@@ -1381,6 +1392,7 @@ const en = {
   compactUiPref: "Compact layout",
   compactUiHint: "Tighter spacing so more fits on screen.",
   settingsQuickLinks: "Shortcuts",
+  settingsBack: "Settings",
   settingsCurrentTheme: "Selected: {name}",
   settingsPaydaySummary: "Month starts on day {n}",
   prefsSaved: "Settings saved",
@@ -2019,4 +2031,16 @@ export function categoryLabel(
   t: (key: MessageKey) => string,
 ) {
   return labelFor(cat.name, t, { nameAr: cat.nameAr, locale });
+}
+
+/** Person / user display name by UI locale. */
+export function personLabel(
+  person: { name: string; nameAr?: string | null } | string,
+  locale: string,
+) {
+  if (typeof person === "string") return person;
+  const en = person.name?.trim() || "";
+  const ar = person.nameAr?.trim() || "";
+  if (locale === "ar") return ar || en;
+  return en || ar;
 }

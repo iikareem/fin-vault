@@ -7,14 +7,14 @@ import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
-import { labelFor, categoryLabel, fill } from "@/lib/i18n";
+import { labelFor, categoryLabel, fill, personLabel } from "@/lib/i18n";
 import { householdPath } from "@/lib/space";
 import { Money } from "@/components/Money";
 import { ItemDate } from "@/components/ItemDate";
 import { DateField } from "@/components/DateField";
 import { sortByOccurredOnDesc } from "@/lib/calendar";
 
-type Person = { id: string; name: string };
+type Person = { id: string; name: string; nameAr?: string | null };
 type Category = { id: string; name: string; nameAr?: string | null; kind: string };
 type Loan = {
   id: string;
@@ -28,8 +28,8 @@ type Loan = {
   kind?: string;
   note: string;
   occurredOn?: string;
-  fromUser: { id: string; name: string };
-  toUser: { id: string; name: string };
+  fromUser: { id: string; name: string; nameAr?: string | null };
+  toUser: { id: string; name: string; nameAr?: string | null };
   category: { id: string; name: string; nameAr?: string | null; color: string };
 };
 
@@ -180,7 +180,8 @@ export default function BetweenPage() {
   }
 
   const others = people.filter((p) => p.id !== userId);
-  const otherName = others.find((p) => p.id === toUserId)?.name ?? "";
+  const otherPerson = others.find((p) => p.id === toUserId);
+  const otherName = otherPerson ? personLabel(otherPerson, locale) : "";
 
   function loanCard(loan: Loan, asDebtor: boolean) {
     const other = asDebtor ? loan.fromUser : loan.toUser;
@@ -189,7 +190,7 @@ export default function BetweenPage() {
       <li key={loan.id} className="rounded-2xl bg-white px-4 py-3 shadow-sm">
         <div className="money-row">
           <span className="font-semibold" dir="auto">
-            {other.name}
+            {personLabel(other, locale)}
           </span>
           <span className="font-semibold">
             <Money
@@ -380,7 +381,7 @@ export default function BetweenPage() {
             ) : null}
             {others.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name}
+                {personLabel(p, locale)}
               </option>
             ))}
           </select>

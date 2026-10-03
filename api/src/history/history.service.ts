@@ -20,7 +20,9 @@ type MoneyEvent = {
   parentId?: string;
   direction: string;
   fromName?: string;
+  fromNameAr?: string | null;
   toName?: string;
+  toNameAr?: string | null;
 };
 
 @Injectable()
@@ -66,7 +68,7 @@ export class HistoryService {
     if (!memberId) throw new BadRequestException('Pick a person');
     const member = await this.prisma.membership.findUnique({
       where: { userId_householdId: { userId: memberId, householdId } },
-      include: { user: { select: { id: true, name: true } } },
+      include: { user: { select: { id: true, name: true, nameAr: true } } },
     });
     if (!member) throw new NotFoundException('That person is not in this house');
 
@@ -194,7 +196,7 @@ export class HistoryService {
 
     const members = await this.prisma.membership.findMany({
       where: { householdId, userId: { in: [userA, userB] } },
-      include: { user: { select: { id: true, name: true } } },
+      include: { user: { select: { id: true, name: true, nameAr: true } } },
     });
     if (members.length !== 2) {
       throw new NotFoundException('Both people must be in this house');
@@ -212,8 +214,8 @@ export class HistoryService {
         ],
       },
       include: {
-        fromUser: { select: { id: true, name: true } },
-        toUser: { select: { id: true, name: true } },
+        fromUser: { select: { id: true, name: true, nameAr: true } },
+        toUser: { select: { id: true, name: true, nameAr: true } },
         category: { select: { name: true } },
         repayments: { orderBy: { occurredOn: 'asc' } },
       },
@@ -244,7 +246,9 @@ export class HistoryService {
           direction:
             loan.fromUserId === userA ? 'A_GAVE_B' : 'B_GAVE_A',
           fromName: loan.fromUser.name,
+          fromNameAr: loan.fromUser.nameAr,
           toName: loan.toUser.name,
+          toNameAr: loan.toUser.nameAr,
         });
       }
 
@@ -262,7 +266,9 @@ export class HistoryService {
           direction:
             loan.toUserId === userA ? 'A_REPAID_B' : 'B_REPAID_A',
           fromName: loan.toUser.name,
+          fromNameAr: loan.toUser.nameAr,
           toName: loan.fromUser.name,
+          toNameAr: loan.fromUser.nameAr,
         });
       }
     }

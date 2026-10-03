@@ -7,7 +7,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
-import { labelFor } from "@/lib/i18n";
+import { labelFor, personLabel } from "@/lib/i18n";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 import { Money } from "@/components/Money";
@@ -20,7 +20,7 @@ import {
   shiftPeriod,
 } from "@/lib/period";
 
-type Person = { id: string; name: string };
+type Person = { id: string; name: string; nameAr?: string | null };
 type EventRow = {
   id: string;
   kind: string;
@@ -32,7 +32,9 @@ type EventRow = {
   categoryName?: string;
   direction: string;
   fromName?: string;
+  fromNameAr?: string | null;
   toName?: string;
+  toNameAr?: string | null;
 };
 type HistoryPayload = {
   a: Person;
@@ -127,7 +129,7 @@ export default function BetweenHistoryPage() {
           >
             {pickOptionsA.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name}
+                {personLabel(p, locale)}
               </option>
             ))}
           </select>
@@ -141,7 +143,7 @@ export default function BetweenHistoryPage() {
           >
             {pickOptionsB.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name}
+                {personLabel(p, locale)}
               </option>
             ))}
           </select>
@@ -196,8 +198,8 @@ export default function BetweenHistoryPage() {
             {data.status.aOwesB > 0.001 ? (
               <p>
                 {t("aOwesB", {
-                  a: data.a.name,
-                  b: data.b.name,
+                  a: personLabel(data.a, locale),
+                  b: personLabel(data.b, locale),
                   amount: money(data.status.aOwesB, currency, locale),
                 })}
               </p>
@@ -205,8 +207,8 @@ export default function BetweenHistoryPage() {
             {data.status.bOwesA > 0.001 ? (
               <p>
                 {t("aOwesB", {
-                  a: data.b.name,
-                  b: data.a.name,
+                  a: personLabel(data.b, locale),
+                  b: personLabel(data.a, locale),
                   amount: money(data.status.bOwesA, currency, locale),
                 })}
               </p>
@@ -225,16 +227,18 @@ export default function BetweenHistoryPage() {
       {data && data.events.length > 0 ? (
         <ul className="mt-5 space-y-2">
           {data.events.map((ev) => {
+            const from = personLabel(
+              { name: ev.fromName ?? "", nameAr: ev.fromNameAr },
+              locale,
+            );
+            const to = personLabel(
+              { name: ev.toName ?? "", nameAr: ev.toNameAr },
+              locale,
+            );
             const title =
               ev.kind === "LOAN_REPAY"
-                ? t("eventLoanRepaid", {
-                    from: ev.fromName ?? "",
-                    to: ev.toName ?? "",
-                  })
-                : t("eventLoanGave", {
-                    from: ev.fromName ?? "",
-                    to: ev.toName ?? "",
-                  });
+                ? t("eventLoanRepaid", { from, to })
+                : t("eventLoanGave", { from, to });
             return (
               <li key={ev.id} className="surface rounded-2xl px-4 py-3">
                 <div className="money-row">

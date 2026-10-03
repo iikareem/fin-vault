@@ -63,7 +63,7 @@ export class CharityService {
         householdId,
         occurredOn: { gte: from, lte: to },
       },
-      include: { member: { select: { id: true, name: true } } },
+      include: { member: { select: { id: true, name: true, nameAr: true } } },
       orderBy: { createdAt: 'asc' },
     });
     const giftedIds = [...new Set(gifts.map((g) => g.typeId))];
@@ -90,15 +90,17 @@ export class CharityService {
       const goal = Number(type.monthlyGoal);
       const byMemberMap = new Map<
         string,
-        { userId: string; name: string; total: number }
+        { userId: string; name: string; nameAr: string; total: number }
       >();
       for (const g of typeGifts) {
         const fromHouse = Boolean(g.houseTxId);
         const userId = fromHouse ? 'house' : g.member.id;
         const name = fromHouse ? 'House' : g.member.name;
+        const nameAr = fromHouse ? '' : (g.member.nameAr ?? '');
         const cur = byMemberMap.get(userId) ?? {
           userId,
           name,
+          nameAr,
           total: 0,
         };
         cur.total += Number(g.amount);
@@ -235,7 +237,7 @@ export class CharityService {
           personalTxId,
           houseTxId,
         },
-        include: { member: { select: { id: true, name: true } } },
+        include: { member: { select: { id: true, name: true, nameAr: true } } },
       });
     });
   }
@@ -292,7 +294,7 @@ export class CharityService {
     });
     return this.prisma.charityGift.findFirstOrThrow({
       where: { id: giftId },
-      include: { member: { select: { id: true, name: true } } },
+      include: { member: { select: { id: true, name: true, nameAr: true } } },
     });
   }
 

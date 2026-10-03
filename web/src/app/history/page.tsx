@@ -9,7 +9,13 @@ import { PageShell } from "@/components/PageShell";
 import { Money } from "@/components/Money";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
-import { labelFor, categoryLabel, fill, type MessageKey } from "@/lib/i18n";
+import {
+  labelFor,
+  categoryLabel,
+  personLabel,
+  fill,
+  type MessageKey,
+} from "@/lib/i18n";
 import { CategoryPicker } from "@/components/CategoryPicker";
 import { useCalendarClock } from "@/hooks/useCalendarClock";
 import { isoLocal } from "@/lib/calendar";
@@ -24,7 +30,7 @@ type Tx = {
   note: string;
   category: { id?: string; name: string; nameAr?: string | null };
   categoryId?: string;
-  user: { name: string };
+  user: { name: string; nameAr?: string | null };
 };
 type Claim = {
   id: string;
@@ -33,7 +39,7 @@ type Claim = {
   note: string;
   status: string;
   memberId: string;
-  member: { name: string };
+  member: { name: string; nameAr?: string | null };
   category: { name: string; nameAr?: string | null };
   categoryId: string;
 };
@@ -42,7 +48,7 @@ type Gift = {
   amount: number;
   note: string;
   memberId: string;
-  member: { name: string };
+  member: { name: string; nameAr?: string | null };
   type: { name: string };
 };
 type DayLog = {
@@ -355,7 +361,7 @@ function HistoryInner() {
                         const showUser =
                           active?.kind === "HOUSE" && tx.user.name !== "House";
                         const parts = [
-                          showUser ? labelFor(tx.user.name, t) : null,
+                          showUser ? personLabel(tx.user, locale) : null,
                           tx.note || null,
                         ].filter(Boolean);
                         if (parts.length === 0) return null;
@@ -451,7 +457,7 @@ function HistoryInner() {
                   <div className="mt-1.5 flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <p className="truncate text-base font-bold" dir="auto">
-                        {c.member.name} · {categoryLabel(c.category, locale, t)}
+                        {personLabel(c.member, locale)} · {categoryLabel(c.category, locale, t)}
                       </p>
                       {c.note ? (
                         <p
@@ -518,7 +524,8 @@ function HistoryInner() {
                   </span>
                   <div className="mt-1.5 flex items-start justify-between gap-3">
                     <p className="min-w-0 truncate text-base font-bold" dir="auto">
-                      {labelFor(g.member.name, t)} · {labelFor(g.type.name, t)}
+                      {personLabel(g.member, locale)} ·{" "}
+                      {labelFor(g.type.name, t)}
                     </p>
                     <span className="shrink-0 text-base font-bold tabular-nums text-teal-950">
                       <Money

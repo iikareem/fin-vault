@@ -7,7 +7,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
-import { labelFor, type MessageKey } from "@/lib/i18n";
+import { labelFor, personLabel, type MessageKey } from "@/lib/i18n";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 import { Money } from "@/components/Money";
@@ -20,7 +20,7 @@ import {
   shiftPeriod,
 } from "@/lib/period";
 
-type Person = { id: string; name: string };
+type Person = { id: string; name: string; nameAr?: string | null };
 type EventRow = {
   id: string;
   kind: string;
@@ -60,8 +60,9 @@ export default function WithHouseHistoryPage() {
   const [data, setData] = useState<HistoryPayload | null>(null);
   const [error, setError] = useState("");
   const { from, to } = rangeForPeriod(period, cursor);
-  const memberName =
-    people.find((p) => p.id === memberId)?.name ?? data?.member.name ?? "";
+  const selected =
+    people.find((p) => p.id === memberId) ?? data?.member ?? null;
+  const memberName = selected ? personLabel(selected, locale) : "";
 
   useEffect(() => {
     setKind("HOUSE");
@@ -111,7 +112,7 @@ export default function WithHouseHistoryPage() {
         >
           {people.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.name}
+              {personLabel(p, locale)}
             </option>
           ))}
         </select>

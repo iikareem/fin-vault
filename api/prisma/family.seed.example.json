@@ -1,41 +1,47 @@
 [
   {
-    "name": "Parent",
+    "name": "Ashraf",
+    "nameAr": "أشرف",
     "email": "parent@example.com",
     "password": "changeme",
     "relation": "Dad",
     "role": "ADMIN"
   },
   {
-    "name": "Parent two",
+    "name": "Toty",
+    "nameAr": "توتي",
     "email": "parent2@example.com",
     "password": "changeme",
     "relation": "Mom",
     "role": "ADMIN"
   },
   {
-    "name": "Child one",
+    "name": "Khaled",
+    "nameAr": "خالد",
     "email": "child1@example.com",
     "password": "changeme",
     "relation": "Son",
     "role": "MEMBER"
   },
   {
-    "name": "Child two",
+    "name": "Kareem",
+    "nameAr": "كريم",
     "email": "child2@example.com",
     "password": "changeme",
     "relation": "Son",
     "role": "MEMBER"
   },
   {
-    "name": "Child three",
+    "name": "Rawan",
+    "nameAr": "روان",
     "email": "child3@example.com",
     "password": "changeme",
     "relation": "Daughter",
     "role": "MEMBER"
   },
   {
-    "name": "Child four",
+    "name": "Noor",
+    "nameAr": "نور",
     "email": "child4@example.com",
     "password": "changeme",
     "relation": "Daughter",

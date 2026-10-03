@@ -8,19 +8,20 @@ import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
 import { householdPath } from "@/lib/space";
-import { labelFor } from "@/lib/i18n";
+import { labelFor, personLabel } from "@/lib/i18n";
 import { Hint } from "@/components/Hint";
 
 type User = {
   id: string;
   name: string;
+  nameAr?: string | null;
   email: string;
   relation: string;
   role: string;
 };
 
 export default function FamilyPage() {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { house, setKind } = useBooks();
   const [users, setUsers] = useState<User[]>([]);
   const [error, setError] = useState("");
@@ -47,7 +48,7 @@ export default function FamilyPage() {
         {users.map((u) => (
           <li key={u.id} className="rounded-2xl bg-white px-4 py-3 shadow-sm">
             <p className="font-semibold">
-              {u.name}
+              {personLabel(u, locale)}
               {u.relation ? ` · ${labelFor(u.relation, t)}` : ""}
             </p>
             <p className="text-sm text-stone-500">

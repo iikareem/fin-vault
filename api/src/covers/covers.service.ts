@@ -65,7 +65,7 @@ export class CoversService {
     const covers = await this.prisma.houseCover.findMany({
       where: { householdId },
       include: {
-        member: { select: { id: true, name: true } },
+        member: { select: { id: true, name: true, nameAr: true } },
         category: { select: { id: true, name: true, nameAr: true, color: true } },
         repayments: true,
       },
@@ -77,7 +77,7 @@ export class CoversService {
   async create(householdId: string, adminId: string, dto: CreateCoverDto) {
     const member = await this.prisma.membership.findFirst({
       where: { householdId, userId: dto.toUserId },
-      include: { user: { select: { id: true, name: true } } },
+      include: { user: { select: { id: true, name: true, nameAr: true } } },
     });
     if (!member) {
       throw new BadRequestException('That person is not in this house');
@@ -129,7 +129,7 @@ export class CoversService {
           houseTxId: houseTx.id,
         },
         include: {
-          member: { select: { id: true, name: true } },
+          member: { select: { id: true, name: true, nameAr: true } },
           category: { select: { id: true, name: true, nameAr: true, color: true } },
           repayments: true,
         },
@@ -239,7 +239,7 @@ export class CoversService {
       const updated = await tx.houseCover.findUniqueOrThrow({
         where: { id: coverId },
         include: {
-          member: { select: { id: true, name: true } },
+          member: { select: { id: true, name: true, nameAr: true } },
           category: { select: { id: true, name: true, nameAr: true, color: true } },
           repayments: true,
         },
@@ -393,7 +393,7 @@ export class CoversService {
       if (dto.toUserId) {
         const member = await tx.membership.findFirst({
           where: { householdId, userId: dto.toUserId },
-          include: { user: { select: { id: true, name: true } } },
+          include: { user: { select: { id: true, name: true, nameAr: true } } },
         });
         if (!member) {
           throw new BadRequestException('That person is not in this house');
@@ -437,7 +437,7 @@ export class CoversService {
       return tx.houseCover.findFirstOrThrow({
         where: { id: coverId },
         include: {
-          member: { select: { id: true, name: true } },
+          member: { select: { id: true, name: true, nameAr: true } },
           category: { select: { id: true, name: true, nameAr: true, color: true } },
           repayments: true,
         },

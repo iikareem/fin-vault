@@ -34,6 +34,7 @@ export async function loadSpace() {
   const me = await api<{
     id: string;
     name: string;
+    nameAr?: string;
     preferredCurrency?: string;
     theme?: string;
     budgetMonthStartDay?: number;
@@ -60,6 +61,7 @@ export async function loadSpace() {
   return {
     id: me.id,
     name: me.name,
+    nameAr: me.nameAr ?? "",
     preferredCurrency: me.preferredCurrency,
     theme: me.theme,
     budgetMonthStartDay: me.budgetMonthStartDay ?? 1,

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { api, money, parseAmount, todayISO } from "@/lib/api";
-import { fill, labelFor, categoryLabel } from "@/lib/i18n";
+import { fill, labelFor, categoryLabel, personLabel } from "@/lib/i18n";
 import { useCalendarClock } from "@/hooks/useCalendarClock";
 import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
@@ -80,7 +80,7 @@ type Tx = {
   note: string;
   occurredOn?: string;
   category: { name: string; nameAr?: string | null };
-  user: { name: string };
+  user: { name: string; nameAr?: string | null };
   account?: { name: string; type?: string };
 };
 
@@ -95,7 +95,7 @@ type Claim = {
   status: string;
   note: string;
   occurredOn: string;
-  member: { id: string; name: string };
+  member: { id: string; name: string; nameAr?: string | null };
   category: { name: string; nameAr?: string | null };
 };
 type Cover = {
@@ -106,14 +106,14 @@ type Cover = {
   status: string;
   note: string;
   occurredOn: string;
-  member: { id: string; name: string };
+  member: { id: string; name: string; nameAr?: string | null };
   category: { name: string; nameAr?: string | null };
 };
 
 export default function HomePage() {
   const { t, locale } = useI18n();
   const {
-    name,
+    displayName,
     userId,
     active,
     personal,
@@ -456,7 +456,7 @@ export default function HomePage() {
   return (
     <PageShell>
       <p className="text-lg font-semibold text-[var(--foreground)]">
-        👋 {name ? t("helloName", { name }) : t("hello")}
+        👋 {displayName ? t("helloName", { name: displayName }) : t("hello")}
       </p>
       <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">
         {isHouse ? t("homeHintHouse") : t("homeHintMine")}
@@ -823,7 +823,7 @@ export default function HomePage() {
                       >
                         <div className="money-row">
                           <div className="min-w-0 text-right" dir="auto">
-                            <p className="font-semibold">{c.member.name}</p>
+                            <p className="font-semibold">{personLabel(c.member, locale)}</p>
                             <p className="text-stone-600">
                               {categoryLabel(c.category, locale, t)}
                               {c.note ? ` · ${c.note}` : ""}
@@ -968,7 +968,7 @@ export default function HomePage() {
                       >
                         <div className="money-row">
                           <div className="min-w-0 text-right" dir="auto">
-                            <p className="font-semibold">{c.member.name}</p>
+                            <p className="font-semibold">{personLabel(c.member, locale)}</p>
                             <p className="text-stone-600">
                               {categoryLabel(c.category, locale, t)}
                               {c.note ? ` · ${c.note}` : ""}
@@ -1149,7 +1149,7 @@ export default function HomePage() {
               >
                 <div className="money-row">
                   <div className="min-w-0 text-right" dir="auto">
-                    <p className="font-semibold">{c.member.name}</p>
+                    <p className="font-semibold">{personLabel(c.member, locale)}</p>
                     <p className="text-stone-600">
                       {categoryLabel(c.category, locale, t)}
                       {c.note ? ` · ${c.note}` : ""}
@@ -1293,7 +1293,7 @@ export default function HomePage() {
                 >
                   <div className="money-row">
                     <div className="min-w-0 text-right" dir="auto">
-                      <p className="font-semibold">{c.member.name}</p>
+                      <p className="font-semibold">{personLabel(c.member, locale)}</p>
                       <p className="text-stone-600">
                         {categoryLabel(c.category, locale, t)}
                         {c.note ? ` · ${c.note}` : ""}
@@ -1684,7 +1684,7 @@ export default function HomePage() {
                 {(() => {
                   const parts = [
                     isHouse && tx.user.name !== "House"
-                      ? labelFor(tx.user.name, t)
+                      ? personLabel(tx.user, locale)
                       : null,
                     tx.type === "TRACK"
                       ? null

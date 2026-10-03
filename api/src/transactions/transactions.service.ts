@@ -22,7 +22,7 @@ export class TransactionsService {
       include: {
         account: { select: { id: true, name: true, type: true } },
         category: { select: { id: true, name: true, nameAr: true, color: true, kind: true } },
-        user: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true, nameAr: true } },
       },
       orderBy: [{ occurredOn: 'desc' }, { createdAt: 'desc' }],
       take: day ? 200 : 80,
@@ -89,7 +89,7 @@ export class TransactionsService {
       include: {
         account: { select: { id: true, name: true, type: true } },
         category: { select: { id: true, name: true, nameAr: true, color: true, kind: true } },
-        user: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true, nameAr: true } },
       },
     });
     return actorForSpace(kind, created);
@@ -218,7 +218,7 @@ export class TransactionsService {
       include: {
         account: { select: { id: true, name: true, type: true } },
         category: { select: { id: true, name: true, nameAr: true, color: true, kind: true } },
-        user: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true, nameAr: true } },
       },
     });
     return actorForSpace(kind, updated);

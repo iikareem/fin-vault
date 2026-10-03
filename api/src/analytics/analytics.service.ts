@@ -516,7 +516,7 @@ export class AnalyticsService {
     const householdId = membership.householdId;
     const members = await this.prisma.membership.findMany({
       where: { householdId },
-      include: { user: { select: { id: true, name: true } } },
+      include: { user: { select: { id: true, name: true, nameAr: true } } },
     });
     const rows = await this.prisma.transaction.groupBy({
       by: ['userId', 'type'],
@@ -641,7 +641,7 @@ export class AnalyticsService {
             parentId: true,
           },
         },
-        user: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true, nameAr: true } },
       },
       orderBy: [{ occurredOn: 'desc' }, { createdAt: 'desc' }],
       take: ITEM_CAP,
@@ -656,7 +656,7 @@ export class AnalyticsService {
               categoryId: { in: expandedIds },
             },
             include: {
-              member: { select: { id: true, name: true } },
+              member: { select: { id: true, name: true, nameAr: true } },
               category: {
                 select: {
                   id: true,
@@ -771,7 +771,7 @@ export class AnalyticsService {
       include: {
         account: { select: { id: true, name: true } },
         category: { select: { id: true, name: true, nameAr: true, color: true, emoji: true, kind: true } },
-        user: { select: { id: true, name: true } },
+        user: { select: { id: true, name: true, nameAr: true } },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -780,7 +780,7 @@ export class AnalyticsService {
         ? await this.prisma.houseClaim.findMany({
             where: { householdId, occurredOn: day },
             include: {
-              member: { select: { id: true, name: true } },
+              member: { select: { id: true, name: true, nameAr: true } },
               category: { select: { id: true, name: true, nameAr: true, color: true, emoji: true } },
               reimbursements: true,
             },
@@ -792,7 +792,7 @@ export class AnalyticsService {
         ? await this.prisma.charityGift.findMany({
             where: { householdId, occurredOn: day },
             include: {
-              member: { select: { id: true, name: true } },
+              member: { select: { id: true, name: true, nameAr: true } },
               type: { select: { id: true, name: true } },
             },
             orderBy: { createdAt: 'asc' },

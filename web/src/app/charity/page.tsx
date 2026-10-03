@@ -6,7 +6,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
-import { labelFor } from "@/lib/i18n";
+import { labelFor, personLabel } from "@/lib/i18n";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 import { DateField } from "@/components/DateField";
@@ -21,13 +21,18 @@ import {
 
 type Account = { id: string; name: string };
 
-type MemberTotal = { userId: string; name: string; total: number };
+type MemberTotal = {
+  userId: string;
+  name: string;
+  nameAr?: string | null;
+  total: number;
+};
 type Gift = {
   id: string;
   amount: number;
   occurredOn: string;
   note: string;
-  member: { id: string; name: string };
+  member: { id: string; name: string; nameAr?: string | null };
 };
 type CharityTypeRow = {
   id: string;
@@ -385,7 +390,11 @@ export default function CharityPage() {
                 <ul className="mt-2 space-y-1">
                   {row.byMember.map((m) => (
                     <li key={m.userId} className="flex justify-between">
-                      <span>{labelFor(m.name, t)}</span>
+                      <span>
+                        {m.userId === "house"
+                          ? labelFor("House", t)
+                          : personLabel(m, locale)}
+                      </span>
                       <span className="font-semibold">
                         {money(m.total, currency, locale)}
                       </span>

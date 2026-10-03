@@ -51,8 +51,8 @@ export class LoansService implements OnModuleInit {
         OR: [{ fromPersonalTxId: null }, { toPersonalTxId: null }],
       },
       include: {
-        fromUser: { select: { id: true, name: true } },
-        toUser: { select: { id: true, name: true } },
+        fromUser: { select: { id: true, name: true, nameAr: true } },
+        toUser: { select: { id: true, name: true, nameAr: true } },
         category: { select: { id: true, name: true, nameAr: true, color: true } },
       },
       orderBy: { occurredOn: 'asc' },
@@ -64,8 +64,8 @@ export class LoansService implements OnModuleInit {
       include: {
         loan: {
           include: {
-            fromUser: { select: { id: true, name: true } },
-            toUser: { select: { id: true, name: true } },
+            fromUser: { select: { id: true, name: true, nameAr: true } },
+            toUser: { select: { id: true, name: true, nameAr: true } },
             category: { select: { id: true, name: true, nameAr: true, color: true } },
           },
         },
@@ -324,8 +324,8 @@ export class LoansService implements OnModuleInit {
     const loans = await this.prisma.peerLoan.findMany({
       where: { householdId },
       include: {
-        fromUser: { select: { id: true, name: true } },
-        toUser: { select: { id: true, name: true } },
+        fromUser: { select: { id: true, name: true, nameAr: true } },
+        toUser: { select: { id: true, name: true, nameAr: true } },
         category: { select: { id: true, name: true, nameAr: true, color: true } },
         repayments: true,
       },
@@ -415,8 +415,8 @@ export class LoansService implements OnModuleInit {
           toPersonalTxId,
         },
         include: {
-          fromUser: { select: { id: true, name: true } },
-          toUser: { select: { id: true, name: true } },
+          fromUser: { select: { id: true, name: true, nameAr: true } },
+          toUser: { select: { id: true, name: true, nameAr: true } },
           category: { select: { id: true, name: true, nameAr: true, color: true } },
           repayments: true,
         },
@@ -452,8 +452,8 @@ export class LoansService implements OnModuleInit {
       where: { id: loanId, householdId },
       include: {
         repayments: true,
-        fromUser: { select: { id: true, name: true } },
-        toUser: { select: { id: true, name: true } },
+        fromUser: { select: { id: true, name: true, nameAr: true } },
+        toUser: { select: { id: true, name: true, nameAr: true } },
         category: { select: { id: true, name: true, nameAr: true, color: true } },
       },
     });
@@ -540,8 +540,8 @@ export class LoansService implements OnModuleInit {
       const updated = await tx.peerLoan.findUniqueOrThrow({
         where: { id: loanId },
         include: {
-          fromUser: { select: { id: true, name: true } },
-          toUser: { select: { id: true, name: true } },
+          fromUser: { select: { id: true, name: true, nameAr: true } },
+          toUser: { select: { id: true, name: true, nameAr: true } },
           category: { select: { id: true, name: true, nameAr: true, color: true } },
           repayments: true,
         },
@@ -584,8 +584,8 @@ export class LoansService implements OnModuleInit {
       where: { id: loanId, householdId },
       include: {
         repayments: true,
-        fromUser: { select: { id: true, name: true } },
-        toUser: { select: { id: true, name: true } },
+        fromUser: { select: { id: true, name: true, nameAr: true } },
+        toUser: { select: { id: true, name: true, nameAr: true } },
         category: { select: { id: true, name: true, nameAr: true, color: true } },
       },
     });
@@ -647,8 +647,8 @@ export class LoansService implements OnModuleInit {
       const updated = await tx.peerLoan.findUniqueOrThrow({
         where: { id: loanId },
         include: {
-          fromUser: { select: { id: true, name: true } },
-          toUser: { select: { id: true, name: true } },
+          fromUser: { select: { id: true, name: true, nameAr: true } },
+          toUser: { select: { id: true, name: true, nameAr: true } },
           category: { select: { id: true, name: true, nameAr: true, color: true } },
           repayments: true,
         },

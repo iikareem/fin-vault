@@ -8,6 +8,7 @@ const prisma = new PrismaClient();
 
 type Person = {
   name: string;
+  nameAr?: string;
   email: string;
   password: string;
   relation: string;
@@ -40,14 +41,19 @@ async function syncFamily(family: Person[]) {
     if (!user) continue;
     await prisma.user.update({
       where: { id: user.id },
-      data: { name: person.name, relation: person.relation, passwordHash },
+      data: {
+        name: person.name,
+        nameAr: person.nameAr?.trim() || user.nameAr,
+        relation: person.relation,
+        passwordHash,
+      },
     });
     await prisma.household.updateMany({
       where: {
         kind: 'PERSONAL',
         memberships: { some: { userId: user.id } },
       },
-      data: { name: `${person.name}` },
+      data: { name: `فلوس ${person.name}` },
     });
   }
 }
@@ -73,6 +79,7 @@ async function main() {
         const user = await tx.user.create({
           data: {
             name: person.name,
+            nameAr: person.nameAr?.trim() || '',
             email: person.email,
             passwordHash,
             relation: person.relation,

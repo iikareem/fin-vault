@@ -70,7 +70,7 @@ export class ClaimsService {
     const claims = await this.prisma.houseClaim.findMany({
       where: { householdId },
       include: {
-        member: { select: { id: true, name: true } },
+        member: { select: { id: true, name: true, nameAr: true } },
         category: { select: { id: true, name: true, nameAr: true, color: true } },
         reimbursements: true,
       },
@@ -109,7 +109,7 @@ export class ClaimsService {
           personalTxId,
         },
         include: {
-          member: { select: { id: true, name: true } },
+          member: { select: { id: true, name: true, nameAr: true } },
           category: { select: { id: true, name: true, nameAr: true, color: true } },
           reimbursements: true,
         },
@@ -180,7 +180,7 @@ export class ClaimsService {
       const updated = await tx.houseClaim.findUniqueOrThrow({
         where: { id: claimId },
         include: {
-          member: { select: { id: true, name: true } },
+          member: { select: { id: true, name: true, nameAr: true } },
           category: { select: { id: true, name: true, nameAr: true, color: true } },
           reimbursements: true,
         },
@@ -332,7 +332,7 @@ export class ClaimsService {
       return tx.houseClaim.findFirstOrThrow({
         where: { id: claimId },
         include: {
-          member: { select: { id: true, name: true } },
+          member: { select: { id: true, name: true, nameAr: true } },
           category: { select: { id: true, name: true, nameAr: true, color: true } },
           reimbursements: true,
         },

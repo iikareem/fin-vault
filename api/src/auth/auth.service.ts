@@ -36,10 +36,12 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+    const nameAr = /[\u0600-\u06FF]/.test(name) ? name : '';
     const user = await this.prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
         data: {
           name,
+          nameAr,
           email,
           passwordHash,
           preferredCurrency: 'EGP',
@@ -57,6 +59,7 @@ export class AuthService {
       user: {
         id: user.id,
         name: user.name,
+        nameAr: user.nameAr,
         email: user.email,
         preferredCurrency: user.preferredCurrency,
         theme: user.theme,
@@ -80,6 +83,7 @@ export class AuthService {
       user: {
         id: user.id,
         name: user.name,
+        nameAr: user.nameAr,
         email: user.email,
         preferredCurrency: user.preferredCurrency,
         theme: user.theme,
@@ -171,6 +175,7 @@ export class AuthService {
     return {
       id: user.id,
       name: user.name,
+      nameAr: user.nameAr,
       email: user.email,
       preferredCurrency: user.preferredCurrency,
       theme: user.theme,

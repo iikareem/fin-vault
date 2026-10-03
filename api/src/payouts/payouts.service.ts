@@ -24,7 +24,7 @@ export class PayoutsService {
   async create(householdId: string, adminId: string, dto: CreatePayoutDto) {
     const member = await this.prisma.membership.findFirst({
       where: { householdId, userId: dto.toUserId },
-      include: { user: { select: { id: true, name: true } } },
+      include: { user: { select: { id: true, name: true, nameAr: true } } },
     });
     if (!member) throw new BadRequestException('That person is not in this house');
 
@@ -111,8 +111,8 @@ export class PayoutsService {
           personalTxId: personalTx.id,
         },
         include: {
-          toUser: { select: { id: true, name: true } },
-          recordedBy: { select: { id: true, name: true } },
+          toUser: { select: { id: true, name: true, nameAr: true } },
+          recordedBy: { select: { id: true, name: true, nameAr: true } },
         },
       });
     });

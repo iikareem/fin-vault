@@ -104,7 +104,10 @@ model Household {
 
 model User {
   id                String          @id @default(cuid())
+  /** English display name (canonical). */
   name              String
+  /** Arabic display name. Empty = fall back to `name`. */
+  nameAr            String          @default("")
   email             String          @unique
   passwordHash      String
   relation          String          @default("")

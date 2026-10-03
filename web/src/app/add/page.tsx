@@ -20,7 +20,7 @@ import {
   HIDDEN_EXPENSE_CATEGORIES,
   HIDDEN_INCOME_CATEGORIES,
 } from "@/lib/category-visibility";
-import { categoryLabel } from "@/lib/i18n";
+import { categoryLabel, personLabel } from "@/lib/i18n";
 
 type Account = { id: string; name: string; type?: string };
 type Category = {
@@ -31,7 +31,7 @@ type Category = {
   parentId?: string | null;
   color?: string | null;
 };
-type Person = { id: string; name: string };
+type Person = { id: string; name: string; nameAr?: string | null };
 type WalletKind = "EXPENSE" | "INCOME" | "GIVE";
 
 const RECENT_CATS_KEY = "fb_recent_cats";
@@ -664,7 +664,7 @@ function AddForm() {
             >
               {people.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name}
+                  {personLabel(p, locale)}
                 </option>
               ))}
             </select>
