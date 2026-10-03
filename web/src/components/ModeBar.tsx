@@ -6,9 +6,8 @@ import { useBooks } from "./BooksProvider";
 import { HOUSE_BOOKS_ENABLED } from "@/lib/features";
 
 /**
- * Top chrome below the fixed ios-top-mask: house/personal switch when
- * enabled, otherwise an in-flow safe-area spacer so Hello / charts clear
- * the Dynamic Island.
+ * House/personal switch when enabled. Safe-area spacing is owned by
+ * `.app-frame` / `.ios-top-mask` so Hello / charts never sit under the island.
  */
 export function ModeBar() {
   const path = usePathname();
@@ -18,14 +17,12 @@ export function ModeBar() {
 
   const showSwitch =
     HOUSE_BOOKS_ENABLED && !personalOnly && Boolean(house && personal);
+  if (!showSwitch) return null;
+
   const kind = active?.kind ?? "PERSONAL";
 
-  if (!showSwitch) {
-    return <div aria-hidden className="ios-top-spacer" />;
-  }
-
   return (
-    <div className="chrome-bar sticky top-0 z-30 pt-[env(safe-area-inset-top,0px)]">
+    <div className="chrome-bar sticky top-0 z-30">
       <div className="mx-auto flex max-w-lg items-center gap-2 px-3 py-2 sm:px-4">
         <div className="grid min-w-0 flex-1 grid-cols-2 gap-1 rounded-full bg-[var(--panel-soft)] p-1 ring-1 ring-[var(--input-border)]">
           <button

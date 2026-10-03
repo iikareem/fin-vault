@@ -496,9 +496,22 @@ html[data-compact] .field {
   padding-bottom: 0.55rem;
 }
 
+/* Safe-area helpers — constant() for older iOS, env() for current. */
+:root {
+  --sat: constant(safe-area-inset-top);
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: constant(safe-area-inset-bottom);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: constant(safe-area-inset-left);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: constant(safe-area-inset-right);
+  --sar: env(safe-area-inset-right, 0px);
+}
+
 html {
   /* clip avoids creating a scrollport that breaks position:sticky on iOS */
   overflow-x: clip;
+  /* Solid only — background-image on html/body makes iOS frost the status bar. */
   background-color: var(--background);
 }
 
@@ -518,19 +531,38 @@ body {
   background-color: var(--background);
 }
 
-/* Soft atmosphere on the document itself — avoid a fixed full-screen layer
-   that iOS composites under the status bar / Dynamic Island while scrolling.
-   Keep the top wash below the safe area so titles stay crisp under the island. */
 body {
   position: relative;
   color: var(--foreground);
   font-family: var(--font-arabic), system-ui, sans-serif;
   -webkit-tap-highlight-color: transparent;
-  text-rendering: optimizeLegibility;
+  /* Solid opaque fill only — no background-image (iOS status-bar blur trigger). */
   background-color: var(--background);
+  background-image: none;
+}
+
+/* Pads content below the Dynamic Island; solid fill so the top stays crisp. */
+.app-frame {
+  position: relative;
+  min-height: 100dvh;
+  padding-top: var(--sat);
+  background-color: var(--background);
+}
+
+.app-frame-content {
+  position: relative;
+  z-index: 1;
+}
+
+/* Soft atmosphere — clipped to the content box below the safe area. */
+.app-atmosphere {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
   background-image:
     radial-gradient(
-      ellipse 80% 36% at 50% calc(env(safe-area-inset-top, 0px) + 8%),
+      ellipse 80% 36% at 50% 0%,
       var(--grad-a),
       transparent 62%
     ),
@@ -539,24 +571,18 @@ body {
       var(--grad-b),
       transparent 55%
     );
-  background-attachment: scroll;
 }
 
-/* Opaque mask over the status bar / Dynamic Island — fixed so iOS overscroll
+/* Opaque mask over the status bar / Dynamic Island — fixed so overscroll
    cannot drag page content into a translucent system blur. */
 .ios-top-mask {
   position: fixed;
   inset-inline: 0;
   top: 0;
   z-index: 60;
-  height: env(safe-area-inset-top, 0px);
-  background-color: var(--chrome-bg);
+  height: var(--sat);
+  background-color: var(--background);
   pointer-events: none;
-}
-
-.ios-top-spacer {
-  height: env(safe-area-inset-top, 0px);
-  background-color: var(--chrome-bg);
 }
 
 a,
@@ -885,9 +911,9 @@ html.dark .shadow-lg {
   margin-inline: auto;
   width: 100%;
   max-width: 32rem;
-  padding-inline: max(1rem, env(safe-area-inset-left), env(safe-area-inset-right));
-  padding-top: 0.75rem;
-  padding-bottom: calc(7.25rem + env(safe-area-inset-bottom, 0px));
+  padding-inline: max(1rem, var(--sal), var(--sar));
+  padding-top: 0.85rem;
+  padding-bottom: calc(7.25rem + var(--sab));
 }
 
 @utility amount {

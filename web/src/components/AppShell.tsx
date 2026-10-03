@@ -8,10 +8,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <I18nProvider>
       <BooksProvider>
-        {/* Always on — covers Dynamic Island even on login/register. */}
+        {/* Solid cover for the status bar / Dynamic Island (overscroll-safe). */}
         <div aria-hidden className="ios-top-mask" />
-        <ModeBar />
-        {children}
+        <div className="app-frame">
+          {/* Gradients live here — never on body — so iOS won't frost the top. */}
+          <div aria-hidden className="app-atmosphere" />
+          <div className="app-frame-content">
+            <ModeBar />
+            {children}
+          </div>
+        </div>
       </BooksProvider>
     </I18nProvider>
   );
