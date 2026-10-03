@@ -749,8 +749,13 @@ export default function HomePage() {
               className="flex min-h-[5.5rem] flex-col justify-between rounded-[1.5rem] px-3.5 py-3 shadow-md transition hover:opacity-95 active:scale-[0.99]"
               style={{ background: "var(--cta-bg)", color: "var(--cta-fg)" }}
             >
-              <span className="text-base font-semibold leading-snug">
-                {t("homeSpend")}
+              <span className="flex items-start justify-between gap-2">
+                <span className="text-base font-semibold leading-snug">
+                  {t("homeSpend")}
+                </span>
+                <span className="shrink-0 text-lg opacity-80" aria-hidden>
+                  →
+                </span>
               </span>
               <span className="text-xs font-medium leading-snug opacity-70">
                 {t("homeSpendHint")}
@@ -764,11 +769,16 @@ export default function HomePage() {
                 color: "var(--accent-a-fg)",
               }}
             >
-              <span className="text-base font-semibold leading-snug">
-                {t("homeSalary")}
+              <span className="flex items-start justify-between gap-2">
+                <span className="text-base font-semibold leading-snug">
+                  {t("homeIncome")}
+                </span>
+                <span className="shrink-0 text-lg opacity-80" aria-hidden>
+                  →
+                </span>
               </span>
               <span className="text-xs font-medium leading-snug opacity-70">
-                {t("homeSalaryHint")}
+                {t("homeIncomeHint")}
               </span>
             </Link>
           </div>
