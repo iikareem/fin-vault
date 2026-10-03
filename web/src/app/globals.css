@@ -497,8 +497,14 @@ html[data-compact] .field {
 }
 
 html {
-  overflow-x: hidden;
+  /* clip avoids creating a scrollport that breaks position:sticky on iOS */
+  overflow-x: clip;
   background-color: var(--background);
+}
+
+/* Hide UI until the boot script paints the saved theme (kills light→theme flash). */
+html:not(.app-booted) body {
+  visibility: hidden;
 }
 
 /* Kill theme/color transitions on first paint so boot → hydrate does not smear. */
@@ -518,7 +524,8 @@ body {
 }
 
 /* Soft atmosphere on the document itself — avoid a fixed full-screen layer
-   that iOS composites under the status bar / Dynamic Island while scrolling. */
+   that iOS composites under the status bar / Dynamic Island while scrolling.
+   Keep the top wash below the safe area so titles stay crisp under the island. */
 body {
   position: relative;
   color: var(--foreground);
@@ -528,7 +535,7 @@ body {
   background-color: var(--background);
   background-image:
     radial-gradient(
-      ellipse 80% 36% at 50% -12%,
+      ellipse 80% 36% at 50% calc(env(safe-area-inset-top, 0px) + 8%),
       var(--grad-a),
       transparent 62%
     ),
@@ -538,6 +545,23 @@ body {
       transparent 55%
     );
   background-attachment: scroll;
+}
+
+/* Opaque mask over the status bar / Dynamic Island — fixed so iOS overscroll
+   cannot drag page content into a translucent system blur. */
+.ios-top-mask {
+  position: fixed;
+  inset-inline: 0;
+  top: 0;
+  z-index: 60;
+  height: env(safe-area-inset-top, 0px);
+  background-color: var(--chrome-bg);
+  pointer-events: none;
+}
+
+.ios-top-spacer {
+  height: env(safe-area-inset-top, 0px);
+  background-color: var(--chrome-bg);
 }
 
 a,
@@ -594,11 +618,6 @@ button:focus-visible {
   border-bottom: 1px solid var(--chrome-edge);
   -webkit-backdrop-filter: none;
   backdrop-filter: none;
-  transform: translateZ(0);
-}
-
-.chrome-bar.chrome-bar-flush {
-  border-bottom: none;
 }
 
 @utility nav-shell {

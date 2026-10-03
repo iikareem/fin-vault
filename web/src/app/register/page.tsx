@@ -88,7 +88,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))]">
+    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 pb-[max(1.25rem,env(safe-area-inset-bottom,0px))] pt-[max(1.25rem,env(safe-area-inset-top,0px))]">
       <LanguageSwitch />
       <div className="surface mt-6 rounded-[2rem] p-6">
         <Image

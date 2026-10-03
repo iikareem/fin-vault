@@ -145,7 +145,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       }
       setActive(nextActive ?? p ?? (!only ? h : null));
       const nextTheme = normalizeTheme(me.theme);
-      setTheme(nextTheme);
+      setTheme((prev) => (prev === nextTheme ? prev : nextTheme));
       applyTheme(nextTheme);
       setPreferredCurrency(me.preferredCurrency ?? p?.currency ?? "EGP");
       setBudgetMonthStartDay(
@@ -165,10 +165,14 @@ export function BooksProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
+    // Boot script already painted the saved theme; keep React state aligned
+    // without forcing "light" over it (that caused a visible color flash).
+    const stored = readStoredTheme();
+    setTheme((prev) => (prev === stored ? prev : stored));
+    applyTheme(stored);
+
     if (onAuthPage) {
       setLoading(false);
-      // Keep the saved theme — forcing light here caused a fast color flash.
-      applyTheme(readStoredTheme());
       return;
     }
     let cancelled = false;
