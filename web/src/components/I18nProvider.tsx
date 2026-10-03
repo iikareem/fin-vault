@@ -26,18 +26,29 @@ type I18nValue = {
 
 const I18nContext = createContext<I18nValue | null>(null);
 
-export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE);
-
-  useEffect(() => {
+function readStoredLocale(): Locale {
+  if (typeof window === "undefined") return DEFAULT_LOCALE;
+  try {
     const stored = localStorage.getItem(LANG_KEY);
-    if (stored === "ar" || stored === "en") setLocaleState(stored);
-  }, []);
+    if (stored === "ar" || stored === "en") return stored;
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_LOCALE;
+}
+
+export function I18nProvider({ children }: { children: ReactNode }) {
+  const [locale, setLocaleState] = useState<Locale>(readStoredLocale);
 
   useEffect(() => {
-    document.documentElement.lang = locale;
-    document.documentElement.dir = locale === "ar" ? "rtl" : "ltr";
-    localStorage.setItem(LANG_KEY, locale);
+    const root = document.documentElement;
+    root.lang = locale;
+    root.dir = locale === "ar" ? "rtl" : "ltr";
+    try {
+      localStorage.setItem(LANG_KEY, locale);
+    } catch {
+      /* ignore */
+    }
   }, [locale]);
 
   const value = useMemo<I18nValue>(

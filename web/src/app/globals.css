@@ -501,6 +501,15 @@ html {
   background-color: var(--background);
 }
 
+/* Kill theme/color transitions on first paint so boot → hydrate does not smear. */
+html:not(.app-ready),
+html:not(.app-ready) *,
+html:not(.app-ready) *::before,
+html:not(.app-ready) *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
 html,
 body {
   min-height: 100%;

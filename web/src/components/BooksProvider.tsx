@@ -63,11 +63,24 @@ const PERSONAL_ONLY = ["/gold", "/outside-loans"];
 
 const THEME_KEY = "fb_theme";
 
+function readStoredTheme(): ThemeMode {
+  if (typeof window === "undefined") return "light";
+  try {
+    return normalizeTheme(localStorage.getItem(THEME_KEY));
+  } catch {
+    return "light";
+  }
+}
+
 function applyTheme(theme: ThemeMode) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
-  root.setAttribute("data-theme", theme);
-  root.classList.toggle("dark", isDarkTheme(theme));
+  const dark = isDarkTheme(theme);
+  if (root.getAttribute("data-theme") !== theme) {
+    root.setAttribute("data-theme", theme);
+  }
+  root.classList.toggle("dark", dark);
+  root.style.colorScheme = dark ? "dark" : "light";
   try {
     localStorage.setItem(THEME_KEY, theme);
   } catch {
@@ -80,7 +93,9 @@ function applyTheme(theme: ThemeMode) {
     meta.setAttribute("name", "theme-color");
     document.head.appendChild(meta);
   }
-  meta.setAttribute("content", color);
+  if (meta.getAttribute("content") !== color) {
+    meta.setAttribute("content", color);
+  }
 }
 
 export function BooksProvider({ children }: { children: ReactNode }) {
@@ -97,7 +112,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [personalOnly, setPersonalOnly] = useState(!HOUSE_BOOKS_ENABLED);
   const [preferredCurrency, setPreferredCurrency] = useState("EGP");
-  const [theme, setTheme] = useState<ThemeMode>("light");
+  const [theme, setTheme] = useState<ThemeMode>(readStoredTheme);
   const [budgetMonthStartDay, setBudgetMonthStartDay] = useState(1);
 
   const applyMe = useCallback(
@@ -152,7 +167,8 @@ export function BooksProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (onAuthPage) {
       setLoading(false);
-      applyTheme("light");
+      // Keep the saved theme — forcing light here caused a fast color flash.
+      applyTheme(readStoredTheme());
       return;
     }
     let cancelled = false;
