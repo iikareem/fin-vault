@@ -502,11 +502,6 @@ html {
   background-color: var(--background);
 }
 
-/* Hide UI until the boot script paints the saved theme (kills light→theme flash). */
-html:not(.app-booted) body {
-  visibility: hidden;
-}
-
 /* Kill theme/color transitions on first paint so boot → hydrate does not smear. */
 html:not(.app-ready),
 html:not(.app-ready) *,
