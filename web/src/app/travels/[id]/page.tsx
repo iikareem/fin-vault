@@ -195,18 +195,17 @@ export default function TravelDetailPage() {
     setEnding(true);
     setError("");
     try {
-      const updated = await api<TravelDetail>(
-        householdPath(hid, `/travels/${trip.id}/end`),
-        { method: "POST", body: JSON.stringify({}) },
-      );
-      setTrip(updated);
-      setConfirmEnd(false);
-      setShowSpend(false);
-      await load(hid, trip.id);
+      await api(householdPath(hid, `/travels/${trip.id}/end`), {
+        method: "POST",
+        body: JSON.stringify({}),
+      });
+      // Go back to the travels hub — don't patch local trip state with the
+      // summary payload (missing items/byCategory) or reload categories.
+      window.location.assign("/travels");
     } catch (err) {
       setError(err instanceof Error ? err.message : t("travelsSaveFailed"));
-    } finally {
       setEnding(false);
+      setConfirmEnd(false);
     }
   }
 
@@ -339,7 +338,7 @@ export default function TravelDetailPage() {
             <p className="text-xs text-[var(--muted)]">{t("travelsFromCurrent")}</p>
             <p className="font-bold tabular-nums">
               <Money
-                amount={trip.fromWallet}
+                amount={trip.fromWallet ?? 0}
                 currency={trip.currency}
                 locale={locale}
               />
@@ -349,7 +348,7 @@ export default function TravelDetailPage() {
             <p className="text-xs text-[var(--muted)]">{t("travelsFromCash")}</p>
             <p className="font-bold tabular-nums">
               <Money
-                amount={trip.fromCash}
+                amount={trip.fromCash ?? 0}
                 currency={trip.currency}
                 locale={locale}
               />
@@ -451,13 +450,13 @@ export default function TravelDetailPage() {
         <p className="mb-3 text-sm text-red-700">{error}</p>
       ) : null}
 
-      {trip.byCategory.length > 0 ? (
+      {(trip.byCategory?.length ?? 0) > 0 ? (
         <section className="mb-5">
           <h2 className="mb-2 text-sm font-semibold text-[var(--muted)]">
             {t("travelsByCategory")}
           </h2>
           <ul className="space-y-2">
-            {trip.byCategory.map((c) => (
+            {(trip.byCategory ?? []).map((c) => (
               <li
                 key={c.categoryId}
                 className="surface flex items-center justify-between rounded-[1.25rem] px-3.5 py-2.5"
@@ -482,13 +481,13 @@ export default function TravelDetailPage() {
         <h2 className="mb-2 text-sm font-semibold text-[var(--muted)]">
           {t("travelsLog")}
         </h2>
-        {trip.items.length === 0 ? (
+        {(trip.items?.length ?? 0) === 0 ? (
           <div className="surface rounded-[1.5rem] p-4 text-sm text-[var(--muted)]">
             {t("travelsLogEmpty")}
           </div>
         ) : (
           <ul className="space-y-2">
-            {trip.items.map((item) => (
+            {(trip.items ?? []).map((item) => (
               <li
                 key={item.id}
                 className="surface flex items-start justify-between gap-3 rounded-[1.25rem] px-3.5 py-2.5"

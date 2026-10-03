@@ -338,14 +338,14 @@ export class TravelsService {
     // Keep history dates sensible: planned end becomes today (or start if upcoming).
     const endsOn = today < start ? start : today;
 
-    const updated = await this.prisma.travel.update({
+    await this.prisma.travel.update({
       where: { id },
       data: {
         endedAt: new Date(),
         endsOn: dateOnlyUtc(endsOn),
       },
     });
-    return this.shape(updated, await this.spentTotal(id));
+    return this.get(householdId, id);
   }
 
   async remove(householdId: string, id: string) {

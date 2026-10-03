@@ -38,6 +38,7 @@ type CatRow = {
   emoji?: string;
   type: string;
   total: number;
+  kind?: "travel" | "category";
   children?: CatChild[];
 };
 type MemberRow = { name: string; type: string; total: number };
@@ -1422,9 +1423,21 @@ export default function AnalyticsPage() {
                                         const logHref = kid.categoryId
                                           ? `/analytics/category-log?${new URLSearchParams(
                                               {
-                                                cats: kid.categoryId,
+                                                cats:
+                                                  group.kind === "travel" &&
+                                                  group.categoryId
+                                                    ? group.categoryId
+                                                    : kid.categoryId,
                                                 from,
                                                 to,
+                                                ...(group.kind === "travel"
+                                                  ? { leaf: kid.categoryId }
+                                                  : {}),
+                                                ...(excludeCommitments
+                                                  ? {
+                                                      excludeCommitments: "1",
+                                                    }
+                                                  : {}),
                                               },
                                             ).toString()}`
                                           : null;

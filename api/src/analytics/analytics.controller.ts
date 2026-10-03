@@ -112,6 +112,7 @@ export class AnalyticsController {
     @Query('to') to?: string,
     @Query('categoryIds') categoryIds?: string,
     @Query('excludeCommitments') excludeCommitments?: string,
+    @Query('leaf') leaf?: string,
   ) {
     const fallback = await this.periodFallback(membership, user.id);
     const ids = (categoryIds ?? '')
@@ -126,6 +127,7 @@ export class AnalyticsController {
       {
         excludeCommitments:
           excludeCommitments === '1' || excludeCommitments === 'true',
+        leafCategoryId: leaf?.trim() || undefined,
       },
     );
   }

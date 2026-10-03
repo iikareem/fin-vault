@@ -409,21 +409,28 @@ export class AnalyticsService {
   ) {
     const householdId = membership.householdId;
     const excludeCommitments = Boolean(opts.excludeCommitments);
+    const baseWhere = {
+      householdId,
+      type: { not: 'REIMBURSEMENT' as const },
+      occurredOn: { gte: dateOnlyUtc(from), lte: dateOnlyUtc(to) },
+      category: nonSpendCategoryFilter,
+      ...(excludeCommitments ? { subscriptionPayment: { is: null } } : {}),
+    };
+
+    // Day-to-day: exclude travel-linked spend so it doesn't mix into Food/etc.
     const rows = await this.prisma.transaction.groupBy({
       by: ['categoryId', 'type'],
-      where: {
-        householdId,
-        type: { not: 'REIMBURSEMENT' },
-        occurredOn: { gte: dateOnlyUtc(from), lte: dateOnlyUtc(to) },
-        category: nonSpendCategoryFilter,
-        // Drop commitment (subscription) payments; keep the same category if
-        // there is still other spend left after that subtraction.
-        ...(excludeCommitments
-          ? { subscriptionPayment: { is: null } }
-          : {}),
-      },
+      where: { ...baseWhere, travelId: null },
       _sum: { amount: true },
     });
+
+    // Travel: one chart group per trip, children = categories spent on that trip.
+    const travelRows = await this.prisma.transaction.groupBy({
+      by: ['travelId', 'categoryId', 'type'],
+      where: { ...baseWhere, travelId: { not: null } },
+      _sum: { amount: true },
+    });
+
     const cats = await this.prisma.category.findMany({
       where: { householdId },
     });
@@ -446,6 +453,7 @@ export class AnalyticsService {
       type: string;
       total: number;
       childMap: Map<string, ChildAcc>;
+      kind?: 'travel' | 'category';
     };
     const totals = new Map<string, GroupAcc>();
 
@@ -473,6 +481,7 @@ export class AnalyticsService {
           type,
           total: 0,
           childMap: new Map(),
+          kind: 'category',
         } satisfies GroupAcc);
       cur.total += amount;
       const childId = leaf?.id ?? leafId;
@@ -494,6 +503,59 @@ export class AnalyticsService {
       const type = r.type === 'TRACK' ? 'EXPENSE' : r.type;
       addAmount(r.categoryId, type, Number(r._sum.amount ?? 0));
     }
+
+    if (travelRows.length > 0) {
+      const travelIds = [
+        ...new Set(
+          travelRows
+            .map((r) => r.travelId)
+            .filter((id): id is string => !!id),
+        ),
+      ];
+      const travels = await this.prisma.travel.findMany({
+        where: { householdId, id: { in: travelIds } },
+        select: { id: true, name: true, currency: true },
+      });
+      const travelName = new Map(travels.map((t) => [t.id, t.name]));
+
+      for (const r of travelRows) {
+        if (!r.travelId) continue;
+        const amount = Number(r._sum.amount ?? 0);
+        if (amount === 0) continue;
+        const type = r.type === 'TRACK' ? 'EXPENSE' : r.type;
+        const groupId = `travel:${r.travelId}`;
+        const key = `${groupId}:${type}`;
+        const name = travelName.get(r.travelId) ?? 'Travel';
+        const cur =
+          totals.get(key) ??
+          ({
+            categoryId: groupId,
+            name,
+            nameAr: name,
+            color: '#0284c7',
+            emoji: '✈',
+            type,
+            total: 0,
+            childMap: new Map(),
+            kind: 'travel',
+          } satisfies GroupAcc);
+        cur.total += amount;
+        const leaf = cats.find((c) => c.id === r.categoryId);
+        const child =
+          cur.childMap.get(r.categoryId) ??
+          ({
+            categoryId: r.categoryId,
+            name: leaf?.name ?? 'Unknown',
+            nameAr: leaf?.nameAr ?? '',
+            emoji: leaf?.emoji ?? '',
+            total: 0,
+          } satisfies ChildAcc);
+        child.total += amount;
+        cur.childMap.set(r.categoryId, child);
+        totals.set(key, cur);
+      }
+    }
+
     if (membership.kind === 'HOUSE') {
       const claims = await this.prisma.houseClaim.groupBy({
         by: ['categoryId'],
@@ -509,16 +571,19 @@ export class AnalyticsService {
     }
 
     return [...totals.values()]
-      .map(({ childMap, ...row }) => {
+      .map(({ childMap, kind, ...row }) => {
         const children = [...childMap.values()]
           .filter((c) => c.total > 0)
           .sort((a, b) => b.total - a.total);
-        // Only attach breakdown when the group has subcategories in the books,
-        // or spend landed on more than one leaf (including direct-on-parent).
+        // Travel groups always expose their spend categories as children.
+        // Category groups: only when the parent has subs or mixed leaves.
         const attach =
+          kind === 'travel' ||
           hasSubs.has(row.categoryId) ||
           children.some((c) => c.categoryId !== row.categoryId);
-        return attach ? { ...row, children } : { ...row };
+        return attach
+          ? { ...row, kind: kind ?? 'category', children }
+          : { ...row, kind: kind ?? 'category' };
       })
       .sort((a, b) => b.total - a.total);
   }
@@ -588,13 +653,14 @@ export class AnalyticsService {
   /**
    * Purchase-by-purchase log for selected category groups over a date range.
    * Expands each selected id to parent + children (matches byCategory rollup).
+   * Synthetic ids `travel:{travelId}` load that trip's spends instead.
    */
   async categoryLog(
     membership: MembershipContext,
     from: string,
     to: string,
     categoryIds: string[],
-    opts: { excludeCommitments?: boolean } = {},
+    opts: { excludeCommitments?: boolean; leafCategoryId?: string } = {},
   ) {
     const excludeCommitments = Boolean(opts.excludeCommitments);
     const ids = [...new Set(categoryIds.filter(Boolean))];
@@ -603,18 +669,40 @@ export class AnalyticsService {
     }
 
     const householdId = membership.householdId;
+    const travelIds = ids
+      .filter((id) => id.startsWith('travel:'))
+      .map((id) => id.slice('travel:'.length))
+      .filter(Boolean);
+    const plainIds = ids.filter((id) => !id.startsWith('travel:'));
+
     const cats = await this.prisma.category.findMany({
       where: { householdId },
     });
-    const selected = new Set(ids);
+    const selected = new Set(plainIds);
     const expanded = new Set<string>();
-    for (const id of ids) expanded.add(id);
+    for (const id of plainIds) expanded.add(id);
     for (const c of cats) {
       if (selected.has(c.id) || (c.parentId && selected.has(c.parentId))) {
         expanded.add(c.id);
       }
     }
     const expandedIds = [...expanded];
+
+    const travels =
+      travelIds.length > 0
+        ? await this.prisma.travel.findMany({
+            where: { householdId, id: { in: travelIds } },
+            select: { id: true, name: true },
+          })
+        : [];
+    const travelMeta = travels.map((t) => ({
+      id: `travel:${t.id}`,
+      name: t.name,
+      nameAr: t.name,
+      color: '#0284c7',
+      emoji: '✈',
+    }));
+
     const selectedCats = cats
       .filter((c) => selected.has(c.id))
       .map((c) => ({
@@ -624,22 +712,45 @@ export class AnalyticsService {
         color: c.color,
         emoji: c.emoji,
       }));
-    // Preserve request order for any ids still unknown (deleted)
-    const categories =
-      selectedCats.length > 0
-        ? ids
-            .map((id) => selectedCats.find((c) => c.id === id))
-            .filter((c): c is NonNullable<typeof c> => !!c)
-        : selectedCats;
+    // Preserve request order for ids (travel groups + real categories).
+    const categories = ids
+      .map((id) => {
+        if (id.startsWith('travel:')) {
+          return travelMeta.find((t) => t.id === id);
+        }
+        return selectedCats.find((c) => c.id === id);
+      })
+      .filter((c): c is NonNullable<typeof c> => !!c);
 
     const ITEM_CAP = 500;
+    const leafFilter = opts.leafCategoryId
+      ? { categoryId: opts.leafCategoryId }
+      : {};
+
+    const orBranches: Record<string, unknown>[] = [];
+    if (expandedIds.length > 0) {
+      orBranches.push({
+        travelId: null,
+        categoryId: { in: expandedIds },
+      });
+    }
+    if (travelIds.length > 0) {
+      orBranches.push({
+        travelId: { in: travelIds },
+        ...leafFilter,
+      });
+    }
+    if (orBranches.length === 0) {
+      throw new BadRequestException('Pick at least one category');
+    }
+
     const txs = await this.prisma.transaction.findMany({
       where: {
         householdId,
         type: { in: ['EXPENSE', 'TRACK'] },
         occurredOn: { gte: dateOnlyUtc(from), lte: dateOnlyUtc(to) },
-        categoryId: { in: expandedIds },
         category: nonSpendCategoryFilter,
+        OR: orBranches,
         ...(excludeCommitments
           ? { subscriptionPayment: { is: null } }
           : {}),
@@ -664,7 +775,7 @@ export class AnalyticsService {
     });
 
     const claims =
-      membership.kind === 'HOUSE'
+      membership.kind === 'HOUSE' && expandedIds.length > 0
         ? await this.prisma.houseClaim.findMany({
             where: {
               householdId,

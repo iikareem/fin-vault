@@ -92,6 +92,7 @@ function CategoryLogInner() {
   const hideAggregates = active?.kind === "HOUSE" && house?.role !== "ADMIN";
 
   const catsParam = search.get("cats") ?? "";
+  const leafParam = search.get("leaf")?.trim() || "";
   const excludeCommitments =
     search.get("excludeCommitments") === "1" ||
     search.get("excludeCommitments") === "true";
@@ -153,6 +154,7 @@ function CategoryLogInner() {
       categoryIds: catIds.join(","),
     });
     if (excludeCommitments) q.set("excludeCommitments", "1");
+    if (leafParam) q.set("leaf", leafParam);
     api<CategoryLog>(
       householdPath(active.householdId, `/analytics/category-log?${q}`),
     )
@@ -162,7 +164,14 @@ function CategoryLogInner() {
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [active?.householdId, from, to, catIds.join(","), excludeCommitments]);
+  }, [
+    active?.householdId,
+    from,
+    to,
+    catIds.join(","),
+    excludeCommitments,
+    leafParam,
+  ]);
 
   useEffect(() => {
     if (catIds.length === 0) return;
@@ -172,8 +181,9 @@ function CategoryLogInner() {
       to,
     });
     if (excludeCommitments) params.set("excludeCommitments", "1");
+    if (leafParam) params.set("leaf", leafParam);
     router.replace(`/analytics/category-log?${params}`, { scroll: false });
-  }, [from, to, catIds.join(","), excludeCommitments]);
+  }, [from, to, catIds.join(","), excludeCommitments, leafParam]);
 
   const categories = data?.categories ?? [];
   const visibleCats = categories.slice(0, 4);
