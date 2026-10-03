@@ -470,14 +470,29 @@ export default function HomePage() {
     }
   }
 
+  const personalAttention =
+    !isHouse && subs && subs.unpaidCount > 0
+      ? {
+          href: "/commitments",
+          title:
+            subs.unpaidCount === 1
+              ? t("subsHomeUnpaidOne")
+              : fill(t("subsHomeUnpaid"), { n: String(subs.unpaidCount) }),
+          amount: subs.dueAmount,
+        }
+      : null;
+
   return (
     <PageShell>
       <p className="text-lg font-semibold text-[var(--foreground)]">
-        👋 {displayName ? t("helloName", { name: displayName }) : t("hello")}
+        {isHouse ? "👋 " : ""}
+        {displayName ? t("helloName", { name: displayName }) : t("hello")}
       </p>
-      <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">
-        {isHouse ? t("homeHintHouse") : t("homeHintMine")}
-      </p>
+      {isHouse ? (
+        <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">
+          {t("homeHintHouse")}
+        </p>
+      ) : null}
       {flash ? <p className="flash mt-3">{flash}</p> : null}
       {error ? <p className="mt-2 text-red-700">{error}</p> : null}
 
@@ -510,7 +525,7 @@ export default function HomePage() {
       >
         <div className="flex items-start justify-between gap-3">
           <p className="text-base" style={{ color: "#fff" }}>
-            💵 {isHouse ? t("houseMoneyNow") : t("yourMoneyNow")}
+            {isHouse ? `💵 ${t("houseMoneyNow")}` : t("yourMoneyNow")}
           </p>
           {canToggleMoney ? (
             <span
@@ -571,7 +586,10 @@ export default function HomePage() {
                 className="rounded-2xl px-3 py-2"
                 style={{ background: "rgba(255,255,255,0.18)" }}
               >
-                <p className="text-sm opacity-90">💵 {t("currentWallet")}</p>
+                <p className="text-sm opacity-90">
+                  {isHouse ? "💵 " : ""}
+                  {t("currentWallet")}
+                </p>
                 <p className="text-xl font-semibold leading-tight">
                   {accounts.length ? (
                     <PrivateMoney
@@ -584,13 +602,18 @@ export default function HomePage() {
                     "…"
                   )}
                 </p>
-                <p className="mt-1 text-xs opacity-80">{t("currentHint")}</p>
+                {isHouse ? (
+                  <p className="mt-1 text-xs opacity-80">{t("currentHint")}</p>
+                ) : null}
               </div>
               <div
                 className="rounded-2xl px-3 py-2"
                 style={{ background: "rgba(255,255,255,0.18)" }}
               >
-                <p className="text-sm opacity-90">💰 {t("savingsWallet")}</p>
+                <p className="text-sm opacity-90">
+                  {isHouse ? "💰 " : ""}
+                  {t("savingsWallet")}
+                </p>
                 <p className="text-xl font-semibold leading-tight">
                   {accounts.length ? (
                     <PrivateMoney
@@ -603,7 +626,9 @@ export default function HomePage() {
                     "…"
                   )}
                 </p>
-                <p className="mt-1 text-xs opacity-80">{t("savingsHint")}</p>
+                {isHouse ? (
+                  <p className="mt-1 text-xs opacity-80">{t("savingsHint")}</p>
+                ) : null}
               </div>
             </div>
             <div className="mt-3 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
@@ -611,7 +636,10 @@ export default function HomePage() {
                 className="rounded-2xl px-3 py-2"
                 style={{ background: "rgba(255,255,255,0.18)" }}
               >
-                <p className="text-sm opacity-90">📈 {t("monthIn")}</p>
+                <p className="text-sm opacity-90">
+                  {isHouse ? "📈 " : ""}
+                  {t("monthIn")}
+                </p>
                 <p className="text-lg font-semibold leading-tight">
                   {summary ? (
                     <PrivateMoney
@@ -624,13 +652,18 @@ export default function HomePage() {
                     "…"
                   )}
                 </p>
-                <p className="mt-1 text-xs opacity-80">{t("monthInHint")}</p>
+                {isHouse ? (
+                  <p className="mt-1 text-xs opacity-80">{t("monthInHint")}</p>
+                ) : null}
               </div>
               <div
                 className="rounded-2xl px-3 py-2"
                 style={{ background: "rgba(255,255,255,0.18)" }}
               >
-                <p className="text-sm opacity-90">📉 {t("monthOut")}</p>
+                <p className="text-sm opacity-90">
+                  {isHouse ? "📉 " : ""}
+                  {t("monthOut")}
+                </p>
                 <p className="text-lg font-semibold leading-tight">
                   {summary ? (
                     <PrivateMoney
@@ -643,19 +676,20 @@ export default function HomePage() {
                     "…"
                   )}
                 </p>
-                <p className="mt-1 text-xs opacity-80">{t("monthOutHint")}</p>
+                {isHouse ? (
+                  <p className="mt-1 text-xs opacity-80">{t("monthOutHint")}</p>
+                ) : null}
               </div>
             </div>
             {canToggleMoney ? (
-              <p className="mt-3 flex items-center gap-2 text-sm opacity-90">
-                <span aria-hidden>{moneyVisible ? "👁" : "🙈"}</span>
+              <p className="mt-3 text-sm opacity-90">
                 {moneyVisible ? t("tapToHideMoney") : t("tapToShowMoney")}
               </p>
             ) : null}
           </>
         )}
         <p className="mt-3 text-sm opacity-90">
-          📅{" "}
+          {isHouse ? "📅 " : ""}
           {cal.remainingDays === 0
             ? t("lastDayOfMonth")
             : cal.remainingDays === 1
@@ -665,6 +699,83 @@ export default function HomePage() {
           {fill(t("monthLength"), { n: String(cal.daysInMonth) })}
         </p>
       </section>
+
+      {!isHouse ? (
+        <div className="mt-4 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <Link
+              href="/add?type=expense"
+              className="flex min-h-[5.5rem] flex-col justify-between rounded-[1.5rem] px-3.5 py-3 shadow-md transition hover:opacity-95 active:scale-[0.99]"
+              style={{ background: "var(--cta-bg)", color: "var(--cta-fg)" }}
+            >
+              <span className="text-base font-semibold leading-snug">
+                {t("homeSpend")}
+              </span>
+              <span className="text-xs font-medium leading-snug opacity-70">
+                {t("homeSpendHint")}
+              </span>
+            </Link>
+            <Link
+              href="/add?type=income"
+              className="flex min-h-[5.5rem] flex-col justify-between rounded-[1.5rem] px-3.5 py-3 shadow-md transition hover:opacity-95 active:scale-[0.99]"
+              style={{
+                background: "var(--accent-a)",
+                color: "var(--accent-a-fg)",
+              }}
+            >
+              <span className="text-base font-semibold leading-snug">
+                {t("homeSalary")}
+              </span>
+              <span className="text-xs font-medium leading-snug opacity-70">
+                {t("homeSalaryHint")}
+              </span>
+            </Link>
+          </div>
+          <Link
+            href={personalTransferHref}
+            className="flex min-h-14 items-center justify-between gap-3 rounded-[1.5rem] px-4 py-3 shadow-md transition hover:opacity-95 active:scale-[0.99]"
+            style={{
+              background: "var(--accent-b)",
+              color: "var(--accent-b-fg)",
+            }}
+          >
+            <span className="min-w-0 text-start">
+              <span className="block text-base font-semibold leading-snug">
+                {personalTransferTitle}
+              </span>
+              <span className="mt-0.5 block text-xs font-medium leading-snug opacity-70">
+                {personalTransferHint}
+              </span>
+            </span>
+            <span className="shrink-0 text-lg opacity-80" aria-hidden>
+              →
+            </span>
+          </Link>
+          {personalAttention ? (
+            <Link
+              href={personalAttention.href}
+              className="surface flex items-center justify-between gap-3 rounded-[1.5rem] px-4 py-3 transition hover:bg-[var(--panel-soft)]"
+            >
+              <span className="min-w-0">
+                <span className="block text-sm font-semibold">
+                  {t("attentionTitle")}
+                </span>
+                <span className="mt-0.5 block text-sm text-[var(--muted)]">
+                  {personalAttention.title}
+                </span>
+              </span>
+              <span className="shrink-0 text-sm font-bold tabular-nums">
+                <PrivateMoney
+                  amount={personalAttention.amount}
+                  currency={currency}
+                  locale={locale}
+                  visible={moneyVisible}
+                />
+              </span>
+            </Link>
+          ) : null}
+        </div>
+      ) : null}
 
       {summary &&
       !personalOnly &&
@@ -1461,13 +1572,13 @@ export default function HomePage() {
           </span>
         </Link>
       ) : (
-        <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="mt-5 grid grid-cols-2 gap-3">
           <Link
             href="/goals"
             className="surface flex min-h-[7.5rem] flex-col rounded-[1.5rem] p-3.5 transition hover:bg-[var(--panel-soft)]"
           >
-            <span className="text-sm font-semibold text-stone-700">
-              🎯 {t("navGoals")}
+            <span className="text-sm font-semibold text-[var(--foreground)]">
+              {t("navGoals")}
             </span>
             <span className="mt-2 text-lg font-bold leading-tight tabular-nums">
               {goals ? (
@@ -1481,7 +1592,7 @@ export default function HomePage() {
                 "…"
               )}
             </span>
-            <span className="mt-auto pt-2 text-xs leading-snug text-stone-500">
+            <span className="mt-auto pt-2 text-xs leading-snug text-[var(--muted)]">
               {goals && goals.goals.length > 0
                 ? goals.goals.length === 1
                   ? t("goalsCountOne")
@@ -1493,8 +1604,8 @@ export default function HomePage() {
             href="/commitments"
             className="surface flex min-h-[7.5rem] flex-col rounded-[1.5rem] p-3.5 transition hover:bg-[var(--panel-soft)]"
           >
-            <span className="text-sm font-semibold text-stone-700">
-              📌 {t("navSubs")}
+            <span className="text-sm font-semibold text-[var(--foreground)]">
+              {t("navSubs")}
             </span>
             <span className="mt-2 text-lg font-bold leading-tight tabular-nums">
               {subs ? (
@@ -1510,7 +1621,7 @@ export default function HomePage() {
                 "…"
               )}
             </span>
-            <span className="mt-auto pt-2 text-xs leading-snug text-stone-500">
+            <span className="mt-auto pt-2 text-xs leading-snug text-[var(--muted)]">
               {subs && subs.subscriptions.length > 0
                 ? subs.unpaidCount === 0
                   ? t("subsHomeAllPaid")
@@ -1526,8 +1637,8 @@ export default function HomePage() {
             href="/gold"
             className="surface flex min-h-[7.5rem] flex-col rounded-[1.5rem] p-3.5 transition hover:bg-[var(--panel-soft)]"
           >
-            <span className="text-sm font-semibold text-stone-700">
-              🥇 {t("navGold")}
+            <span className="text-sm font-semibold text-[var(--foreground)]">
+              {t("navGold")}
             </span>
             <span className="mt-2 text-lg font-bold leading-tight tabular-nums">
               {gold ? (
@@ -1547,7 +1658,7 @@ export default function HomePage() {
                   ? gold.totalGainLoss >= 0
                     ? "text-emerald-800"
                     : "text-red-800"
-                  : "text-stone-500"
+                  : "text-[var(--muted)]"
               }`}
             >
               {gold?.totalGainLoss != null ? (
@@ -1576,8 +1687,8 @@ export default function HomePage() {
             href="/outside-loans"
             className="surface flex min-h-[7.5rem] flex-col rounded-[1.5rem] p-3.5 transition hover:bg-[var(--panel-soft)]"
           >
-            <span className="text-sm font-semibold text-stone-700">
-              🤝 {t("navOutsideLoans")}
+            <span className="text-sm font-semibold text-[var(--foreground)]">
+              {t("navOutsideLoans")}
             </span>
             <span className="mt-2 text-lg font-bold leading-tight tabular-nums">
               {outside ? (
@@ -1591,7 +1702,7 @@ export default function HomePage() {
                 "…"
               )}
             </span>
-            <span className="mt-auto pt-2 text-xs leading-snug text-stone-500">
+            <span className="mt-auto pt-2 text-xs leading-snug text-[var(--muted)]">
               {outside && outside.open.length > 0
                 ? t("outsideOwedToYou")
                 : t("outsideLoansHomeHint")}
@@ -1634,64 +1745,14 @@ export default function HomePage() {
           </Link>
           <Hint>{t("addFromMyMoneyHomeHint")}</Hint>
         </>
-      ) : (
-        <div className="mt-5 space-y-2">
-          <div className="grid grid-cols-2 gap-2">
-            <Link
-              href="/add?type=expense"
-              className="flex min-h-[5.5rem] flex-col justify-between rounded-[1.5rem] px-3.5 py-3 shadow-md transition hover:opacity-95"
-              style={{ background: "var(--cta-bg)", color: "var(--cta-fg)" }}
-            >
-              <span className="text-base font-semibold leading-snug">
-                🧾 {t("homeSpend")}
-              </span>
-              <span className="text-xs font-medium leading-snug opacity-70">
-                {t("homeSpendHint")}
-              </span>
-            </Link>
-            <Link
-              href="/add?type=income"
-              className="flex min-h-[5.5rem] flex-col justify-between rounded-[1.5rem] px-3.5 py-3 shadow-md transition hover:opacity-95"
-              style={{
-                background: "var(--accent-a)",
-                color: "var(--accent-a-fg)",
-              }}
-            >
-              <span className="text-base font-semibold leading-snug">
-                📈 {t("homeSalary")}
-              </span>
-              <span className="text-xs font-medium leading-snug opacity-70">
-                {t("homeSalaryHint")}
-              </span>
-            </Link>
-          </div>
-          <Link
-            href={personalTransferHref}
-            className="flex min-h-14 items-center justify-between gap-3 rounded-[1.5rem] px-4 py-3 shadow-md transition hover:opacity-95"
-            style={{
-              background: "var(--accent-b)",
-              color: "var(--accent-b-fg)",
-            }}
-          >
-            <span className="min-w-0 text-start">
-              <span className="block text-base font-semibold leading-snug">
-                🔁 {personalTransferTitle}
-              </span>
-              <span className="mt-0.5 block text-xs font-medium leading-snug opacity-70">
-                {personalTransferHint}
-              </span>
-            </span>
-            <span className="shrink-0 text-lg opacity-80" aria-hidden>
-              →
-            </span>
-          </Link>
-        </div>
-      )}
+      ) : null}
 
       {txs.length > 0 ? (
         <>
-          <h2 className="mt-8 text-xl font-semibold">🕒 {t("latest")}</h2>
-          <Hint>{t("latestHint")}</Hint>
+          <h2 className="mt-8 text-xl font-semibold">
+            {isHouse ? `🕒 ${t("latest")}` : t("latest")}
+          </h2>
+          {isHouse ? <Hint>{t("latestHint")}</Hint> : null}
           <ul className="mt-3 space-y-2">
             {txs.map((tx) => (
               <li key={tx.id} className="list-row text-[var(--foreground)]">
