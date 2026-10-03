@@ -26,15 +26,14 @@ export class TravelsService {
 
   private status(
     startsOn: Date,
-    endsOn: Date,
+    _endsOn: Date,
     endedAt: Date | null,
     today = this.todayIso(),
   ): TravelStatus {
+    // Only a manual end closes a trip. Dates are for tracking, not auto-close.
     if (endedAt) return 'past';
     const start = isoFromDbDate(startsOn);
-    const end = isoFromDbDate(endsOn);
     if (today < start) return 'upcoming';
-    if (today > end) return 'past';
     return 'active';
   }
 
@@ -103,28 +102,17 @@ export class TravelsService {
     }
   }
 
-  private async assertNoOverlap(
-    householdId: string,
-    startsOn: string,
-    endsOn: string,
-    excludeId?: string,
-  ) {
-    const start = dateOnlyUtc(startsOn);
-    const end = dateOnlyUtc(endsOn);
+  private async assertOneOpen(householdId: string, excludeId?: string) {
     const clash = await this.prisma.travel.findFirst({
       where: {
         householdId,
         endedAt: null,
         ...(excludeId ? { id: { not: excludeId } } : {}),
-        startsOn: { lte: end },
-        endsOn: { gte: start },
       },
       select: { id: true, name: true },
     });
     if (clash) {
-      throw new BadRequestException(
-        'Only one travel at a time — dates overlap another trip',
-      );
+      throw new BadRequestException('Only one open travel at a time');
     }
   }
 
@@ -161,8 +149,12 @@ export class TravelsService {
     const active = shaped.find((t) => t.status === 'active') ?? null;
     const upcoming = shaped.filter((t) => t.status === 'upcoming');
     const past = shaped.filter((t) => t.status === 'past');
+    const open =
+      shaped.find((t) => t.status === 'active' || t.status === 'upcoming') ??
+      null;
     return {
       active,
+      open,
       upcoming,
       past,
       travels: shaped,
@@ -263,7 +255,7 @@ export class TravelsService {
 
   async create(householdId: string, dto: CreateTravelDto) {
     this.assertDateOrder(dto.startsOn, dto.endsOn);
-    await this.assertNoOverlap(householdId, dto.startsOn, dto.endsOn);
+    await this.assertOneOpen(householdId);
 
     const created = await this.prisma.travel.create({
       data: {
@@ -291,7 +283,6 @@ export class TravelsService {
     const startsOn = dto.startsOn ?? isoFromDbDate(existing.startsOn);
     const endsOn = dto.endsOn ?? isoFromDbDate(existing.endsOn);
     this.assertDateOrder(startsOn, endsOn);
-    await this.assertNoOverlap(householdId, startsOn, endsOn, id);
 
     const updated = await this.prisma.travel.update({
       where: { id },
@@ -313,7 +304,7 @@ export class TravelsService {
           : {}),
       },
     });
-    return this.shape(updated, await this.spentTotal(id));
+    return this.get(householdId, id);
   }
 
   async end(householdId: string, id: string) {
@@ -324,26 +315,10 @@ export class TravelsService {
     if (existing.endedAt) {
       throw new BadRequestException('Trip is already ended');
     }
-    const status = this.status(
-      existing.startsOn,
-      existing.endsOn,
-      existing.endedAt,
-    );
-    if (status === 'past') {
-      throw new BadRequestException('Trip is already ended');
-    }
-
-    const today = this.todayIso();
-    const start = isoFromDbDate(existing.startsOn);
-    // Keep history dates sensible: planned end becomes today (or start if upcoming).
-    const endsOn = today < start ? start : today;
 
     await this.prisma.travel.update({
       where: { id },
-      data: {
-        endedAt: new Date(),
-        endsOn: dateOnlyUtc(endsOn),
-      },
+      data: { endedAt: new Date() },
     });
     return this.get(householdId, id);
   }
@@ -373,13 +348,11 @@ export class TravelsService {
       where: { id: travelId, householdId },
     });
     if (!travel) throw new NotFoundException();
+    if (travel.endedAt) {
+      throw new BadRequestException('Trip is already ended');
+    }
 
     const day = dto.occurredOn;
-    const start = isoFromDbDate(travel.startsOn);
-    const end = isoFromDbDate(travel.endsOn);
-    if (day < start || day > end) {
-      throw new BadRequestException('Spend date must fall inside the trip dates');
-    }
 
     const category = await this.prisma.category.findFirst({
       where: {

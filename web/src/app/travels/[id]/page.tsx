@@ -15,6 +15,8 @@ import { DateField } from "@/components/DateField";
 import { CategoryPicker } from "@/components/CategoryPicker";
 import { categoryLabel, fill } from "@/lib/i18n";
 import { ItemDate } from "@/components/ItemDate";
+import { CURRENCY_OPTIONS } from "@/lib/currencies";
+import { formatItemDate } from "@/lib/calendar";
 
 type Cat = {
   id: string;
@@ -80,12 +82,6 @@ function LimitBar({ pct, over }: { pct: number | null; over: boolean }) {
   );
 }
 
-function clampDate(iso: string, from: string, to: string) {
-  if (iso < from) return from;
-  if (iso > to) return to;
-  return iso;
-}
-
 export default function TravelDetailPage() {
   const { t, locale } = useI18n();
   const { personal, setKind } = useBooks();
@@ -102,8 +98,15 @@ export default function TravelDetailPage() {
   const [occurredOn, setOccurredOn] = useState(todayISO());
   const [note, setNote] = useState("");
   const [showSpend, setShowSpend] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editCurrency, setEditCurrency] = useState("EGP");
+  const [editStartsOn, setEditStartsOn] = useState(todayISO());
+  const [editEndsOn, setEditEndsOn] = useState(todayISO());
+  const [editLimit, setEditLimit] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [editBusy, setEditBusy] = useState(false);
   const [ending, setEnding] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -117,6 +120,18 @@ export default function TravelDetailPage() {
     [cats],
   );
 
+  const isOpen = trip?.status === "active" || trip?.status === "upcoming";
+
+  function syncEditForm(detail: TravelDetail) {
+    setEditName(detail.name);
+    setEditCurrency(detail.currency);
+    setEditStartsOn(detail.startsOn);
+    setEditEndsOn(detail.endsOn);
+    setEditLimit(
+      detail.softLimit != null ? String(detail.softLimit) : "",
+    );
+  }
+
   function load(householdId: string, id: string) {
     return Promise.all([
       api<TravelDetail>(householdPath(householdId, `/travels/${id}`)),
@@ -124,9 +139,13 @@ export default function TravelDetailPage() {
     ]).then(([detail, list]) => {
       setTrip(detail);
       setCats(list);
-      const today = clampDate(todayISO(), detail.startsOn, detail.endsOn);
-      setOccurredOn(today);
-      if (detail.status === "active") setShowSpend(true);
+      syncEditForm(detail);
+      setOccurredOn(todayISO());
+      if (detail.status === "active" || detail.status === "upcoming") {
+        setShowSpend(true);
+      } else {
+        setShowSpend(false);
+      }
       const travelParent = list.find(
         (c) =>
           c.kind === "EXPENSE" &&
@@ -185,11 +204,56 @@ export default function TravelDetailPage() {
     }
   }
 
+  async function onSaveEdit(e: FormEvent) {
+    e.preventDefault();
+    if (!hid || !trip || editBusy) return;
+    const trimmed = editName.trim();
+    if (!trimmed) {
+      setError(t("travelsNameHint"));
+      return;
+    }
+    if (editStartsOn > editEndsOn) {
+      setError(t("travelsDateOrder"));
+      return;
+    }
+    const limitRaw = editLimit.trim();
+    const limitAmt = limitRaw ? parseAmount(limitRaw) : null;
+    if (limitRaw && (!Number.isFinite(limitAmt) || (limitAmt ?? 0) <= 0)) {
+      setError(t("travelsLimitHint"));
+      return;
+    }
+    setEditBusy(true);
+    setError("");
+    try {
+      const updated = await api<TravelDetail>(
+        householdPath(hid, `/travels/${trip.id}`),
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            name: trimmed,
+            currency: editCurrency,
+            startsOn: editStartsOn,
+            endsOn: editEndsOn,
+            softLimit: limitAmt,
+          }),
+        },
+      );
+      setTrip(updated);
+      syncEditForm(updated);
+      setShowEdit(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("travelsSaveFailed"));
+    } finally {
+      setEditBusy(false);
+    }
+  }
+
   async function onEnd() {
     if (!hid || !trip || ending) return;
     if (!confirmEnd) {
       setConfirmEnd(true);
       setConfirmDelete(false);
+      setShowEdit(false);
       return;
     }
     setEnding(true);
@@ -262,6 +326,12 @@ export default function TravelDetailPage() {
         ? t("travelsUpcoming")
         : t("travelsPast");
 
+  const rangeLabel = (() => {
+    const from = formatItemDate(trip.startsOn, locale) || trip.startsOn;
+    const to = formatItemDate(trip.endsOn, locale) || trip.endsOn;
+    return trip.startsOn === trip.endsOn ? from : `${from} → ${to}`;
+  })();
+
   return (
     <PageShell>
       <header className="mb-4">
@@ -272,26 +342,115 @@ export default function TravelDetailPage() {
           ← {t("navTravels")}
         </Link>
         <div className="mt-2 flex items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <p className="text-xs font-bold uppercase tracking-wide text-sky-800">
               {statusLabel}
             </p>
             <h1 className="text-2xl font-bold">{trip.name}</h1>
             <p className="mt-0.5 text-sm text-[var(--muted)]">
-              {trip.startsOn} → {trip.endsOn} · {trip.currency}
+              {rangeLabel} · {trip.currency}
             </p>
           </div>
-          {trip.status === "active" ? (
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            {isOpen ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSpend((v) => !v);
+                  setShowEdit(false);
+                  setConfirmEnd(false);
+                }}
+                className="rounded-2xl bg-sky-800 px-3 py-2 text-sm font-semibold text-white"
+              >
+                {showSpend ? t("travelsCancel") : `＋ ${t("travelsAddSpend")}`}
+              </button>
+            ) : null}
             <button
               type="button"
-              onClick={() => setShowSpend((v) => !v)}
-              className="shrink-0 rounded-2xl bg-sky-800 px-3 py-2 text-sm font-semibold text-white"
+              onClick={() => {
+                syncEditForm(trip);
+                setShowEdit((v) => !v);
+                setShowSpend(false);
+                setConfirmEnd(false);
+                setConfirmDelete(false);
+                setError("");
+              }}
+              className="rounded-2xl px-3 py-2 text-sm font-semibold text-sky-900 ring-1 ring-sky-200"
             >
-              {showSpend ? t("travelsCancel") : `＋ ${t("travelsAddSpend")}`}
+              {showEdit ? t("travelsCancel") : t("travelsEdit")}
             </button>
-          ) : null}
+          </div>
         </div>
       </header>
+
+      {showEdit ? (
+        <form
+          onSubmit={onSaveEdit}
+          className="surface mb-4 space-y-3 rounded-[1.75rem] p-4"
+        >
+          <h2 className="text-lg font-bold">{t("travelsEditTitle")}</h2>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
+              {t("travelsName")}
+            </span>
+            <input
+              className="field text-base"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              required
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
+              {t("travelsCurrency")}
+            </span>
+            <select
+              className="field text-base"
+              value={editCurrency}
+              onChange={(e) => setEditCurrency(e.target.value)}
+            >
+              {CURRENCY_OPTIONS.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.code} — {locale === "ar" ? c.labelAr : c.labelEn}
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
+                {t("travelsFrom")}
+              </span>
+              <DateField value={editStartsOn} onChange={setEditStartsOn} />
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
+                {t("travelsTo")}
+              </span>
+              <DateField value={editEndsOn} onChange={setEditEndsOn} />
+            </label>
+          </div>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
+              {t("travelsLimit")}
+            </span>
+            <input
+              inputMode="decimal"
+              dir="ltr"
+              className="amount-input field text-2xl font-bold"
+              value={editLimit}
+              onChange={(e) => setEditLimit(e.target.value)}
+              placeholder={t("travelsLimitPlaceholder")}
+            />
+          </label>
+          <button
+            disabled={editBusy}
+            className="w-full rounded-3xl bg-sky-800 px-4 py-3.5 text-base font-semibold text-white disabled:opacity-60"
+          >
+            {editBusy ? t("saving") : `✅ ${t("travelsEditSave")}`}
+          </button>
+        </form>
+      ) : null}
 
       <section className="surface mb-4 rounded-[1.75rem] p-4">
         <p className="text-xs font-medium text-[var(--muted)]">
@@ -357,7 +516,7 @@ export default function TravelDetailPage() {
         </div>
       </section>
 
-      {showSpend && trip.status !== "past" ? (
+      {showSpend && isOpen ? (
         <form
           onSubmit={onSpend}
           className="surface mb-5 space-y-3 rounded-[1.75rem] p-4"
@@ -418,12 +577,7 @@ export default function TravelDetailPage() {
             onChange={setCategoryId}
           />
           <div className="surface rounded-[1.5rem] p-3.5 !shadow-none ring-1 ring-[var(--input-border)]">
-            <DateField
-              value={occurredOn}
-              onChange={(v) =>
-                setOccurredOn(clampDate(v, trip.startsOn, trip.endsOn))
-              }
-            />
+            <DateField value={occurredOn} onChange={setOccurredOn} />
           </div>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
@@ -517,7 +671,7 @@ export default function TravelDetailPage() {
         )}
       </section>
 
-      {trip.status === "active" || trip.status === "upcoming" ? (
+      {isOpen ? (
         <div className="mb-3 space-y-2">
           {confirmEnd ? (
             <div className="surface space-y-3 rounded-[1.5rem] p-4 ring-1 ring-amber-300/70">

@@ -31,6 +31,7 @@ type TravelCard = {
 
 type TravelsData = {
   active: TravelCard | null;
+  open: TravelCard | null;
   upcoming: TravelCard[];
   past: TravelCard[];
   travels: TravelCard[];
@@ -98,10 +99,11 @@ export default function TravelsPage() {
   useEffect(() => {
     if (!data) return;
     // Only auto-open create when there are no trips at all.
-    if (!data.active && data.travels.length === 0) setShowCreate(true);
+    if (!data.open && data.travels.length === 0) setShowCreate(true);
   }, [data]);
 
-  const canAdd = !data?.active;
+  const openTrip = data?.open ?? data?.active ?? null;
+  const canAdd = !openTrip;
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
@@ -190,42 +192,44 @@ export default function TravelsPage() {
         <p className="mb-3 text-sm text-red-700">{error}</p>
       ) : null}
 
-      {data?.active ? (
+      {openTrip ? (
         <Link
-          href={`/travels/${data.active.id}`}
+          href={`/travels/${openTrip.id}`}
           className="mb-4 block overflow-hidden rounded-[1.75rem] bg-[var(--soft-sky)] p-4 shadow-sm ring-1 ring-sky-200/60"
         >
           <div className="flex items-center justify-between gap-2">
             <span className="rounded-full bg-sky-800 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
-              {t("travelsActive")}
+              {openTrip.status === "upcoming"
+                ? t("travelsUpcoming")
+                : t("travelsActive")}
             </span>
             <span className="text-xs font-medium text-sky-900/70">
-              {tripRangeLabel(data.active, locale)}
+              {tripRangeLabel(openTrip, locale)}
             </span>
           </div>
           <h2 className="mt-2 text-xl font-bold text-[var(--foreground)]">
-            ✈ {data.active.name}
+            ✈ {openTrip.name}
           </h2>
           <p className="mt-1 text-2xl font-bold tabular-nums">
             <Money
-              amount={data.active.spent}
-              currency={data.active.currency}
+              amount={openTrip.spent}
+              currency={openTrip.currency}
               locale={locale}
             />
-            {data.active.softLimit != null ? (
+            {openTrip.softLimit != null ? (
               <span className="text-base font-semibold text-[var(--muted)]">
                 {" "}
                 /{" "}
                 <Money
-                  amount={data.active.softLimit}
-                  currency={data.active.currency}
+                  amount={openTrip.softLimit}
+                  currency={openTrip.currency}
                   locale={locale}
                 />
               </span>
             ) : null}
           </p>
           <div className="mt-3">
-            <LimitBar pct={data.active.pct} over={data.active.overLimit} />
+            <LimitBar pct={openTrip.pct} over={openTrip.overLimit} />
           </div>
           <p className="mt-2 text-sm font-semibold text-sky-900">
             {t("travelsOpenTrip")} →
@@ -306,13 +310,16 @@ export default function TravelsPage() {
         </form>
       ) : null}
 
-      {data && data.upcoming.length > 0 ? (
+      {data &&
+      data.upcoming.filter((t) => t.id !== openTrip?.id).length > 0 ? (
         <section className="mb-5">
           <h2 className="mb-2 text-sm font-semibold text-[var(--muted)]">
             {t("travelsUpcoming")}
           </h2>
           <ul className="space-y-2">
-            {data.upcoming.map((trip) => (
+            {data.upcoming
+              .filter((t) => t.id !== openTrip?.id)
+              .map((trip) => (
               <li key={trip.id}>
                 <Link
                   href={`/travels/${trip.id}`}
@@ -406,7 +413,7 @@ export default function TravelsPage() {
         </section>
       ) : null}
 
-      {data && !data.active && data.travels.length === 0 && !showCreate ? (
+      {data && !openTrip && data.travels.length === 0 && !showCreate ? (
         <div className="surface rounded-[1.75rem] p-6 text-center">
           <p className="text-4xl" aria-hidden>
             ✈
@@ -425,11 +432,7 @@ export default function TravelsPage() {
         </div>
       ) : null}
 
-      {data &&
-      !data.active &&
-      data.past.length > 0 &&
-      !showCreate &&
-      canAdd ? (
+      {data && data.past.length > 0 && !showCreate && canAdd ? (
         <button
           type="button"
           onClick={openCreate}
@@ -439,9 +442,7 @@ export default function TravelsPage() {
         </button>
       ) : null}
 
-      {data?.active ? (
-        <Hint>{t("travelsOneActiveHint")}</Hint>
-      ) : null}
+      {openTrip ? <Hint>{t("travelsOneActiveHint")}</Hint> : null}
 
       <BottomNav />
     </PageShell>
