@@ -1662,57 +1662,189 @@ export default function HomePage() {
         </Link>
       ) : (
         <div className="mt-5 space-y-3">
-          {travels?.active ? (
-            <Link
-              href={`/travels/${travels.active.id}`}
-              className="relative flex flex-col overflow-hidden rounded-[1.5rem] bg-[var(--soft-sky)] p-3.5 shadow-sm ring-1 ring-sky-200/50 transition hover:opacity-95 active:scale-[0.99]"
-            >
-              <span
-                className="absolute inset-x-0 top-0 h-1 bg-sky-600"
-                aria-hidden
-              />
-              <span className="flex items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-2">
+          <div className="grid grid-cols-2 gap-3">
+            {(
+              [
+                {
+                  href: "/goals",
+                  emoji: "🎯",
+                  soft: "var(--soft-emerald)",
+                  accent: "var(--accent-a)",
+                  title: t("navGoals"),
+                  amount: goals?.allocated,
+                  hint:
+                    goals && goals.goals.length > 0
+                      ? goals.goals.length === 1
+                        ? t("goalsCountOne")
+                        : fill(t("goalsCount"), {
+                            n: String(goals.goals.length),
+                          })
+                      : t("goalsHomeHint"),
+                  hintClass: "text-[var(--muted)]",
+                },
+                {
+                  href: "/commitments",
+                  emoji: "📌",
+                  soft: "var(--soft-indigo)",
+                  accent: "var(--accent-b)",
+                  title: t("navSubs"),
+                  amount: subs
+                    ? subs.unpaidCount > 0
+                      ? subs.dueAmount
+                      : subs.monthlyTotal
+                    : undefined,
+                  hint:
+                    subs && subs.subscriptions.length > 0
+                      ? subs.unpaidCount === 0
+                        ? t("subsHomeAllPaid")
+                        : subs.unpaidCount === 1
+                          ? t("subsHomeUnpaidOne")
+                          : fill(t("subsHomeUnpaid"), {
+                              n: String(subs.unpaidCount),
+                            })
+                      : t("subsHomeHint"),
+                  hintClass:
+                    subs && subs.unpaidCount > 0
+                      ? "font-semibold text-amber-800"
+                      : "text-[var(--muted)]",
+                },
+                {
+                  href: "/gold",
+                  emoji: "🥇",
+                  soft: "var(--soft-amber)",
+                  accent: "#d97706",
+                  title: t("navGold"),
+                  amount: gold?.totalValue,
+                  hint:
+                    gold?.totalGainLoss != null ? null : t("goldHomeHint"),
+                  hintNode:
+                    gold?.totalGainLoss != null ? (
+                      <>
+                        <PrivateMoney
+                          amount={gold.totalGainLoss}
+                          currency={currency}
+                          locale={locale}
+                          visible={moneyVisible}
+                          extraSign={gold.totalGainLoss >= 0 ? "+" : "−"}
+                        />
+                        {moneyVisible && gold.totalGainLossPct != null ? (
+                          <span>
+                            {" "}
+                            ({gold.totalGainLossPct >= 0 ? "+" : ""}
+                            {gold.totalGainLossPct}%)
+                          </span>
+                        ) : null}
+                      </>
+                    ) : null,
+                  hintClass:
+                    gold?.totalGainLoss != null && moneyVisible
+                      ? gold.totalGainLoss >= 0
+                        ? "font-semibold text-emerald-800"
+                        : "font-semibold text-red-800"
+                      : "text-[var(--muted)]",
+                },
+                {
+                  href: "/outside-loans",
+                  emoji: "🤝",
+                  soft: "var(--soft-sky)",
+                  accent: "#0284c7",
+                  title: t("navOutsideLoans"),
+                  amount: outside?.owedToYou,
+                  hint:
+                    outside && outside.open.length > 0
+                      ? t("outsideOwedToYou")
+                      : t("outsideLoansHomeHint"),
+                  hintClass: "text-[var(--muted)]",
+                },
+              ] as const
+            ).map((tile) => (
+              <Link
+                key={tile.href}
+                href={tile.href}
+                className="relative flex min-h-[7.5rem] flex-col overflow-hidden rounded-[1.5rem] p-3.5 shadow-sm transition hover:opacity-95 active:scale-[0.99]"
+                style={{ background: tile.soft }}
+              >
+                <span
+                  className="absolute inset-x-0 top-0 h-1"
+                  style={{ background: tile.accent }}
+                  aria-hidden
+                />
+                <span className="flex items-center gap-2">
                   <span
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-base"
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-base"
                     style={{
                       background:
                         "color-mix(in srgb, var(--surface-bg) 72%, transparent)",
                     }}
                     aria-hidden
                   >
-                    ✈
+                    {tile.emoji}
                   </span>
-                  <span className="text-sm font-semibold text-[var(--foreground)]">
-                    {travels.active.name}
+                  <span className="min-w-0 text-sm font-semibold leading-snug text-[var(--foreground)]">
+                    {tile.title}
                   </span>
                 </span>
-                <span className="rounded-full bg-sky-800 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-                  {t("travelsActive")}
-                </span>
-              </span>
-              <span className="mt-2 text-lg font-bold tabular-nums text-[var(--foreground)]">
-                <PrivateMoney
-                  amount={travels.active.spent}
-                  currency={travels.active.currency}
-                  locale={locale}
-                  visible={moneyVisible}
-                />
-                {travels.active.softLimit != null ? (
-                  <span className="text-sm font-semibold text-[var(--muted)]">
-                    {" "}
-                    /{" "}
+                <span className="mt-2 text-lg font-bold leading-tight tabular-nums text-[var(--foreground)]">
+                  {tile.amount != null ? (
                     <PrivateMoney
-                      amount={travels.active.softLimit}
-                      currency={travels.active.currency}
+                      amount={tile.amount}
+                      currency={currency}
                       locale={locale}
                       visible={moneyVisible}
                     />
+                  ) : (
+                    "…"
+                  )}
+                </span>
+                <span
+                  className={`mt-auto pt-2 text-xs leading-snug ${tile.hintClass}`}
+                >
+                  {"hintNode" in tile && tile.hintNode
+                    ? tile.hintNode
+                    : tile.hint}
+                </span>
+              </Link>
+            ))}
+          </div>
+
+          <Link
+            href={
+              travels?.active ? `/travels/${travels.active.id}` : "/travels"
+            }
+            className="relative flex items-center gap-3 overflow-hidden rounded-[1.5rem] bg-[var(--soft-sky)] px-3.5 py-3 shadow-sm transition hover:opacity-95 active:scale-[0.99]"
+          >
+            <span
+              className="absolute inset-y-0 start-0 w-1 bg-sky-600"
+              aria-hidden
+            />
+            <span
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg"
+              style={{
+                background:
+                  "color-mix(in srgb, var(--surface-bg) 72%, transparent)",
+              }}
+              aria-hidden
+            >
+              ✈
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-[var(--foreground)]">
+                  {travels?.active ? travels.active.name : t("navTravels")}
+                </span>
+                {travels?.active ? (
+                  <span className="rounded-full bg-sky-800 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                    {t("travelsActive")}
                   </span>
                 ) : null}
               </span>
-              {travels.active.pct != null ? (
-                <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-[var(--panel-soft)]">
+              <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                {travels?.active
+                  ? t("travelsHomeActive")
+                  : t("travelsHomeHint")}
+              </span>
+              {travels?.active?.pct != null ? (
+                <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-[var(--panel-soft)]">
                   <span
                     className={`block h-full rounded-full ${
                       travels.active.overLimit ? "bg-amber-600" : "bg-sky-600"
@@ -1723,179 +1855,20 @@ export default function HomePage() {
                   />
                 </span>
               ) : null}
-              <span className="mt-2 text-xs font-semibold text-sky-900">
-                {t("travelsHomeActive")}
-              </span>
-            </Link>
-          ) : null}
-        <div className="grid grid-cols-2 gap-3">
-          {(
-            [
-              {
-                href: "/goals",
-                emoji: "🎯",
-                soft: "var(--soft-emerald)",
-                accent: "var(--accent-a)",
-                title: t("navGoals"),
-                amount: goals?.allocated,
-                amountCurrency: currency,
-                hint:
-                  goals && goals.goals.length > 0
-                    ? goals.goals.length === 1
-                      ? t("goalsCountOne")
-                      : fill(t("goalsCount"), {
-                          n: String(goals.goals.length),
-                        })
-                    : t("goalsHomeHint"),
-                hintClass: "text-[var(--muted)]",
-              },
-              {
-                href: travels?.active
-                  ? `/travels/${travels.active.id}`
-                  : "/travels",
-                emoji: "✈",
-                soft: "var(--soft-sky)",
-                accent: "#0284c7",
-                title: t("navTravels"),
-                amount: travels?.active?.spent,
-                amountCurrency: travels?.active?.currency ?? currency,
-                hint: travels?.active
-                  ? travels.active.name
-                  : t("travelsHomeHint"),
-                hintClass: travels?.active
-                  ? "font-semibold text-sky-900"
-                  : "text-[var(--muted)]",
-              },
-              {
-                href: "/commitments",
-                emoji: "📌",
-                soft: "var(--soft-indigo)",
-                accent: "var(--accent-b)",
-                title: t("navSubs"),
-                amount: subs
-                  ? subs.unpaidCount > 0
-                    ? subs.dueAmount
-                    : subs.monthlyTotal
-                  : undefined,
-                amountCurrency: currency,
-                hint:
-                  subs && subs.subscriptions.length > 0
-                    ? subs.unpaidCount === 0
-                      ? t("subsHomeAllPaid")
-                      : subs.unpaidCount === 1
-                        ? t("subsHomeUnpaidOne")
-                        : fill(t("subsHomeUnpaid"), {
-                            n: String(subs.unpaidCount),
-                          })
-                    : t("subsHomeHint"),
-                hintClass:
-                  subs && subs.unpaidCount > 0
-                    ? "font-semibold text-amber-800"
-                    : "text-[var(--muted)]",
-              },
-              {
-                href: "/gold",
-                emoji: "🥇",
-                soft: "var(--soft-amber)",
-                accent: "#d97706",
-                title: t("navGold"),
-                amount: gold?.totalValue,
-                amountCurrency: currency,
-                hint:
-                  gold?.totalGainLoss != null ? null : t("goldHomeHint"),
-                hintNode:
-                  gold?.totalGainLoss != null ? (
-                    <>
-                      <PrivateMoney
-                        amount={gold.totalGainLoss}
-                        currency={currency}
-                        locale={locale}
-                        visible={moneyVisible}
-                        extraSign={gold.totalGainLoss >= 0 ? "+" : "−"}
-                      />
-                      {moneyVisible && gold.totalGainLossPct != null ? (
-                        <span>
-                          {" "}
-                          ({gold.totalGainLossPct >= 0 ? "+" : ""}
-                          {gold.totalGainLossPct}%)
-                        </span>
-                      ) : null}
-                    </>
-                  ) : null,
-                hintClass:
-                  gold?.totalGainLoss != null && moneyVisible
-                    ? gold.totalGainLoss >= 0
-                      ? "font-semibold text-emerald-800"
-                      : "font-semibold text-red-800"
-                    : "text-[var(--muted)]",
-              },
-              {
-                href: "/outside-loans",
-                emoji: "🤝",
-                soft: "var(--soft-sky)",
-                accent: "#0284c7",
-                title: t("navOutsideLoans"),
-                amount: outside?.owedToYou,
-                amountCurrency: currency,
-                hint:
-                  outside && outside.open.length > 0
-                    ? t("outsideOwedToYou")
-                    : t("outsideLoansHomeHint"),
-                hintClass: "text-[var(--muted)]",
-              },
-            ] as const
-          ).map((tile) => (
-            <Link
-              key={tile.href}
-              href={tile.href}
-              className="relative flex min-h-[7.5rem] flex-col overflow-hidden rounded-[1.5rem] p-3.5 shadow-sm transition hover:opacity-95 active:scale-[0.99]"
-              style={{ background: tile.soft }}
-            >
-              <span
-                className="absolute inset-x-0 top-0 h-1"
-                style={{ background: tile.accent }}
-                aria-hidden
-              />
-              <span className="flex items-center gap-2">
-                <span
-                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-base"
-                  style={{
-                    background: "color-mix(in srgb, var(--surface-bg) 72%, transparent)",
-                  }}
-                  aria-hidden
-                >
-                  {tile.emoji}
-                </span>
-                <span className="min-w-0 text-sm font-semibold leading-snug text-[var(--foreground)]">
-                  {tile.title}
-                </span>
-              </span>
-              <span className="mt-2 text-lg font-bold leading-tight tabular-nums text-[var(--foreground)]">
-                {tile.amount != null ? (
-                  <PrivateMoney
-                    amount={tile.amount}
-                    currency={
-                      "amountCurrency" in tile ? tile.amountCurrency : currency
-                    }
-                    locale={locale}
-                    visible={moneyVisible}
-                  />
-                ) : tile.href.startsWith("/travels") ? (
-                  "＋"
-                ) : (
-                  "…"
-                )}
-              </span>
-              <span
-                className={`mt-auto pt-2 text-xs leading-snug ${tile.hintClass}`}
-              >
-                {"hintNode" in tile && tile.hintNode
-                  ? tile.hintNode
-                  : tile.hint}
-              </span>
-            </Link>
-          ))}
-        </div>
+            </span>
+            <span className="shrink-0 text-sm font-bold tabular-nums text-[var(--foreground)]">
+              {travels?.active ? (
+                <PrivateMoney
+                  amount={travels.active.spent}
+                  currency={travels.active.currency}
+                  locale={locale}
+                  visible={moneyVisible}
+                />
+              ) : (
+                <span className="text-sky-800">＋</span>
+              )}
+            </span>
+          </Link>
         </div>
       )}
 

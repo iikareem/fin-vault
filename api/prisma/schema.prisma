@@ -256,6 +256,8 @@ model Travel {
   softLimit   Decimal?      @db.Decimal(14, 2)
   startsOn    DateTime      @db.Date
   endsOn      DateTime      @db.Date
+  /** When set, trip is closed early (status past) even if endsOn is still in the future. */
+  endedAt     DateTime?
   note        String        @default("")
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt

@@ -2,7 +2,6 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { api, parseAmount, todayISO } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
@@ -14,6 +13,7 @@ import { Hint } from "@/components/Hint";
 import { DateField } from "@/components/DateField";
 import { CURRENCY_OPTIONS } from "@/lib/currencies";
 import { fill } from "@/lib/i18n";
+import { formatItemDate } from "@/lib/calendar";
 
 type TravelCard = {
   id: string;
@@ -57,10 +57,19 @@ function LimitBar({
   );
 }
 
+function tripRangeLabel(
+  trip: TravelCard,
+  locale: "ar" | "en",
+) {
+  const from = formatItemDate(trip.startsOn, locale) || trip.startsOn;
+  const to = formatItemDate(trip.endsOn, locale) || trip.endsOn;
+  if (trip.startsOn === trip.endsOn) return from;
+  return `${from} → ${to}`;
+}
+
 export default function TravelsPage() {
   const { t, locale } = useI18n();
   const { personal, setKind } = useBooks();
-  const router = useRouter();
   const hid = personal?.householdId ?? "";
 
   const [data, setData] = useState<TravelsData | null>(null);
@@ -69,8 +78,7 @@ export default function TravelsPage() {
   const [currency, setCurrency] = useState(personal?.currency ?? "EGP");
   const [startsOn, setStartsOn] = useState(todayISO());
   const [endsOn, setEndsOn] = useState(todayISO());
-  const [softLimit, setSoftLimit] = useState("");
-  const [note, setNote] = useState("");
+  const [limit, setLimit] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -89,12 +97,19 @@ export default function TravelsPage() {
 
   useEffect(() => {
     if (!data) return;
+    // Only auto-open create when there are no trips at all.
     if (!data.active && data.travels.length === 0) setShowCreate(true);
   }, [data]);
 
+  const canAdd = !data?.active;
+
   async function onCreate(e: FormEvent) {
     e.preventDefault();
-    if (!hid) return;
+    if (!hid || busy) return;
+    if (!canAdd) {
+      setError(t("travelsOneActiveHint"));
+      return;
+    }
     const trimmed = name.trim();
     if (!trimmed) {
       setError(t("travelsNameHint"));
@@ -104,9 +119,9 @@ export default function TravelsPage() {
       setError(t("travelsDateOrder"));
       return;
     }
-    const limitRaw = softLimit.trim();
-    const limit = limitRaw ? parseAmount(limitRaw) : undefined;
-    if (limitRaw && (!Number.isFinite(limit) || (limit ?? 0) <= 0)) {
+    const limitRaw = limit.trim();
+    const limitAmt = limitRaw ? parseAmount(limitRaw) : undefined;
+    if (limitRaw && (!Number.isFinite(limitAmt) || (limitAmt ?? 0) <= 0)) {
       setError(t("travelsLimitHint"));
       return;
     }
@@ -122,26 +137,28 @@ export default function TravelsPage() {
             currency,
             startsOn,
             endsOn,
-            ...(limit != null ? { softLimit: limit } : {}),
-            ...(note.trim() ? { note: note.trim() } : {}),
+            ...(limitAmt != null ? { softLimit: limitAmt } : {}),
           }),
         },
       );
-      router.push(`/travels/${created.id}`);
+      if (!created?.id) {
+        throw new Error(t("travelsSaveFailed"));
+      }
+      window.location.assign(`/travels/${created.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("travelsSaveFailed"));
       setBusy(false);
     }
   }
 
-  function tripMeta(trip: TravelCard) {
-    const range = `${trip.startsOn} → ${trip.endsOn}`;
-    if (trip.softLimit != null && trip.pct != null) {
-      return fill(t("travelsProgressHint"), {
-        pct: String(Math.round(trip.pct)),
-      });
-    }
-    return range;
+  function openCreate() {
+    setError("");
+    setShowCreate(true);
+    setName("");
+    setLimit("");
+    setStartsOn(todayISO());
+    setEndsOn(todayISO());
+    setCurrency(personal?.currency ?? "EGP");
   }
 
   return (
@@ -158,15 +175,15 @@ export default function TravelsPage() {
             {t("travelsPageHint")}
           </p>
         </div>
-        {data?.active ? null : (
+        {canAdd ? (
           <button
             type="button"
-            onClick={() => setShowCreate((v) => !v)}
+            onClick={() => (showCreate ? setShowCreate(false) : openCreate())}
             className="shrink-0 rounded-2xl bg-sky-800 px-3 py-2 text-sm font-semibold text-white"
           >
             {showCreate ? t("travelsCancel") : `＋ ${t("travelsAdd")}`}
           </button>
-        )}
+        ) : null}
       </header>
 
       {error ? (
@@ -183,7 +200,7 @@ export default function TravelsPage() {
               {t("travelsActive")}
             </span>
             <span className="text-xs font-medium text-sky-900/70">
-              {data.active.startsOn} → {data.active.endsOn}
+              {tripRangeLabel(data.active, locale)}
             </span>
           </div>
           <h2 className="mt-2 text-xl font-bold text-[var(--foreground)]">
@@ -216,7 +233,7 @@ export default function TravelsPage() {
         </Link>
       ) : null}
 
-      {showCreate && !data?.active ? (
+      {showCreate && canAdd ? (
         <form
           onSubmit={onCreate}
           className="surface mb-5 space-y-3 rounded-[1.75rem] p-4"
@@ -268,28 +285,17 @@ export default function TravelsPage() {
           </div>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
-              {t("travelsSoftLimit")}
+              {t("travelsLimit")}
             </span>
             <input
               inputMode="decimal"
               dir="ltr"
               className="amount-input field text-2xl font-bold"
-              value={softLimit}
-              onChange={(e) => setSoftLimit(e.target.value)}
-              placeholder={t("travelsSoftLimitPlaceholder")}
+              value={limit}
+              onChange={(e) => setLimit(e.target.value)}
+              placeholder={t("travelsLimitPlaceholder")}
             />
-            <Hint>{t("travelsSoftLimitHint")}</Hint>
-          </label>
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
-              {t("noteOptional")}
-            </span>
-            <input
-              className="field text-base"
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder={t("notePlaceholder")}
-            />
+            <Hint>{t("travelsLimitHintUi")}</Hint>
           </label>
           <button
             disabled={busy}
@@ -310,16 +316,16 @@ export default function TravelsPage() {
               <li key={trip.id}>
                 <Link
                   href={`/travels/${trip.id}`}
-                  className="surface flex items-center justify-between rounded-[1.5rem] px-4 py-3"
+                  className="surface flex items-center justify-between gap-3 rounded-[1.5rem] px-4 py-3"
                 >
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-semibold">{trip.name}</p>
                     <p className="text-xs text-[var(--muted)]">
-                      {trip.startsOn} → {trip.endsOn}
+                      {tripRangeLabel(trip, locale)} · {trip.currency}
                     </p>
                   </div>
-                  <span className="text-xs font-bold text-sky-800">
-                    {trip.currency}
+                  <span className="shrink-0 text-xs font-bold text-sky-800">
+                    {t("travelsOpenLog")} →
                   </span>
                 </Link>
               </li>
@@ -330,29 +336,69 @@ export default function TravelsPage() {
 
       {data && data.past.length > 0 ? (
         <section className="mb-5">
-          <h2 className="mb-2 text-sm font-semibold text-[var(--muted)]">
-            {t("travelsPast")}
-          </h2>
+          <div className="mb-2 flex items-end justify-between gap-2">
+            <h2 className="text-sm font-semibold text-[var(--muted)]">
+              {t("travelsPast")}
+            </h2>
+            <p className="text-xs text-[var(--muted)]">
+              {fill(t("travelsPastCount"), { n: String(data.past.length) })}
+            </p>
+          </div>
           <ul className="space-y-2">
             {data.past.map((trip) => (
               <li key={trip.id}>
                 <Link
                   href={`/travels/${trip.id}`}
-                  className="surface flex items-center justify-between rounded-[1.5rem] px-4 py-3"
+                  className="surface block rounded-[1.5rem] px-4 py-3.5 transition hover:opacity-95 active:scale-[0.99]"
                 >
-                  <div>
-                    <p className="font-semibold">{trip.name}</p>
-                    <p className="text-xs text-[var(--muted)]">
-                      {tripMeta(trip)}
-                    </p>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-[var(--foreground)]">
+                        ✈ {trip.name}
+                      </p>
+                      <p className="mt-0.5 text-xs text-[var(--muted)]">
+                        {tripRangeLabel(trip, locale)}
+                      </p>
+                    </div>
+                    <div className="shrink-0 text-end">
+                      <p className="text-sm font-bold tabular-nums">
+                        <Money
+                          amount={trip.spent}
+                          currency={trip.currency}
+                          locale={locale}
+                        />
+                      </p>
+                      <p className="text-[11px] font-medium text-sky-800">
+                        {trip.currency}
+                      </p>
+                    </div>
                   </div>
-                  <span className="text-sm font-bold tabular-nums">
-                    <Money
-                      amount={trip.spent}
-                      currency={trip.currency}
-                      locale={locale}
-                    />
-                  </span>
+                  {trip.softLimit != null ? (
+                    <div className="mt-2.5 space-y-1">
+                      <LimitBar pct={trip.pct} over={trip.overLimit} />
+                      <p className="text-[11px] text-[var(--muted)]">
+                        <Money
+                          amount={trip.spent}
+                          currency={trip.currency}
+                          locale={locale}
+                        />
+                        {" / "}
+                        <Money
+                          amount={trip.softLimit}
+                          currency={trip.currency}
+                          locale={locale}
+                        />
+                        {trip.pct != null
+                          ? ` · ${fill(t("travelsProgressHint"), {
+                              pct: String(Math.round(trip.pct)),
+                            })}`
+                          : ""}
+                      </p>
+                    </div>
+                  ) : null}
+                  <p className="mt-2 text-xs font-semibold text-sky-800">
+                    {t("travelsOpenLog")} →
+                  </p>
                 </Link>
               </li>
             ))}
@@ -371,12 +417,26 @@ export default function TravelsPage() {
           </p>
           <button
             type="button"
-            onClick={() => setShowCreate(true)}
+            onClick={openCreate}
             className="mt-4 rounded-2xl bg-sky-800 px-4 py-2.5 text-sm font-semibold text-white"
           >
             {t("travelsAdd")}
           </button>
         </div>
+      ) : null}
+
+      {data &&
+      !data.active &&
+      data.past.length > 0 &&
+      !showCreate &&
+      canAdd ? (
+        <button
+          type="button"
+          onClick={openCreate}
+          className="mb-4 w-full rounded-3xl bg-sky-800 px-4 py-3.5 text-base font-semibold text-white"
+        >
+          ＋ {t("travelsAdd")}
+        </button>
       ) : null}
 
       {data?.active ? (

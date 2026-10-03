@@ -55,6 +55,14 @@ export class TravelsController {
     return this.travels.update(membership.householdId, travelId, dto);
   }
 
+  @Post(':travelId/end')
+  end(
+    @CurrentMembership() membership: MembershipContext,
+    @Param('travelId') travelId: string,
+  ) {
+    return this.travels.end(membership.householdId, travelId);
+  }
+
   @Delete(':travelId')
   remove(
     @CurrentMembership() membership: MembershipContext,

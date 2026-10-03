@@ -24,7 +24,13 @@ export class TravelsService {
     return isoLocal(new Date());
   }
 
-  private status(startsOn: Date, endsOn: Date, today = this.todayIso()): TravelStatus {
+  private status(
+    startsOn: Date,
+    endsOn: Date,
+    endedAt: Date | null,
+    today = this.todayIso(),
+  ): TravelStatus {
+    if (endedAt) return 'past';
     const start = isoFromDbDate(startsOn);
     const end = isoFromDbDate(endsOn);
     if (today < start) return 'upcoming';
@@ -52,6 +58,7 @@ export class TravelsService {
       softLimit: Prisma.Decimal | null;
       startsOn: Date;
       endsOn: Date;
+      endedAt: Date | null;
       note: string;
       createdAt: Date;
       updatedAt: Date;
@@ -60,7 +67,11 @@ export class TravelsService {
   ) {
     const softLimit =
       travel.softLimit == null ? null : Number(travel.softLimit);
-    const status = this.status(travel.startsOn, travel.endsOn);
+    const status = this.status(
+      travel.startsOn,
+      travel.endsOn,
+      travel.endedAt,
+    );
     const pct =
       softLimit != null && softLimit > 0
         ? Math.round((spent / softLimit) * 1000) / 10
@@ -73,6 +84,7 @@ export class TravelsService {
       softLimit,
       startsOn: isoFromDbDate(travel.startsOn),
       endsOn: isoFromDbDate(travel.endsOn),
+      endedAt: travel.endedAt ? travel.endedAt.toISOString() : null,
       note: travel.note,
       createdAt: travel.createdAt,
       updatedAt: travel.updatedAt,
@@ -102,6 +114,7 @@ export class TravelsService {
     const clash = await this.prisma.travel.findFirst({
       where: {
         householdId,
+        endedAt: null,
         ...(excludeId ? { id: { not: excludeId } } : {}),
         startsOn: { lte: end },
         endsOn: { gte: start },
@@ -116,16 +129,25 @@ export class TravelsService {
   }
 
   private async currentWallet(householdId: string) {
-    const wallet = await this.prisma.account.findFirst({
+    const current = await this.prisma.account.findFirst({
       where: {
         householdId,
         archived: false,
         type: 'CASH',
-        name: { in: ['Current', 'Cash'] },
+        name: 'Current',
       },
     });
-    if (!wallet) throw new BadRequestException('No Current wallet');
-    return wallet;
+    if (current) return current;
+    const cash = await this.prisma.account.findFirst({
+      where: {
+        householdId,
+        archived: false,
+        type: 'CASH',
+        name: 'Cash',
+      },
+    });
+    if (!cash) throw new BadRequestException('No Current wallet');
+    return cash;
   }
 
   async list(householdId: string) {
@@ -294,6 +316,38 @@ export class TravelsService {
     return this.shape(updated, await this.spentTotal(id));
   }
 
+  async end(householdId: string, id: string) {
+    const existing = await this.prisma.travel.findFirst({
+      where: { id, householdId },
+    });
+    if (!existing) throw new NotFoundException();
+    if (existing.endedAt) {
+      throw new BadRequestException('Trip is already ended');
+    }
+    const status = this.status(
+      existing.startsOn,
+      existing.endsOn,
+      existing.endedAt,
+    );
+    if (status === 'past') {
+      throw new BadRequestException('Trip is already ended');
+    }
+
+    const today = this.todayIso();
+    const start = isoFromDbDate(existing.startsOn);
+    // Keep history dates sensible: planned end becomes today (or start if upcoming).
+    const endsOn = today < start ? start : today;
+
+    const updated = await this.prisma.travel.update({
+      where: { id },
+      data: {
+        endedAt: new Date(),
+        endsOn: dateOnlyUtc(endsOn),
+      },
+    });
+    return this.shape(updated, await this.spentTotal(id));
+  }
+
   async remove(householdId: string, id: string) {
     const existing = await this.prisma.travel.findFirst({
       where: { id, householdId },
@@ -332,13 +386,15 @@ export class TravelsService {
         id: dto.categoryId,
         householdId,
         kind: 'EXPENSE',
-        hidden: false,
       },
     });
-    if (!category) throw new BadRequestException('Pick an expense category');
+    if (!category || category.hidden) {
+      throw new BadRequestException('Pick an expense category');
+    }
 
     const wallet = await this.currentWallet(householdId);
-    const isCash = dto.paidFrom === 'CASH';
+    // CURRENT = real wallet EXPENSE (balance goes down). CASH = TRACK (log only).
+    const type = dto.paidFrom === 'CURRENT' ? 'EXPENSE' : 'TRACK';
 
     const created = await this.prisma.transaction.create({
       data: {
@@ -347,7 +403,7 @@ export class TravelsService {
         accountId: wallet.id,
         categoryId: category.id,
         travelId,
-        type: isCash ? 'TRACK' : 'EXPENSE',
+        type,
         amount: new Prisma.Decimal(dto.amount),
         occurredOn: dateOnlyUtc(day),
         note: dto.note?.trim() ?? '',
@@ -370,7 +426,10 @@ export class TravelsService {
       id: created.id,
       amount: Number(created.amount),
       type: created.type,
-      paidFrom: isCash ? ('CASH' as const) : ('CURRENT' as const),
+      paidFrom:
+        created.type === 'EXPENSE'
+          ? ('CURRENT' as const)
+          : ('CASH' as const),
       occurredOn: isoFromDbDate(created.occurredOn),
       note: created.note,
       category: created.category,

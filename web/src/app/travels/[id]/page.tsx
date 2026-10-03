@@ -98,13 +98,16 @@ export default function TravelDetailPage() {
   const [cats, setCats] = useState<Cat[]>([]);
   const [amount, setAmount] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [paidFrom, setPaidFrom] = useState<"CURRENT" | "CASH">("CASH");
+  const [paidFrom, setPaidFrom] = useState<"CURRENT" | "CASH">("CURRENT");
   const [occurredOn, setOccurredOn] = useState(todayISO());
   const [note, setNote] = useState("");
   const [showSpend, setShowSpend] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [ending, setEnding] = useState(false);
+  const [confirmEnd, setConfirmEnd] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const expenseCats = useMemo(
     () =>
@@ -182,10 +185,40 @@ export default function TravelDetailPage() {
     }
   }
 
+  async function onEnd() {
+    if (!hid || !trip || ending) return;
+    if (!confirmEnd) {
+      setConfirmEnd(true);
+      setConfirmDelete(false);
+      return;
+    }
+    setEnding(true);
+    setError("");
+    try {
+      const updated = await api<TravelDetail>(
+        householdPath(hid, `/travels/${trip.id}/end`),
+        { method: "POST", body: JSON.stringify({}) },
+      );
+      setTrip(updated);
+      setConfirmEnd(false);
+      setShowSpend(false);
+      await load(hid, trip.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("travelsSaveFailed"));
+    } finally {
+      setEnding(false);
+    }
+  }
+
   async function onDelete() {
     if (!hid || !trip) return;
     if (trip.spent > 0.001) {
       setError(t("travelsDeleteBlocked"));
+      return;
+    }
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      setConfirmEnd(false);
       return;
     }
     setDeleting(true);
@@ -198,6 +231,7 @@ export default function TravelDetailPage() {
     } catch (err) {
       setError(err instanceof Error ? err.message : t("travelsSaveFailed"));
       setDeleting(false);
+      setConfirmDelete(false);
     }
   }
 
@@ -370,7 +404,7 @@ export default function TravelDetailPage() {
                     : "text-[var(--muted)]"
                 }`}
               >
-                💵 {t("travelsFromCash")}
+                📋 {t("travelsFromCash")}
               </button>
             </div>
             <Hint>
@@ -484,15 +518,88 @@ export default function TravelDetailPage() {
         )}
       </section>
 
+      {trip.status === "active" || trip.status === "upcoming" ? (
+        <div className="mb-3 space-y-2">
+          {confirmEnd ? (
+            <div className="surface space-y-3 rounded-[1.5rem] p-4 ring-1 ring-amber-300/70">
+              <p className="text-sm font-semibold text-[var(--foreground)]">
+                {t("travelsEndConfirm")}
+              </p>
+              <p className="text-xs text-[var(--muted)]">
+                {t("travelsEndConfirmHint")}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={ending}
+                  onClick={() => setConfirmEnd(false)}
+                  className="rounded-2xl px-3 py-2.5 text-sm font-semibold ring-1 ring-[var(--input-border)]"
+                >
+                  {t("travelsCancel")}
+                </button>
+                <button
+                  type="button"
+                  disabled={ending}
+                  onClick={onEnd}
+                  className="rounded-2xl bg-amber-700 px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {ending ? t("saving") : t("travelsEndConfirmAction")}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              disabled={ending}
+              onClick={onEnd}
+              className="w-full rounded-2xl px-4 py-2.5 text-sm font-semibold text-amber-900 ring-1 ring-amber-300 disabled:opacity-60"
+            >
+              {t("travelsEnd")}
+            </button>
+          )}
+        </div>
+      ) : null}
+
       {trip.spent < 0.001 ? (
-        <button
-          type="button"
-          disabled={deleting}
-          onClick={onDelete}
-          className="mb-4 w-full rounded-2xl px-4 py-2.5 text-sm font-semibold text-red-800 ring-1 ring-red-200 disabled:opacity-60"
-        >
-          {deleting ? t("saving") : t("travelsDelete")}
-        </button>
+        <div className="mb-4 space-y-2">
+          {confirmDelete ? (
+            <div className="surface space-y-3 rounded-[1.5rem] p-4 ring-1 ring-red-300/70">
+              <p className="text-sm font-semibold text-[var(--foreground)]">
+                {t("travelsDeleteConfirm")}
+              </p>
+              <p className="text-xs text-[var(--muted)]">
+                {t("travelsDeleteConfirmHint")}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  disabled={deleting}
+                  onClick={() => setConfirmDelete(false)}
+                  className="rounded-2xl px-3 py-2.5 text-sm font-semibold ring-1 ring-[var(--input-border)]"
+                >
+                  {t("travelsCancel")}
+                </button>
+                <button
+                  type="button"
+                  disabled={deleting}
+                  onClick={onDelete}
+                  className="rounded-2xl bg-red-700 px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+                >
+                  {deleting ? t("saving") : t("travelsDeleteConfirmAction")}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              disabled={deleting}
+              onClick={onDelete}
+              className="w-full rounded-2xl px-4 py-2.5 text-sm font-semibold text-red-800 ring-1 ring-red-200 disabled:opacity-60"
+            >
+              {t("travelsDelete")}
+            </button>
+          )}
+        </div>
       ) : null}
 
       <BottomNav />
