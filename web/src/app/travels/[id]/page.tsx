@@ -141,11 +141,8 @@ export default function TravelDetailPage() {
       setCats(list);
       syncEditForm(detail);
       setOccurredOn(todayISO());
-      if (detail.status === "active" || detail.status === "upcoming") {
-        setShowSpend(true);
-      } else {
-        setShowSpend(false);
-      }
+      setShowSpend(false);
+      setShowEdit(false);
       const travelParent = list.find(
         (c) =>
           c.kind === "EXPENSE" &&
@@ -332,63 +329,149 @@ export default function TravelDetailPage() {
     return trip.startsOn === trip.endsOn ? from : `${from} → ${to}`;
   })();
 
+  function openSpend() {
+    setShowSpend(true);
+    setShowEdit(false);
+    setConfirmEnd(false);
+    setConfirmDelete(false);
+    setError("");
+  }
+
+  function openEdit() {
+    if (!trip) return;
+    syncEditForm(trip);
+    setShowEdit(true);
+    setShowSpend(false);
+    setConfirmEnd(false);
+    setConfirmDelete(false);
+    setError("");
+  }
+
+  function closePanels() {
+    setShowSpend(false);
+    setShowEdit(false);
+    setError("");
+  }
+
   return (
     <PageShell>
       <header className="mb-4">
-        <Link
-          href="/travels"
-          className="text-sm font-semibold text-sky-800"
-        >
-          ← {t("navTravels")}
-        </Link>
-        <div className="mt-2 flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-wide text-sky-800">
-              {statusLabel}
-            </p>
-            <h1 className="text-2xl font-bold">{trip.name}</h1>
-            <p className="mt-0.5 text-sm text-[var(--muted)]">
-              {rangeLabel} · {trip.currency}
-            </p>
-          </div>
-          <div className="flex shrink-0 flex-col items-end gap-2">
-            {isOpen ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setShowSpend((v) => !v);
-                  setShowEdit(false);
-                  setConfirmEnd(false);
-                }}
-                className="rounded-2xl bg-sky-800 px-3 py-2 text-sm font-semibold text-white"
-              >
-                {showSpend ? t("travelsCancel") : `＋ ${t("travelsAddSpend")}`}
-              </button>
-            ) : null}
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            href="/travels"
+            className="text-sm font-semibold text-sky-800"
+          >
+            ← {t("navTravels")}
+          </Link>
+          <span className="rounded-full bg-sky-800/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-sky-900">
+            {statusLabel}
+          </span>
+        </div>
+        <h1 className="mt-3 text-2xl font-bold tracking-tight">{trip.name}</h1>
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-[var(--muted)]">
+          <span>
+            {rangeLabel} · {trip.currency}
+          </span>
+          {!showEdit ? (
             <button
               type="button"
-              onClick={() => {
-                syncEditForm(trip);
-                setShowEdit((v) => !v);
-                setShowSpend(false);
-                setConfirmEnd(false);
-                setConfirmDelete(false);
-                setError("");
-              }}
-              className="rounded-2xl px-3 py-2 text-sm font-semibold text-sky-900 ring-1 ring-sky-200"
+              onClick={openEdit}
+              className="font-semibold text-sky-800 underline-offset-2 hover:underline"
             >
-              {showEdit ? t("travelsCancel") : t("travelsEdit")}
+              {t("travelsEdit")}
             </button>
-          </div>
+          ) : null}
         </div>
       </header>
+
+      <section className="surface mb-3 rounded-[1.75rem] p-4">
+        <p className="text-xs font-medium text-[var(--muted)]">
+          {t("travelsSpent")}
+        </p>
+        <p className="mt-1 text-3xl font-bold tabular-nums">
+          <Money
+            amount={trip.spent}
+            currency={trip.currency}
+            locale={locale}
+          />
+          {trip.softLimit != null ? (
+            <span className="text-lg font-semibold text-[var(--muted)]">
+              {" "}
+              /{" "}
+              <Money
+                amount={trip.softLimit}
+                currency={trip.currency}
+                locale={locale}
+              />
+            </span>
+          ) : null}
+        </p>
+        {trip.softLimit != null ? (
+          <div className="mt-3 space-y-1.5">
+            <LimitBar pct={trip.pct} over={trip.overLimit} />
+            <p
+              className={`text-xs font-semibold ${
+                trip.overLimit ? "text-amber-800" : "text-[var(--muted)]"
+              }`}
+            >
+              {trip.overLimit
+                ? t("travelsOverLimit")
+                : fill(t("travelsProgressHint"), {
+                    pct: String(Math.round(trip.pct ?? 0)),
+                  })}
+            </p>
+          </div>
+        ) : null}
+        <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+          <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-2">
+            <p className="text-xs text-[var(--muted)]">{t("travelsFromCurrent")}</p>
+            <p className="font-bold tabular-nums">
+              <Money
+                amount={trip.fromWallet ?? 0}
+                currency={trip.currency}
+                locale={locale}
+              />
+            </p>
+          </div>
+          <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-2">
+            <p className="text-xs text-[var(--muted)]">{t("travelsFromCash")}</p>
+            <p className="font-bold tabular-nums">
+              <Money
+                amount={trip.fromCash ?? 0}
+                currency={trip.currency}
+                locale={locale}
+              />
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {isOpen && !showSpend && !showEdit ? (
+        <button
+          type="button"
+          onClick={openSpend}
+          className="mb-4 flex w-full items-center justify-center gap-2 rounded-3xl bg-sky-800 px-4 py-3.5 text-base font-semibold text-white shadow-sm transition hover:opacity-95 active:scale-[0.99]"
+        >
+          <span aria-hidden>＋</span>
+          {t("travelsActionSpend")}
+        </button>
+      ) : null}
 
       {showEdit ? (
         <form
           onSubmit={onSaveEdit}
-          className="surface mb-4 space-y-3 rounded-[1.75rem] p-4"
+          className="surface mb-4 space-y-3 rounded-[1.75rem] p-4 ring-1 ring-sky-200/70"
         >
-          <h2 className="text-lg font-bold">{t("travelsEditTitle")}</h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-base font-bold">{t("travelsEditTitle")}</h2>
+            <button
+              type="button"
+              onClick={closePanels}
+              className="rounded-xl px-2.5 py-1 text-sm font-semibold text-[var(--muted)]"
+            >
+              {t("travelsCancel")}
+            </button>
+          </div>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
               {t("travelsName")}
@@ -398,6 +481,7 @@ export default function TravelDetailPage() {
               value={editName}
               onChange={(e) => setEditName(e.target.value)}
               required
+              autoFocus
             />
           </label>
           <label className="block">
@@ -447,81 +531,26 @@ export default function TravelDetailPage() {
             disabled={editBusy}
             className="w-full rounded-3xl bg-sky-800 px-4 py-3.5 text-base font-semibold text-white disabled:opacity-60"
           >
-            {editBusy ? t("saving") : `✅ ${t("travelsEditSave")}`}
+            {editBusy ? t("saving") : t("travelsEditSave")}
           </button>
         </form>
       ) : null}
 
-      <section className="surface mb-4 rounded-[1.75rem] p-4">
-        <p className="text-xs font-medium text-[var(--muted)]">
-          {t("travelsSpent")}
-        </p>
-        <p className="mt-1 text-3xl font-bold tabular-nums">
-          <Money
-            amount={trip.spent}
-            currency={trip.currency}
-            locale={locale}
-          />
-          {trip.softLimit != null ? (
-            <span className="text-lg font-semibold text-[var(--muted)]">
-              {" "}
-              /{" "}
-              <Money
-                amount={trip.softLimit}
-                currency={trip.currency}
-                locale={locale}
-              />
-            </span>
-          ) : null}
-        </p>
-        {trip.softLimit != null ? (
-          <div className="mt-3 space-y-1.5">
-            <LimitBar pct={trip.pct} over={trip.overLimit} />
-            <p
-              className={`text-xs font-semibold ${
-                trip.overLimit ? "text-amber-800" : "text-[var(--muted)]"
-              }`}
-            >
-              {trip.overLimit
-                ? t("travelsOverLimit")
-                : fill(t("travelsProgressHint"), {
-                    pct: String(Math.round(trip.pct ?? 0)),
-                  })}
-            </p>
-          </div>
-        ) : (
-          <Hint>{t("travelsNoLimitHint")}</Hint>
-        )}
-        <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-          <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-2">
-            <p className="text-xs text-[var(--muted)]">{t("travelsFromCurrent")}</p>
-            <p className="font-bold tabular-nums">
-              <Money
-                amount={trip.fromWallet ?? 0}
-                currency={trip.currency}
-                locale={locale}
-              />
-            </p>
-          </div>
-          <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-2">
-            <p className="text-xs text-[var(--muted)]">{t("travelsFromCash")}</p>
-            <p className="font-bold tabular-nums">
-              <Money
-                amount={trip.fromCash ?? 0}
-                currency={trip.currency}
-                locale={locale}
-              />
-            </p>
-          </div>
-        </div>
-      </section>
-
       {showSpend && isOpen ? (
         <form
           onSubmit={onSpend}
-          className="surface mb-5 space-y-3 rounded-[1.75rem] p-4"
+          className="surface mb-5 space-y-3 rounded-[1.75rem] p-4 ring-1 ring-sky-200/70"
         >
-          <h2 className="text-lg font-bold">{t("travelsAddSpend")}</h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-base font-bold">{t("travelsAddSpend")}</h2>
+            <button
+              type="button"
+              onClick={closePanels}
+              className="rounded-xl px-2.5 py-1 text-sm font-semibold text-[var(--muted)]"
+            >
+              {t("travelsCancel")}
+            </button>
+          </div>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
               {t("amount")}
