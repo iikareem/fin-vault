@@ -285,6 +285,8 @@ export default function HomePage() {
   const currentWallet = cashAccounts.find(isCurrentWallet);
   const savingsWallet = cashAccounts.find(isSavingsWallet);
   const cashTotal = cashAccounts.reduce((s, a) => s + a.balance, 0);
+  const goldValue = gold?.totalValue ?? 0;
+  const netTotal = cashTotal + goldValue;
   const currentBal = currentWallet?.balance ?? 0;
   const savingsBal = savingsWallet?.balance ?? 0;
   const suggestTransferToCurrent =
@@ -672,6 +674,29 @@ export default function HomePage() {
                 ) : null}
               </div>
             </div>
+            {!isHouse ? (
+              <div
+                className="mt-3 rounded-2xl px-3 py-2"
+                style={{ background: "rgba(255,255,255,0.18)" }}
+              >
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="text-sm opacity-90">{t("homeNet")}</p>
+                  <p className="text-xl font-semibold leading-tight">
+                    {accounts.length ? (
+                      <PrivateMoney
+                        amount={netTotal}
+                        currency={currency}
+                        locale={locale}
+                        visible={moneyVisible}
+                      />
+                    ) : (
+                      "…"
+                    )}
+                  </p>
+                </div>
+                <p className="mt-1 text-xs opacity-80">{t("homeNetHint")}</p>
+              </div>
+            ) : null}
             <div className="mt-3 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
               <div
                 className="rounded-2xl px-3 py-2"
