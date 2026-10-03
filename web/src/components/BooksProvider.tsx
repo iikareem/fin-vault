@@ -96,6 +96,12 @@ function applyTheme(theme: ThemeMode) {
   if (meta.getAttribute("content") !== color) {
     meta.setAttribute("content", color);
   }
+  const bar = document.querySelector(
+    'meta[name="apple-mobile-web-app-status-bar-style"]',
+  );
+  if (bar) {
+    bar.setAttribute("content", dark ? "black-translucent" : "default");
+  }
 }
 
 export function BooksProvider({ children }: { children: ReactNode }) {

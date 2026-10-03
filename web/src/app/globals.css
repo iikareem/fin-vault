@@ -497,8 +497,6 @@ html[data-compact] .field {
 }
 
 html {
-  /* clip avoids creating a scrollport that breaks position:sticky on iOS */
-  overflow-x: clip;
   /* Solid only — background-image on html/body makes iOS frost the status bar. */
   background-color: var(--background);
 }
@@ -514,9 +512,10 @@ html:not(.app-ready) *::after {
 
 html,
 body {
-  min-height: 100%;
-  min-height: 100dvh;
+  height: 100%;
   background-color: var(--background);
+  /* Body must NOT scroll — iOS frosts the top of the scrolling root. */
+  overflow: hidden;
 }
 
 body {
@@ -524,25 +523,57 @@ body {
   color: var(--foreground);
   font-family: var(--font-arabic), system-ui, sans-serif;
   -webkit-tap-highlight-color: transparent;
-  /* Solid opaque fill only — no background-image (iOS status-bar blur trigger). */
   background-color: var(--background);
   background-image: none;
 }
 
 /*
-  IMPORTANT: use env() directly — Safari often resolves
-  env(safe-area-inset-*) inside custom properties (var(--sat)) as 0px,
-  which parks Hello under the status-bar scrim.
+  App chrome: fixed safe-area strip (does not scroll) + inner scroller.
+  Hello / charts live in .app-scroll so they never sit under the iOS
+  status-bar frosted edge.
 */
-.app-frame {
-  position: relative;
-  min-height: 100dvh;
-  padding-top: constant(safe-area-inset-top);
-  padding-top: env(safe-area-inset-top, 0px);
+.app-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  height: 100dvh;
+  overflow: hidden;
   background-color: var(--background);
 }
 
-.app-frame-content {
+.app-top-chrome {
+  flex: 0 0 auto;
+  /*
+    Cover the safe area PLUS a few px of frost-bleed that iOS paints
+    below the status bar. env() must be used directly (not via var()).
+  */
+  height: calc(constant(safe-area-inset-top) + 10px);
+  height: calc(env(safe-area-inset-top, 0px) + 10px);
+  background-color: var(--background);
+  position: relative;
+  z-index: 50;
+}
+
+/* Home-screen app: if env() is unsupported, fall back to Dynamic Island height */
+@media all and (display-mode: standalone) {
+  .app-top-chrome {
+    height: calc(constant(safe-area-inset-top) + 10px);
+    height: calc(env(safe-area-inset-top, 59px) + 10px);
+  }
+}
+
+.app-scroll {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: none;
+  background-color: var(--background);
+}
+
+.app-scroll-content {
   position: relative;
   z-index: 1;
 }
@@ -551,7 +582,7 @@ body {
 .app-atmosphere {
   position: absolute;
   inset: 0;
-  top: 6.5rem;
+  top: 5rem;
   z-index: 0;
   pointer-events: none;
   background-image:
@@ -565,19 +596,6 @@ body {
       var(--grad-b),
       transparent 55%
     );
-}
-
-/* Opaque mask over the status bar / Dynamic Island — fixed so overscroll
-   cannot drag page content into a translucent system blur. */
-.ios-top-mask {
-  position: fixed;
-  inset-inline: 0;
-  top: 0;
-  z-index: 60;
-  height: constant(safe-area-inset-top);
-  height: env(safe-area-inset-top, 0px);
-  background-color: var(--background);
-  pointer-events: none;
 }
 
 a,
@@ -916,7 +934,7 @@ html.dark .shadow-lg {
     env(safe-area-inset-left, 0px),
     env(safe-area-inset-right, 0px)
   );
-  padding-top: 0.85rem;
+  padding-top: 1rem;
   padding-bottom: calc(7.25rem + constant(safe-area-inset-bottom));
   padding-bottom: calc(7.25rem + env(safe-area-inset-bottom, 0px));
 }

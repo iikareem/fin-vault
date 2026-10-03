@@ -5,10 +5,7 @@ import { useI18n } from "./I18nProvider";
 import { useBooks } from "./BooksProvider";
 import { HOUSE_BOOKS_ENABLED } from "@/lib/features";
 
-/**
- * House/personal switch when enabled. Safe-area spacing is owned by
- * `.app-frame` / `.ios-top-mask` so Hello / charts never sit under the island.
- */
+/** House/personal switch. Safe-area is owned by `.app-top-chrome`. */
 export function ModeBar() {
   const path = usePathname();
   const { t } = useI18n();

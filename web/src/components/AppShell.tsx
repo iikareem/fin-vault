@@ -4,18 +4,24 @@ import { I18nProvider } from "./I18nProvider";
 import { BooksProvider } from "./BooksProvider";
 import { ModeBar } from "./ModeBar";
 
+/**
+ * Split chrome vs scroll on purpose for iOS PWAs:
+ * the status-bar / Dynamic Island zone is a non-scrolling solid strip.
+ * Page content scrolls in a separate layer below it, so Hello / charts
+ * never sit under the system frosted-edge blur.
+ */
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <I18nProvider>
       <BooksProvider>
-        {/* Solid cover for the status bar / Dynamic Island (overscroll-safe). */}
-        <div aria-hidden className="ios-top-mask" />
-        <div className="app-frame">
-          {/* Gradients live here — never on body — so iOS won't frost the top. */}
-          <div aria-hidden className="app-atmosphere" />
-          <div className="app-frame-content">
-            <ModeBar />
-            {children}
+        <div className="app-root">
+          <div aria-hidden className="app-top-chrome" />
+          <div className="app-scroll">
+            <div aria-hidden className="app-atmosphere" />
+            <div className="app-scroll-content">
+              <ModeBar />
+              {children}
+            </div>
           </div>
         </div>
       </BooksProvider>
