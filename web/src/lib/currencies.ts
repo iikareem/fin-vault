@@ -9,6 +9,7 @@ export const CURRENCY_OPTIONS = [
   { code: "KWD", labelAr: "دينار كويتي", labelEn: "Kuwaiti dinar" },
   { code: "QAR", labelAr: "ريال قطري", labelEn: "Qatari riyal" },
   { code: "BHD", labelAr: "دينار بحريني", labelEn: "Bahraini dinar" },
+  { code: "TRY", labelAr: "ليرة تركية", labelEn: "Turkish lira" },
 ] as const;
 
 export type CurrencyCode = (typeof CURRENCY_OPTIONS)[number]["code"];

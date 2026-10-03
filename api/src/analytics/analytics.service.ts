@@ -189,6 +189,7 @@ export class AnalyticsService {
             householdId,
             accountId: { in: cashIds },
             occurredOn: today,
+            travelId: null,
             category: nonSpendCategoryFilter,
           },
           _sum: { amount: true },
@@ -328,6 +329,7 @@ export class AnalyticsService {
         householdId,
         type: { in: ['EXPENSE', 'TRACK'] },
         occurredOn: { gte: monthStart, lte: monthEnd },
+        travelId: null,
         category: nonSpendCategoryFilter,
       },
       _sum: { amount: true },
@@ -369,6 +371,7 @@ export class AnalyticsService {
         AND t."occurredOn" >= ${dateOnlyUtc(from)}
         AND t."occurredOn" <= ${dateOnlyUtc(to)}
         AND t.type IN ('INCOME', 'EXPENSE', 'TRACK')
+        AND t."travelId" IS NULL
         AND c.name NOT IN ('Wallet transfer', 'Cash withdrawal')
       GROUP BY t."occurredOn", t.type
       ORDER BY t."occurredOn" ASC
@@ -415,6 +418,7 @@ export class AnalyticsService {
         householdId,
         type: { not: 'REIMBURSEMENT' },
         occurredOn: { gte: dateOnlyUtc(from), lte: dateOnlyUtc(to) },
+        travelId: null,
         category: nonSpendCategoryFilter,
         // Drop commitment (subscription) payments; keep the same category if
         // there is still other spend left after that subtraction.
@@ -535,6 +539,7 @@ export class AnalyticsService {
         householdId,
         type: { not: 'REIMBURSEMENT' },
         occurredOn: { gte: dateOnlyUtc(from), lte: dateOnlyUtc(to) },
+        travelId: null,
         category: nonSpendCategoryFilter,
       },
       _sum: { amount: true },
@@ -638,6 +643,7 @@ export class AnalyticsService {
         householdId,
         type: { in: ['EXPENSE', 'TRACK'] },
         occurredOn: { gte: dateOnlyUtc(from), lte: dateOnlyUtc(to) },
+        travelId: null,
         categoryId: { in: expandedIds },
         category: nonSpendCategoryFilter,
         ...(excludeCommitments
@@ -819,9 +825,10 @@ export class AnalyticsService {
       .filter((t) => t.type === 'INCOME')
       .reduce((s, t) => s + Number(t.amount), 0);
     // TRACK counts as spending; cash withdrawal / wallet transfer do not.
+    // Travel-linked spend stays out of day-to-day totals (visible on the trip).
     const expense =
       txs
-        .filter((t) => this.isSpendTx(t))
+        .filter((t) => this.isSpendTx(t) && !t.travelId)
         .reduce((s, t) => s + Number(t.amount), 0) +
       claims.reduce((s, c) => s + Number(c.amount), 0) +
       gifts.reduce(
@@ -836,6 +843,7 @@ export class AnalyticsService {
       txs: txs.map((t) => ({
         ...actorForSpace(membership.kind, t),
         amount: Number(t.amount),
+        travelId: t.travelId,
       })),
       claims: claims.map((c) => {
         const reimbursed = c.reimbursements.reduce(

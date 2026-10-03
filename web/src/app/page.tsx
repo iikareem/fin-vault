@@ -62,6 +62,20 @@ type GoalsHome = {
   savingsBalance: number;
   goals: { id: string }[];
 };
+type TravelHomeCard = {
+  id: string;
+  name: string;
+  currency: string;
+  softLimit: number | null;
+  spent: number;
+  pct: number | null;
+  overLimit: boolean;
+  status: "upcoming" | "active" | "past";
+};
+type TravelsHome = {
+  active: TravelHomeCard | null;
+  travels: TravelHomeCard[];
+};
 type SubsHome = {
   unpaidCount: number;
   dueAmount: number;
@@ -149,6 +163,7 @@ export default function HomePage() {
   const [charity, setCharity] = useState<CharityMonth | null>(null);
   const [gold, setGold] = useState<GoldHome | null>(null);
   const [goals, setGoals] = useState<GoalsHome | null>(null);
+  const [travels, setTravels] = useState<TravelsHome | null>(null);
   const [subs, setSubs] = useState<SubsHome | null>(null);
   const [outside, setOutside] = useState<OutsideHome | null>(null);
   const [claims, setClaims] = useState<Claim[]>([]);
@@ -223,6 +238,7 @@ export default function HomePage() {
       jobs.push(
         api<GoldHome>(householdPath(active.householdId, "/gold")),
         api<GoalsHome>(householdPath(active.householdId, "/savings-goals")),
+        api<TravelsHome>(householdPath(active.householdId, "/travels")),
         api<SubsHome>(householdPath(active.householdId, "/subscriptions")),
         api<OutsideHome>(
           householdPath(active.householdId, "/outside-loans"),
@@ -246,13 +262,15 @@ export default function HomePage() {
           setCovers(sortByOccurredOnDesc(result[5] as Cover[]));
           setGold(null);
           setGoals(null);
+          setTravels(null);
           setSubs(null);
           setOutside(null);
         } else {
           setGold(result[3] as GoldHome);
           setGoals(result[4] as GoalsHome);
-          setSubs(result[5] as SubsHome);
-          setOutside(result[6] as OutsideHome);
+          setTravels(result[5] as TravelsHome);
+          setSubs(result[6] as SubsHome);
+          setOutside(result[7] as OutsideHome);
         }
       })
       .catch((e) => setError(e.message));
@@ -1643,7 +1661,74 @@ export default function HomePage() {
           </span>
         </Link>
       ) : (
-        <div className="mt-5 grid grid-cols-2 gap-3">
+        <div className="mt-5 space-y-3">
+          {travels?.active ? (
+            <Link
+              href={`/travels/${travels.active.id}`}
+              className="relative flex flex-col overflow-hidden rounded-[1.5rem] bg-[var(--soft-sky)] p-3.5 shadow-sm ring-1 ring-sky-200/50 transition hover:opacity-95 active:scale-[0.99]"
+            >
+              <span
+                className="absolute inset-x-0 top-0 h-1 bg-sky-600"
+                aria-hidden
+              />
+              <span className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-2">
+                  <span
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-xl text-base"
+                    style={{
+                      background:
+                        "color-mix(in srgb, var(--surface-bg) 72%, transparent)",
+                    }}
+                    aria-hidden
+                  >
+                    ✈
+                  </span>
+                  <span className="text-sm font-semibold text-[var(--foreground)]">
+                    {travels.active.name}
+                  </span>
+                </span>
+                <span className="rounded-full bg-sky-800 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+                  {t("travelsActive")}
+                </span>
+              </span>
+              <span className="mt-2 text-lg font-bold tabular-nums text-[var(--foreground)]">
+                <PrivateMoney
+                  amount={travels.active.spent}
+                  currency={travels.active.currency}
+                  locale={locale}
+                  visible={moneyVisible}
+                />
+                {travels.active.softLimit != null ? (
+                  <span className="text-sm font-semibold text-[var(--muted)]">
+                    {" "}
+                    /{" "}
+                    <PrivateMoney
+                      amount={travels.active.softLimit}
+                      currency={travels.active.currency}
+                      locale={locale}
+                      visible={moneyVisible}
+                    />
+                  </span>
+                ) : null}
+              </span>
+              {travels.active.pct != null ? (
+                <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-[var(--panel-soft)]">
+                  <span
+                    className={`block h-full rounded-full ${
+                      travels.active.overLimit ? "bg-amber-600" : "bg-sky-600"
+                    }`}
+                    style={{
+                      width: `${Math.min(100, Math.max(0, travels.active.pct))}%`,
+                    }}
+                  />
+                </span>
+              ) : null}
+              <span className="mt-2 text-xs font-semibold text-sky-900">
+                {t("travelsHomeActive")}
+              </span>
+            </Link>
+          ) : null}
+        <div className="grid grid-cols-2 gap-3">
           {(
             [
               {
@@ -1653,6 +1738,7 @@ export default function HomePage() {
                 accent: "var(--accent-a)",
                 title: t("navGoals"),
                 amount: goals?.allocated,
+                amountCurrency: currency,
                 hint:
                   goals && goals.goals.length > 0
                     ? goals.goals.length === 1
@@ -1662,6 +1748,23 @@ export default function HomePage() {
                         })
                     : t("goalsHomeHint"),
                 hintClass: "text-[var(--muted)]",
+              },
+              {
+                href: travels?.active
+                  ? `/travels/${travels.active.id}`
+                  : "/travels",
+                emoji: "✈",
+                soft: "var(--soft-sky)",
+                accent: "#0284c7",
+                title: t("navTravels"),
+                amount: travels?.active?.spent,
+                amountCurrency: travels?.active?.currency ?? currency,
+                hint: travels?.active
+                  ? travels.active.name
+                  : t("travelsHomeHint"),
+                hintClass: travels?.active
+                  ? "font-semibold text-sky-900"
+                  : "text-[var(--muted)]",
               },
               {
                 href: "/commitments",
@@ -1674,6 +1777,7 @@ export default function HomePage() {
                     ? subs.dueAmount
                     : subs.monthlyTotal
                   : undefined,
+                amountCurrency: currency,
                 hint:
                   subs && subs.subscriptions.length > 0
                     ? subs.unpaidCount === 0
@@ -1696,6 +1800,7 @@ export default function HomePage() {
                 accent: "#d97706",
                 title: t("navGold"),
                 amount: gold?.totalValue,
+                amountCurrency: currency,
                 hint:
                   gold?.totalGainLoss != null ? null : t("goldHomeHint"),
                 hintNode:
@@ -1731,6 +1836,7 @@ export default function HomePage() {
                 accent: "#0284c7",
                 title: t("navOutsideLoans"),
                 amount: outside?.owedToYou,
+                amountCurrency: currency,
                 hint:
                   outside && outside.open.length > 0
                     ? t("outsideOwedToYou")
@@ -1768,10 +1874,14 @@ export default function HomePage() {
                 {tile.amount != null ? (
                   <PrivateMoney
                     amount={tile.amount}
-                    currency={currency}
+                    currency={
+                      "amountCurrency" in tile ? tile.amountCurrency : currency
+                    }
                     locale={locale}
                     visible={moneyVisible}
                   />
+                ) : tile.href.startsWith("/travels") ? (
+                  "＋"
                 ) : (
                   "…"
                 )}
@@ -1785,6 +1895,7 @@ export default function HomePage() {
               </span>
             </Link>
           ))}
+        </div>
         </div>
       )}
 

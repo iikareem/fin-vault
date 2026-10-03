@@ -100,6 +100,7 @@ model Household {
   outsideLoans OutsideLoan[]
   savingsGoals SavingsGoal[]
   subscriptions Subscription[]
+  travels      Travel[]
 }
 
 model User {
@@ -211,6 +212,9 @@ model Transaction {
   category      Category       @relation(fields: [categoryId], references: [id])
   userId        String
   user          User           @relation(fields: [userId], references: [id])
+  /** When set, this spend belongs to a personal travel envelope (excluded from day-to-day analytics). */
+  travelId      String?
+  travel        Travel?        @relation(fields: [travelId], references: [id], onDelete: Restrict)
   type          TxType
   amount        Decimal        @db.Decimal(14, 2)
   occurredOn    DateTime       @db.Date
@@ -237,6 +241,27 @@ model Transaction {
   @@index([householdId, occurredOn])
   @@index([householdId, categoryId])
   @@index([householdId, userId])
+  @@index([travelId])
+}
+
+/** Personal-only dated spend envelope (one active trip at a time). */
+model Travel {
+  id          String        @id @default(cuid())
+  householdId String
+  household   Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  name        String
+  /** Display / entry currency for this trip (may differ from household currency). */
+  currency    String
+  /** Soft budget in trip currency; null = no limit. Never blocks spend. */
+  softLimit   Decimal?      @db.Decimal(14, 2)
+  startsOn    DateTime      @db.Date
+  endsOn      DateTime      @db.Date
+  note        String        @default("")
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  txs         Transaction[]
+
+  @@index([householdId, startsOn, endsOn])
 }
 
 model PeerLoan {

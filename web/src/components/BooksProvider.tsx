@@ -76,7 +76,7 @@ type BooksValue = {
 const BooksContext = createContext<BooksValue | null>(null);
 
 const HOUSE_ONLY = ["/between", "/family", "/charity", "/more", "/with-house"];
-const PERSONAL_ONLY = ["/gold", "/outside-loans"];
+const PERSONAL_ONLY = ["/gold", "/outside-loans", "/travels"];
 
 const THEME_KEY = "fb_theme";
 

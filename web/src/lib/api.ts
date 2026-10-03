@@ -79,6 +79,7 @@ function currencyLabel(currency: string, locale: "ar" | "en") {
     if (currency === "KWD") return "د.ك.";
     if (currency === "QAR") return "ر.ق.";
     if (currency === "BHD") return "د.ب.";
+    if (currency === "TRY") return "ل.ت.";
   }
   return currency;
 }
