@@ -285,8 +285,6 @@ export default function HomePage() {
   const currentWallet = cashAccounts.find(isCurrentWallet);
   const savingsWallet = cashAccounts.find(isSavingsWallet);
   const cashTotal = cashAccounts.reduce((s, a) => s + a.balance, 0);
-  const goldValue = gold?.totalValue ?? 0;
-  const netTotal = cashTotal + goldValue;
   const currentBal = currentWallet?.balance ?? 0;
   const savingsBal = savingsWallet?.balance ?? 0;
   const suggestTransferToCurrent =
@@ -675,27 +673,24 @@ export default function HomePage() {
               </div>
             </div>
             {!isHouse ? (
-              <div
-                className="mt-3 rounded-2xl px-3 py-2"
+              <Link
+                href="/net"
+                onClick={(e) => e.stopPropagation()}
+                className="mt-3 flex min-h-12 items-center justify-between gap-3 rounded-2xl px-3 py-2.5 transition hover:opacity-95 active:scale-[0.99]"
                 style={{ background: "rgba(255,255,255,0.18)" }}
               >
-                <div className="flex items-baseline justify-between gap-3">
-                  <p className="text-sm opacity-90">{t("homeNet")}</p>
-                  <p className="text-xl font-semibold leading-tight">
-                    {accounts.length ? (
-                      <PrivateMoney
-                        amount={netTotal}
-                        currency={currency}
-                        locale={locale}
-                        visible={moneyVisible}
-                      />
-                    ) : (
-                      "…"
-                    )}
-                  </p>
-                </div>
-                <p className="mt-1 text-xs opacity-80">{t("homeNetHint")}</p>
-              </div>
+                <span className="min-w-0 text-start">
+                  <span className="block text-base font-semibold leading-snug">
+                    {t("homeNet")}
+                  </span>
+                  <span className="mt-0.5 block text-xs font-medium leading-snug opacity-80">
+                    {t("homeNetOpen")}
+                  </span>
+                </span>
+                <span className="shrink-0 text-lg opacity-80" aria-hidden>
+                  →
+                </span>
+              </Link>
             ) : null}
             <div className="mt-3 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
               <div
