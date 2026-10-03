@@ -672,26 +672,6 @@ export default function HomePage() {
                 ) : null}
               </div>
             </div>
-            {!isHouse ? (
-              <Link
-                href="/net"
-                onClick={(e) => e.stopPropagation()}
-                className="mt-3 flex min-h-12 items-center justify-between gap-3 rounded-2xl px-3 py-2.5 transition hover:opacity-95 active:scale-[0.99]"
-                style={{ background: "rgba(255,255,255,0.18)" }}
-              >
-                <span className="min-w-0 text-start">
-                  <span className="block text-base font-semibold leading-snug">
-                    {t("homeNet")}
-                  </span>
-                  <span className="mt-0.5 block text-xs font-medium leading-snug opacity-80">
-                    {t("homeNetOpen")}
-                  </span>
-                </span>
-                <span className="shrink-0 text-lg opacity-80" aria-hidden>
-                  →
-                </span>
-              </Link>
-            ) : null}
             <div className="mt-3 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
               <div
                 className="rounded-2xl px-3 py-2"
@@ -742,6 +722,26 @@ export default function HomePage() {
                 ) : null}
               </div>
             </div>
+            {!isHouse ? (
+              <Link
+                href="/net"
+                onClick={(e) => e.stopPropagation()}
+                className="mt-3 flex min-h-12 items-center justify-between gap-3 rounded-2xl px-3 py-2.5 transition hover:opacity-95 active:scale-[0.99]"
+                style={{ background: "rgba(255,255,255,0.18)" }}
+              >
+                <span className="min-w-0 text-start">
+                  <span className="block text-base font-semibold leading-snug">
+                    {t("homeNet")}
+                  </span>
+                  <span className="mt-0.5 block text-xs font-medium leading-snug opacity-80">
+                    {t("homeNetOpen")}
+                  </span>
+                </span>
+                <span className="shrink-0 text-lg opacity-80" aria-hidden>
+                  →
+                </span>
+              </Link>
+            ) : null}
             {canToggleMoney ? (
               <p className="mt-3 text-sm opacity-90">
                 {moneyVisible ? t("tapToHideMoney") : t("tapToShowMoney")}
