@@ -36,7 +36,7 @@ html[data-theme="light"] {
   --surface-bg: rgb(255 255 255 / 0.94);
   --surface-border: rgb(255 255 255 / 0.95);
   --surface-shadow: 0 10px 28px rgb(15 59 42 / 0.08);
-  --nav-bg: rgb(255 255 255 / 0.86);
+  --nav-bg: #ffffff;
   --nav-border: rgb(255 255 255 / 0.72);
   --nav-shadow: 0 8px 24px rgb(15 59 42 / 0.07);
   --input-bg: #ffffff;
@@ -77,7 +77,7 @@ html[data-theme="dark"] {
   --surface-bg: #121820;
   --surface-border: #243040;
   --surface-shadow: 0 8px 22px rgb(0 0 0 / 0.45);
-  --nav-bg: rgb(10 14 20 / 0.94);
+  --nav-bg: #0a0e14;
   --nav-border: #1e2836;
   --nav-shadow: 0 8px 24px rgb(0 0 0 / 0.5);
   --input-bg: #0c1118;
@@ -119,7 +119,7 @@ html[data-theme="ocean"] {
   --surface-bg: rgb(255 255 255 / 0.94);
   --surface-border: rgb(255 255 255 / 0.95);
   --surface-shadow: 0 10px 28px rgb(12 74 110 / 0.1);
-  --nav-bg: rgb(255 255 255 / 0.88);
+  --nav-bg: #ffffff;
   --nav-border: rgb(186 230 253 / 0.7);
   --nav-shadow: 0 8px 24px rgb(12 74 110 / 0.08);
   --input-bg: #ffffff;
@@ -160,7 +160,7 @@ html[data-theme="sand"] {
   --surface-bg: rgb(255 255 255 / 0.94);
   --surface-border: rgb(255 255 255 / 0.95);
   --surface-shadow: 0 10px 28px rgb(68 64 60 / 0.08);
-  --nav-bg: rgb(255 255 255 / 0.88);
+  --nav-bg: #ffffff;
   --nav-border: rgb(231 229 228 / 0.8);
   --nav-shadow: 0 8px 24px rgb(68 64 60 / 0.07);
   --input-bg: #ffffff;
@@ -201,7 +201,7 @@ html[data-theme="rose"] {
   --surface-bg: rgb(255 255 255 / 0.96);
   --surface-border: rgb(255 255 255 / 0.98);
   --surface-shadow: 0 10px 28px rgb(244 114 182 / 0.12);
-  --nav-bg: rgb(255 255 255 / 0.92);
+  --nav-bg: #ffffff;
   --nav-border: rgb(252 231 243 / 0.85);
   --nav-shadow: 0 8px 24px rgb(244 114 182 / 0.08);
   --input-bg: #ffffff;
@@ -242,7 +242,7 @@ html[data-theme="mint"] {
   --surface-bg: rgb(255 255 255 / 0.95);
   --surface-border: rgb(255 255 255 / 0.98);
   --surface-shadow: 0 10px 28px rgb(15 118 110 / 0.1);
-  --nav-bg: rgb(255 255 255 / 0.9);
+  --nav-bg: #ffffff;
   --nav-border: rgb(204 251 241 / 0.85);
   --nav-shadow: 0 8px 24px rgb(15 118 110 / 0.08);
   --input-bg: #ffffff;
@@ -282,7 +282,7 @@ html[data-theme="forest"] {
   --surface-bg: rgb(255 255 255 / 0.95);
   --surface-border: rgb(255 255 255 / 0.98);
   --surface-shadow: 0 10px 28px rgb(22 101 52 / 0.1);
-  --nav-bg: rgb(255 255 255 / 0.9);
+  --nav-bg: #ffffff;
   --nav-border: rgb(220 252 231 / 0.85);
   --nav-shadow: 0 8px 24px rgb(22 101 52 / 0.08);
   --input-bg: #ffffff;
@@ -322,7 +322,7 @@ html[data-theme="amber"] {
   --surface-bg: rgb(255 255 255 / 0.96);
   --surface-border: rgb(255 255 255 / 0.98);
   --surface-shadow: 0 10px 28px rgb(180 83 9 / 0.1);
-  --nav-bg: rgb(255 255 255 / 0.92);
+  --nav-bg: #ffffff;
   --nav-border: rgb(254 243 199 / 0.9);
   --nav-shadow: 0 8px 24px rgb(180 83 9 / 0.08);
   --input-bg: #ffffff;
@@ -362,7 +362,7 @@ html[data-theme="grape"] {
   --surface-bg: rgb(255 255 255 / 0.96);
   --surface-border: rgb(255 255 255 / 0.98);
   --surface-shadow: 0 10px 28px rgb(124 58 237 / 0.1);
-  --nav-bg: rgb(255 255 255 / 0.92);
+  --nav-bg: #ffffff;
   --nav-border: rgb(237 233 254 / 0.9);
   --nav-shadow: 0 8px 24px rgb(124 58 237 / 0.08);
   --input-bg: #ffffff;
@@ -402,7 +402,7 @@ html[data-theme="slate"] {
   --surface-bg: rgb(255 255 255 / 0.96);
   --surface-border: rgb(255 255 255 / 0.98);
   --surface-shadow: 0 10px 28px rgb(15 23 42 / 0.08);
-  --nav-bg: rgb(255 255 255 / 0.92);
+  --nav-bg: #ffffff;
   --nav-border: rgb(226 232 240 / 0.9);
   --nav-shadow: 0 8px 24px rgb(15 23 42 / 0.07);
   --input-bg: #ffffff;
@@ -442,7 +442,7 @@ html[data-theme="midnight"] {
   --surface-bg: #141b2f;
   --surface-border: #24304a;
   --surface-shadow: 0 8px 22px rgb(0 0 0 / 0.45);
-  --nav-bg: rgb(11 16 32 / 0.94);
+  --nav-bg: #0b1020;
   --nav-border: #1f2942;
   --nav-shadow: 0 8px 24px rgb(0 0 0 / 0.5);
   --input-bg: #0e1426;
@@ -508,21 +508,14 @@ body {
   background-color: var(--background);
 }
 
+/* Soft atmosphere on the document itself — avoid a fixed full-screen layer
+   that iOS composites under the status bar / Dynamic Island while scrolling. */
 body {
   position: relative;
   color: var(--foreground);
   font-family: var(--font-arabic), system-ui, sans-serif;
   -webkit-tap-highlight-color: transparent;
   text-rendering: optimizeLegibility;
-}
-
-/* Soft atmosphere — keep top wash light so titles stay crisp. */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
   background-color: var(--background);
   background-image:
     radial-gradient(
@@ -535,6 +528,7 @@ body::before {
       var(--grad-b),
       transparent 55%
     );
+  background-attachment: scroll;
 }
 
 a,
@@ -586,14 +580,25 @@ button:focus-visible {
 }
 
 @utility chrome-bar {
+  /* Opaque — avoid iOS status-bar / Dynamic Island blur compositing. */
   background-color: var(--chrome-bg);
   border-bottom: 1px solid var(--chrome-edge);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  transform: translateZ(0);
+}
+
+.chrome-bar.chrome-bar-flush {
+  border-bottom: none;
 }
 
 @utility nav-shell {
+  /* Solid fill; backdrop-filter on iOS ProMotion can smear while scrolling. */
   background-color: var(--nav-bg);
   border: 1px solid var(--nav-border);
   box-shadow: var(--nav-shadow);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 .nav-tab {
