@@ -123,6 +123,7 @@ function AddForm() {
     const wantCover = search.get("mode") === "cover";
     const wantTransfer = search.get("mode") === "transfer";
     const wantWithdraw = search.get("mode") === "withdraw";
+    const wantType = (search.get("type") || "").toLowerCase();
     if (isHouseMember || wantClaim) {
       setMode("claim");
       setType("EXPENSE");
@@ -137,8 +138,11 @@ function AddForm() {
       setType("EXPENSE");
     } else {
       setMode("wallet");
+      if (search.get("mode") === "give" && !isHouseMember) setType("GIVE");
+      else if (wantType === "income" || wantType === "salary") setType("INCOME");
+      else if (wantType === "expense" || wantType === "spend") setType("EXPENSE");
+      else setType("EXPENSE");
     }
-    if (search.get("mode") === "give" && !isHouseMember) setType("GIVE");
     const jobs: Promise<unknown>[] = [
       api<Account[]>(householdPath(active.householdId, "/accounts")),
       api<Category[]>(householdPath(active.householdId, "/categories")),
@@ -163,10 +167,29 @@ function AddForm() {
           : null;
         const current = a.find(isCurrentWallet) ?? a[0];
         const savings = a.find(isSavingsWallet);
-        if (rememberedAccount) setAccountId(rememberedAccount.id);
-        else if (current) setAccountId(current.id);
-        if (savings) setToAccountId(savings.id);
-        else if (a[1]) setToAccountId(a[1].id);
+        const walletByKey = (key: string | null) => {
+          if (key === "savings") return savings ?? null;
+          if (key === "current") return current ?? null;
+          return null;
+        };
+        const fromWanted = walletByKey(search.get("from"));
+        const toWanted = walletByKey(search.get("to"));
+        if (wantTransfer && active.kind === "PERSONAL") {
+          const fromAcc: Account | undefined =
+            fromWanted ?? current ?? a[0];
+          let toAcc: Account | null =
+            toWanted ?? savings ?? a[1] ?? null;
+          if (toAcc && fromAcc && toAcc.id === fromAcc.id) {
+            toAcc = a.find((x) => x.id !== fromAcc.id) ?? null;
+          }
+          if (fromAcc) setAccountId(fromAcc.id);
+          if (toAcc) setToAccountId(toAcc.id);
+        } else {
+          if (rememberedAccount) setAccountId(rememberedAccount.id);
+          else if (current) setAccountId(current.id);
+          if (savings) setToAccountId(savings.id);
+          else if (a[1]) setToAccountId(a[1].id);
+        }
         if (active.kind === "PERSONAL") {
           setRecentCategoryIds(readRecentCategoryIds(active.householdId));
         } else {

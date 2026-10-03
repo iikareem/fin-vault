@@ -268,6 +268,23 @@ export default function HomePage() {
   const currentWallet = cashAccounts.find(isCurrentWallet);
   const savingsWallet = cashAccounts.find(isSavingsWallet);
   const cashTotal = cashAccounts.reduce((s, a) => s + a.balance, 0);
+  const currentBal = currentWallet?.balance ?? 0;
+  const savingsBal = savingsWallet?.balance ?? 0;
+  const suggestTransferToCurrent =
+    !isHouse && savingsBal > 0.001 && currentBal < savingsBal * 0.35;
+  const personalTransferHref = suggestTransferToCurrent
+    ? "/add?mode=transfer&from=savings&to=current"
+    : "/add?mode=transfer&from=current&to=savings";
+  const personalTransferTitle = suggestTransferToCurrent
+    ? t("homeTransferToCurrent")
+    : currentBal > 0.001 || savingsBal > 0.001
+      ? t("homeTransferToSavings")
+      : t("transferWallets");
+  const personalTransferHint = suggestTransferToCurrent
+    ? t("homeTransferToCurrentHint")
+    : currentBal > savingsBal && currentBal > 0.001
+      ? t("homeTransferToSavingsHint")
+      : t("homeTransferNeutralHint");
   const cashId = payWalletId || currentWallet?.id || cashAccounts[0]?.id;
   const personalCashAccounts = sortCashWallets(
     personalAccounts.filter(isCashAccount),
@@ -1618,21 +1635,48 @@ export default function HomePage() {
           <Hint>{t("addFromMyMoneyHomeHint")}</Hint>
         </>
       ) : (
-        <>
-        <Link
-          href="/add"
-          className="mt-5 flex min-h-16 items-center justify-center rounded-3xl bg-stone-900 text-lg font-semibold text-white shadow-md transition hover:opacity-95"
-        >
-          ➕ {t("addPersonal")}
-        </Link>
-        <Hint>{t("addPersonalHint")}</Hint>
-        <Link
-          href="/add?mode=transfer"
-          className="mt-2 flex min-h-14 items-center justify-center rounded-3xl bg-stone-700 text-lg font-semibold text-white shadow-md transition hover:opacity-95"
-        >
-          🔁 {t("transferWallets")}
-        </Link>
-        </>
+        <div className="mt-5 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <Link
+              href="/add?type=expense"
+              className="flex min-h-[5.5rem] flex-col justify-between rounded-[1.5rem] bg-stone-900 px-3.5 py-3 text-white shadow-md transition hover:opacity-95"
+            >
+              <span className="text-base font-semibold leading-snug">
+                🧾 {t("homeSpend")}
+              </span>
+              <span className="text-xs font-medium leading-snug text-white/70">
+                {t("homeSpendHint")}
+              </span>
+            </Link>
+            <Link
+              href="/add?type=income"
+              className="flex min-h-[5.5rem] flex-col justify-between rounded-[1.5rem] bg-emerald-800 px-3.5 py-3 text-white shadow-md transition hover:opacity-95"
+            >
+              <span className="text-base font-semibold leading-snug">
+                📈 {t("homeSalary")}
+              </span>
+              <span className="text-xs font-medium leading-snug text-white/70">
+                {t("homeSalaryHint")}
+              </span>
+            </Link>
+          </div>
+          <Link
+            href={personalTransferHref}
+            className="flex min-h-14 items-center justify-between gap-3 rounded-[1.5rem] bg-stone-700 px-4 py-3 text-white shadow-md transition hover:opacity-95"
+          >
+            <span className="min-w-0 text-start">
+              <span className="block text-base font-semibold leading-snug">
+                🔁 {personalTransferTitle}
+              </span>
+              <span className="mt-0.5 block text-xs font-medium leading-snug text-white/70">
+                {personalTransferHint}
+              </span>
+            </span>
+            <span className="shrink-0 text-lg opacity-80" aria-hidden>
+              →
+            </span>
+          </Link>
+        </div>
       )}
 
       {txs.length > 0 ? (
