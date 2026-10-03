@@ -107,14 +107,16 @@ function HistoryInner() {
   const canEditHouse = active?.kind === "PERSONAL" || active?.role === "ADMIN";
   const hideAggregates = active?.kind === "HOUSE" && house?.role !== "ADMIN";
 
-  function load(hid: string, on: string) {
-    return Promise.all([
-      api<DayLog>(householdPath(hid, `/analytics/day?on=${on}`)),
-      api<Category[]>(householdPath(hid, "/categories")),
-    ]).then(([d, c]) => {
-      setLog(d);
-      setCategories(c);
-    });
+  function loadDay(hid: string, on: string) {
+    return api<DayLog>(householdPath(hid, `/analytics/day?on=${on}`)).then(
+      setLog,
+    );
+  }
+
+  function loadCategories(hid: string) {
+    return api<Category[]>(householdPath(hid, "/categories")).then(
+      setCategories,
+    );
   }
 
   useEffect(() => {
@@ -125,9 +127,15 @@ function HistoryInner() {
     setDay(cal.today);
   }, [cal.today, onParam]);
 
+  // Categories rarely change — fetch once per household, not on every day flip.
   useEffect(() => {
     if (!active) return;
-    load(active.householdId, day).catch((e) => setError(e.message));
+    loadCategories(active.householdId).catch((e) => setError(e.message));
+  }, [active?.householdId]);
+
+  useEffect(() => {
+    if (!active) return;
+    loadDay(active.householdId, day).catch((e) => setError(e.message));
   }, [active?.householdId, day]);
 
   function goDay(next: string) {
@@ -167,7 +175,7 @@ function HistoryInner() {
         }),
       });
       setOpenId("");
-      await load(active.householdId, day);
+      await loadDay(active.householdId, day);
     } catch (e) {
       setError(e instanceof Error ? e.message : t("couldNotSave"));
     } finally {
@@ -189,7 +197,7 @@ function HistoryInner() {
         }),
       });
       setOpenId("");
-      await load(active.householdId, day);
+      await loadDay(active.householdId, day);
     } catch (e) {
       setError(e instanceof Error ? e.message : t("couldNotSave"));
     } finally {
@@ -207,7 +215,7 @@ function HistoryInner() {
         body: JSON.stringify({ amount: parseAmount(amount), note }),
       });
       setOpenId("");
-      await load(active.householdId, day);
+      await loadDay(active.householdId, day);
     } catch (e) {
       setError(e instanceof Error ? e.message : t("couldNotSave"));
     } finally {
@@ -223,7 +231,7 @@ function HistoryInner() {
       await api(householdPath(active.householdId, path), { method: "DELETE" });
       setOpenId("");
       setConfirmId("");
-      await load(active.householdId, day);
+      await loadDay(active.householdId, day);
     } catch (e) {
       setError(e instanceof Error ? e.message : t("couldNotSave"));
     } finally {

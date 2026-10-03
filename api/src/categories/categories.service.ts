@@ -151,9 +151,29 @@ const DELETE_LIST = [
 
 @Injectable()
 export class CategoriesService {
+  /** Skip expensive seed/sync work for this long after a successful run. */
+  private static readonly SEED_TTL_MS = 15 * 60 * 1000;
+  private seedSyncedAt = new Map<string, number>();
+
   constructor(private prisma: PrismaService) {}
 
   async list(householdId: string, kind: HouseholdKind, userId: string) {
+    await this.ensureSeeded(householdId, kind);
+    const cats = await this.prisma.category.findMany({
+      where: { householdId, hidden: false },
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    });
+    return this.orderByUserUsage(householdId, userId, cats);
+  }
+
+  /**
+   * Seed/rename/merge categories at most once per TTL per household.
+   * Days and other readers hit /categories often; full sync every time is too slow.
+   */
+  private async ensureSeeded(householdId: string, kind: HouseholdKind) {
+    const last = this.seedSyncedAt.get(householdId) ?? 0;
+    if (Date.now() - last < CategoriesService.SEED_TTL_MS) return;
+
     await this.mergeLegacyGift(householdId);
     if (kind === 'HOUSE') {
       for (const cat of HOUSE_PAID) {
@@ -178,11 +198,7 @@ export class CategoriesService {
       await this.syncPersonal(householdId);
     }
     await this.fillMissingNameAr(householdId);
-    const cats = await this.prisma.category.findMany({
-      where: { householdId, hidden: false },
-      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-    });
-    return this.orderByUserUsage(householdId, userId, cats);
+    this.seedSyncedAt.set(householdId, Date.now());
   }
 
   /** Backfill Arabic labels for known English category names. */
@@ -512,8 +528,11 @@ export class CategoriesService {
   }
 
   async manageList(householdId: string) {
+    // Always fully sync when the user opens category management.
+    this.seedSyncedAt.delete(householdId);
     await this.syncPersonal(householdId);
     await this.fillMissingNameAr(householdId);
+    this.seedSyncedAt.set(householdId, Date.now());
     const cats = await this.prisma.category.findMany({
       where: { householdId, hidden: false },
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
