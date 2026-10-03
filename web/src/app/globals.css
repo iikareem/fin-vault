@@ -546,10 +546,15 @@ body {
   /*
     Cover the safe area PLUS a few px of frost-bleed that iOS paints
     below the status bar. env() must be used directly (not via var()).
+    Requires apple-mobile-web-app-status-bar-style=black-translucent
+    or iOS keeps an opaque white system bar instead.
   */
   height: calc(constant(safe-area-inset-top) + 10px);
   height: calc(env(safe-area-inset-top, 0px) + 10px);
   background-color: var(--background);
+  background-image: none;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
   position: relative;
   z-index: 50;
 }

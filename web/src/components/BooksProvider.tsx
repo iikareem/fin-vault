@@ -20,6 +20,7 @@ import {
   type Space,
 } from "@/lib/space";
 import {
+  appleStatusBarStyle,
   isDarkTheme,
   normalizeTheme,
   themeMetaColor,
@@ -29,6 +30,22 @@ import { applyUiPrefs, readUiPrefs } from "@/lib/uiPrefs";
 import { useI18n } from "./I18nProvider";
 
 export type ThemeMode = ThemeId;
+
+function setMetaContent(name: string, content: string) {
+  const nodes = document.querySelectorAll(`meta[name="${name}"]`);
+  if (!nodes.length) {
+    const el = document.createElement("meta");
+    el.setAttribute("name", name);
+    el.setAttribute("content", content);
+    document.head.appendChild(el);
+    return;
+  }
+  nodes.forEach((node) => {
+    if (node.getAttribute("content") !== content) {
+      node.setAttribute("content", content);
+    }
+  });
+}
 
 type BooksValue = {
   userId: string;
@@ -87,21 +104,12 @@ function applyTheme(theme: ThemeMode) {
     /* ignore */
   }
   const color = themeMetaColor(theme);
-  let meta = document.querySelector('meta[name="theme-color"]');
-  if (!meta) {
-    meta = document.createElement("meta");
-    meta.setAttribute("name", "theme-color");
-    document.head.appendChild(meta);
-  }
-  if (meta.getAttribute("content") !== color) {
-    meta.setAttribute("content", color);
-  }
-  const bar = document.querySelector(
-    'meta[name="apple-mobile-web-app-status-bar-style"]',
+  root.style.backgroundColor = color;
+  setMetaContent("theme-color", color);
+  setMetaContent(
+    "apple-mobile-web-app-status-bar-style",
+    appleStatusBarStyle(theme),
   );
-  if (bar) {
-    bar.setAttribute("content", dark ? "black-translucent" : "default");
-  }
 }
 
 export function BooksProvider({ children }: { children: ReactNode }) {

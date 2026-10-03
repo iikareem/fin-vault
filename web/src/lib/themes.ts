@@ -101,6 +101,13 @@ export function isDarkTheme(theme: ThemeId) {
   return THEME_OPTIONS.find((t) => t.id === theme)?.dark === true;
 }
 
+/** iOS PWA status bar: translucent so page bg paints under it on dark themes. */
+export function appleStatusBarStyle(
+  theme: ThemeId,
+): "black-translucent" | "default" {
+  return isDarkTheme(theme) ? "black-translucent" : "default";
+}
+
 export function themeMetaColor(theme: ThemeId): string {
   return THEME_OPTIONS.find((t) => t.id === theme)?.themeColor ?? "#edf4f0";
 }
