@@ -630,6 +630,9 @@ const ar = {
   nGroupsSelected: "{n} فئات مختارة",
   topThreeGroups: "أكبر 3",
   topFiveGroups: "أكبر 5",
+  withoutCommitments: "من غير الالتزامات",
+  withoutCommitmentsHint:
+    "يشيل صرف الالتزامات الشهرية من الفئات، ويسيب اللي اتصرّف من غيرها.",
   ofSelection: "{pct}% من الاختيار",
   ofPeriod: "{pct}% من الفترة",
   periodShareLabel: "من الفترة",
@@ -1483,6 +1486,9 @@ const en = {
   nGroupsSelected: "{n} groups selected",
   topThreeGroups: "Top 3",
   topFiveGroups: "Top 5",
+  withoutCommitments: "Without commitments",
+  withoutCommitmentsHint:
+    "Removes monthly commitment payments from groups; leftover non-commitment spend stays.",
   ofSelection: "{pct}% of selection",
   ofPeriod: "{pct}% of period",
   periodShareLabel: "of period",

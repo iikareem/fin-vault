@@ -401,8 +401,14 @@ export class AnalyticsService {
     return [...map.values()].sort((a, b) => a.day.localeCompare(b.day));
   }
 
-  async byCategory(membership: MembershipContext, from: string, to: string) {
+  async byCategory(
+    membership: MembershipContext,
+    from: string,
+    to: string,
+    opts: { excludeCommitments?: boolean } = {},
+  ) {
     const householdId = membership.householdId;
+    const excludeCommitments = Boolean(opts.excludeCommitments);
     const rows = await this.prisma.transaction.groupBy({
       by: ['categoryId', 'type'],
       where: {
@@ -410,6 +416,11 @@ export class AnalyticsService {
         type: { not: 'REIMBURSEMENT' },
         occurredOn: { gte: dateOnlyUtc(from), lte: dateOnlyUtc(to) },
         category: nonSpendCategoryFilter,
+        // Drop commitment (subscription) payments; keep the same category if
+        // there is still other spend left after that subtraction.
+        ...(excludeCommitments
+          ? { subscriptionPayment: { is: null } }
+          : {}),
       },
       _sum: { amount: true },
     });
@@ -583,7 +594,9 @@ export class AnalyticsService {
     from: string,
     to: string,
     categoryIds: string[],
+    opts: { excludeCommitments?: boolean } = {},
   ) {
+    const excludeCommitments = Boolean(opts.excludeCommitments);
     const ids = [...new Set(categoryIds.filter(Boolean))];
     if (ids.length === 0) {
       throw new BadRequestException('Pick at least one category');
@@ -627,6 +640,9 @@ export class AnalyticsService {
         occurredOn: { gte: dateOnlyUtc(from), lte: dateOnlyUtc(to) },
         categoryId: { in: expandedIds },
         category: nonSpendCategoryFilter,
+        ...(excludeCommitments
+          ? { subscriptionPayment: { is: null } }
+          : {}),
       },
       include: {
         account: { select: { id: true, name: true } },

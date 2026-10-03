@@ -75,12 +75,17 @@ export class AnalyticsController {
     @CurrentUser() user: AuthUser,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('excludeCommitments') excludeCommitments?: string,
   ) {
     const fallback = await this.periodFallback(membership, user.id);
     return this.analytics.byCategory(
       membership,
       from ?? fallback.from,
       to ?? fallback.to,
+      {
+        excludeCommitments:
+          excludeCommitments === '1' || excludeCommitments === 'true',
+      },
     );
   }
 
@@ -106,6 +111,7 @@ export class AnalyticsController {
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('categoryIds') categoryIds?: string,
+    @Query('excludeCommitments') excludeCommitments?: string,
   ) {
     const fallback = await this.periodFallback(membership, user.id);
     const ids = (categoryIds ?? '')
@@ -117,6 +123,10 @@ export class AnalyticsController {
       from ?? fallback.from,
       to ?? fallback.to,
       ids,
+      {
+        excludeCommitments:
+          excludeCommitments === '1' || excludeCommitments === 'true',
+      },
     );
   }
 }

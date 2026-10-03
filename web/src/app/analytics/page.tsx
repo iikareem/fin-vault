@@ -230,6 +230,7 @@ export default function AnalyticsPage() {
   const [prevIn, setPrevIn] = useState<number | null>(null);
   const [prevOut, setPrevOut] = useState<number | null>(null);
   const [cats, setCats] = useState<CatRow[]>([]);
+  const [excludeCommitments, setExcludeCommitments] = useState(false);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
   const [expandedSubs, setExpandedSubs] = useState<string[]>([]);
   const [members, setMembers] = useState<MemberRow[]>([]);
@@ -263,10 +264,12 @@ export default function AnalyticsPage() {
   useEffect(() => {
     if (!active) return;
     const id = active.householdId;
-    const q = `from=${from}&to=${to}`;
+    const q = new URLSearchParams({ from, to });
+    const catQ = new URLSearchParams({ from, to });
+    if (excludeCommitments) catQ.set("excludeCommitments", "1");
     Promise.all([
       api<DayRow[]>(householdPath(id, `/analytics/by-day?${q}`)),
-      api<CatRow[]>(householdPath(id, `/analytics/by-category?${q}`)),
+      api<CatRow[]>(householdPath(id, `/analytics/by-category?${catQ}`)),
       api<MemberRow[]>(householdPath(id, `/analytics/by-member?${q}`)),
       api<{ opening: number; months: SavingsMonth[] }>(
         householdPath(id, "/analytics/savings"),
@@ -282,7 +285,7 @@ export default function AnalyticsPage() {
         setSavingsMonths(s.months);
       })
       .catch((e) => setError(e.message));
-  }, [active?.householdId, from, to]);
+  }, [active?.householdId, from, to, excludeCommitments]);
 
   useEffect(() => {
     if (!active || period === "range") {
@@ -359,9 +362,10 @@ export default function AnalyticsPage() {
   }, [days]);
 
   const totalIn = days.reduce((s, d) => s + d.income, 0);
-  const totalOut =
-    days.reduce((s, d) => s + d.expense, 0) ||
-    cats.reduce((s, c) => s + c.total, 0);
+  const dayOut = days.reduce((s, d) => s + d.expense, 0);
+  const catOut = cats.reduce((s, c) => s + c.total, 0);
+  // When commitment payments are excluded, category totals are the period base.
+  const totalOut = excludeCommitments ? catOut : dayOut || catOut;
 
   const compareLabel =
     period === "month"
@@ -1121,20 +1125,26 @@ export default function AnalyticsPage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => pickTop(5)}
-                  disabled={cats.length < 2}
-                  className="rounded-full bg-[var(--panel-soft)] px-3 py-1.5 text-sm font-semibold"
-                >
-                  {t("topFiveGroups")}
-                </button>
-                <button
-                  type="button"
                   onClick={() => {
                     setSelectedGroups(cats.map(catKey));
                   }}
+                  disabled={cats.length === 0}
                   className="rounded-full bg-[var(--panel-soft)] px-3 py-1.5 text-sm font-semibold"
                 >
                   {t("selectAllGroups")}
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={excludeCommitments}
+                  onClick={() => setExcludeCommitments((v) => !v)}
+                  className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
+                    excludeCommitments
+                      ? "bg-[var(--accent-b)] text-[var(--accent-b-fg)]"
+                      : "bg-[var(--panel-soft)]"
+                  }`}
+                  title={t("withoutCommitmentsHint")}
+                >
+                  {t("withoutCommitments")}
                 </button>
                 {selectionActive ? (
                   <button
@@ -1147,6 +1157,11 @@ export default function AnalyticsPage() {
                 ) : null}
               </div>
             </div>
+            {excludeCommitments ? (
+              <p className="mt-2 text-xs leading-snug text-[var(--muted)]">
+                {t("withoutCommitmentsHint")}
+              </p>
+            ) : null}
 
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
               {cats.length === 0 ? (
@@ -1524,6 +1539,9 @@ export default function AnalyticsPage() {
                           .join(","),
                         from,
                         to,
+                        ...(excludeCommitments
+                          ? { excludeCommitments: "1" }
+                          : {}),
                       }).toString()}`}
                       className="mt-3 flex w-full items-center justify-center rounded-2xl bg-[var(--accent-a)] px-4 py-3 text-base font-bold text-[var(--accent-a-fg)] transition hover:opacity-95 active:scale-[0.99]"
                     >

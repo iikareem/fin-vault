@@ -1639,36 +1639,45 @@ export default function HomePage() {
           <div className="grid grid-cols-2 gap-2">
             <Link
               href="/add?type=expense"
-              className="flex min-h-[5.5rem] flex-col justify-between rounded-[1.5rem] bg-stone-900 px-3.5 py-3 text-white shadow-md transition hover:opacity-95"
+              className="flex min-h-[5.5rem] flex-col justify-between rounded-[1.5rem] px-3.5 py-3 shadow-md transition hover:opacity-95"
+              style={{ background: "var(--cta-bg)", color: "var(--cta-fg)" }}
             >
               <span className="text-base font-semibold leading-snug">
                 🧾 {t("homeSpend")}
               </span>
-              <span className="text-xs font-medium leading-snug text-white/70">
+              <span className="text-xs font-medium leading-snug opacity-70">
                 {t("homeSpendHint")}
               </span>
             </Link>
             <Link
               href="/add?type=income"
-              className="flex min-h-[5.5rem] flex-col justify-between rounded-[1.5rem] bg-emerald-800 px-3.5 py-3 text-white shadow-md transition hover:opacity-95"
+              className="flex min-h-[5.5rem] flex-col justify-between rounded-[1.5rem] px-3.5 py-3 shadow-md transition hover:opacity-95"
+              style={{
+                background: "var(--accent-a)",
+                color: "var(--accent-a-fg)",
+              }}
             >
               <span className="text-base font-semibold leading-snug">
                 📈 {t("homeSalary")}
               </span>
-              <span className="text-xs font-medium leading-snug text-white/70">
+              <span className="text-xs font-medium leading-snug opacity-70">
                 {t("homeSalaryHint")}
               </span>
             </Link>
           </div>
           <Link
             href={personalTransferHref}
-            className="flex min-h-14 items-center justify-between gap-3 rounded-[1.5rem] bg-stone-700 px-4 py-3 text-white shadow-md transition hover:opacity-95"
+            className="flex min-h-14 items-center justify-between gap-3 rounded-[1.5rem] px-4 py-3 shadow-md transition hover:opacity-95"
+            style={{
+              background: "var(--accent-b)",
+              color: "var(--accent-b-fg)",
+            }}
           >
             <span className="min-w-0 text-start">
               <span className="block text-base font-semibold leading-snug">
                 🔁 {personalTransferTitle}
               </span>
-              <span className="mt-0.5 block text-xs font-medium leading-snug text-white/70">
+              <span className="mt-0.5 block text-xs font-medium leading-snug opacity-70">
                 {personalTransferHint}
               </span>
             </span>

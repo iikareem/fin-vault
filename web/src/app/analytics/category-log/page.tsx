@@ -92,6 +92,9 @@ function CategoryLogInner() {
   const hideAggregates = active?.kind === "HOUSE" && house?.role !== "ADMIN";
 
   const catsParam = search.get("cats") ?? "";
+  const excludeCommitments =
+    search.get("excludeCommitments") === "1" ||
+    search.get("excludeCommitments") === "true";
   const catIds = useMemo(
     () =>
       catsParam
@@ -149,6 +152,7 @@ function CategoryLogInner() {
       to,
       categoryIds: catIds.join(","),
     });
+    if (excludeCommitments) q.set("excludeCommitments", "1");
     api<CategoryLog>(
       householdPath(active.householdId, `/analytics/category-log?${q}`),
     )
@@ -158,7 +162,7 @@ function CategoryLogInner() {
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [active?.householdId, from, to, catIds.join(",")]);
+  }, [active?.householdId, from, to, catIds.join(","), excludeCommitments]);
 
   useEffect(() => {
     if (catIds.length === 0) return;
@@ -167,8 +171,9 @@ function CategoryLogInner() {
       from,
       to,
     });
+    if (excludeCommitments) params.set("excludeCommitments", "1");
     router.replace(`/analytics/category-log?${params}`, { scroll: false });
-  }, [from, to, catIds.join(",")]);
+  }, [from, to, catIds.join(","), excludeCommitments]);
 
   const categories = data?.categories ?? [];
   const visibleCats = categories.slice(0, 4);
@@ -208,6 +213,7 @@ function CategoryLogInner() {
       from,
       to,
     });
+    if (excludeCommitments) params.set("excludeCommitments", "1");
     return `/analytics/category-log?${params.toString()}`;
   }
 
@@ -229,6 +235,11 @@ function CategoryLogInner() {
       </Link>
 
       <h1 className="page-title mt-2">{t("categoryLogs")}</h1>
+      {excludeCommitments ? (
+        <p className="mt-1 text-sm text-[var(--muted)]">
+          {t("withoutCommitmentsHint")}
+        </p>
+      ) : null}
 
       {catIds.length === 0 ? (
         <p className="mt-4 text-sm text-[var(--muted)]">{t("noCategoryLogs")}</p>
