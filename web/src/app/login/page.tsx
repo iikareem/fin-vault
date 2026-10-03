@@ -80,7 +80,7 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 py-5 pb-[max(1.25rem,var(--sab))]">
+    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 py-5 pb-[max(1.25rem,env(safe-area-inset-bottom,0px))]">
       <LanguageSwitch />
       <div className="surface mt-6 rounded-[2rem] p-6">
         <Image

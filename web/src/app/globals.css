@@ -496,18 +496,6 @@ html[data-compact] .field {
   padding-bottom: 0.55rem;
 }
 
-/* Safe-area helpers — constant() for older iOS, env() for current. */
-:root {
-  --sat: constant(safe-area-inset-top);
-  --sat: env(safe-area-inset-top, 0px);
-  --sab: constant(safe-area-inset-bottom);
-  --sab: env(safe-area-inset-bottom, 0px);
-  --sal: constant(safe-area-inset-left);
-  --sal: env(safe-area-inset-left, 0px);
-  --sar: constant(safe-area-inset-right);
-  --sar: env(safe-area-inset-right, 0px);
-}
-
 html {
   /* clip avoids creating a scrollport that breaks position:sticky on iOS */
   overflow-x: clip;
@@ -541,11 +529,16 @@ body {
   background-image: none;
 }
 
-/* Pads content below the Dynamic Island; solid fill so the top stays crisp. */
+/*
+  IMPORTANT: use env() directly — Safari often resolves
+  env(safe-area-inset-*) inside custom properties (var(--sat)) as 0px,
+  which parks Hello under the status-bar scrim.
+*/
 .app-frame {
   position: relative;
   min-height: 100dvh;
-  padding-top: var(--sat);
+  padding-top: constant(safe-area-inset-top);
+  padding-top: env(safe-area-inset-top, 0px);
   background-color: var(--background);
 }
 
@@ -554,15 +547,16 @@ body {
   z-index: 1;
 }
 
-/* Soft atmosphere — clipped to the content box below the safe area. */
+/* Soft atmosphere — kept below the title so it cannot wash Hello. */
 .app-atmosphere {
   position: absolute;
   inset: 0;
+  top: 6.5rem;
   z-index: 0;
   pointer-events: none;
   background-image:
     radial-gradient(
-      ellipse 80% 36% at 50% 0%,
+      ellipse 80% 40% at 50% 0%,
       var(--grad-a),
       transparent 62%
     ),
@@ -580,7 +574,8 @@ body {
   inset-inline: 0;
   top: 0;
   z-index: 60;
-  height: var(--sat);
+  height: constant(safe-area-inset-top);
+  height: env(safe-area-inset-top, 0px);
   background-color: var(--background);
   pointer-events: none;
 }
@@ -911,9 +906,19 @@ html.dark .shadow-lg {
   margin-inline: auto;
   width: 100%;
   max-width: 32rem;
-  padding-inline: max(1rem, var(--sal), var(--sar));
+  padding-inline: max(
+    1rem,
+    constant(safe-area-inset-left),
+    constant(safe-area-inset-right)
+  );
+  padding-inline: max(
+    1rem,
+    env(safe-area-inset-left, 0px),
+    env(safe-area-inset-right, 0px)
+  );
   padding-top: 0.85rem;
-  padding-bottom: calc(7.25rem + var(--sab));
+  padding-bottom: calc(7.25rem + constant(safe-area-inset-bottom));
+  padding-bottom: calc(7.25rem + env(safe-area-inset-bottom, 0px));
 }
 
 @utility amount {

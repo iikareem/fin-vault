@@ -176,7 +176,7 @@ export function BottomNav() {
   }
 
   return (
-    <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.5rem,var(--sab))] sm:px-4">
+    <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] sm:px-4">
       <div className="pointer-events-auto relative mx-auto max-w-lg">
         <ul className="nav-shell grid grid-cols-5 items-end gap-0.5 rounded-2xl px-1.5 pb-1.5 pt-1.5">
           {left.map(sideLink)}
