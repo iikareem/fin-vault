@@ -19,10 +19,12 @@ import {
   type Space,
 } from "@/lib/space";
 import {
+  isDarkTheme,
   normalizeTheme,
   themeMetaColor,
   type ThemeId,
 } from "@/lib/themes";
+import { applyUiPrefs, readUiPrefs } from "@/lib/uiPrefs";
 
 export type ThemeMode = ThemeId;
 
@@ -59,7 +61,7 @@ function applyTheme(theme: ThemeMode) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
   root.setAttribute("data-theme", theme);
-  root.classList.toggle("dark", theme === "dark");
+  root.classList.toggle("dark", isDarkTheme(theme));
   try {
     localStorage.setItem(THEME_KEY, theme);
   } catch {
@@ -132,6 +134,10 @@ export function BooksProvider({ children }: { children: ReactNode }) {
     const me = await loadSpace();
     applyMe(me);
   }, [applyMe]);
+
+  useEffect(() => {
+    applyUiPrefs(readUiPrefs());
+  }, []);
 
   useEffect(() => {
     if (onAuthPage) {

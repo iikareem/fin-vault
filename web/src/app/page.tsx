@@ -21,6 +21,7 @@ import {
   isSavingsWallet,
   sortCashWallets,
 } from "@/lib/wallets";
+import { readUiPrefs } from "@/lib/uiPrefs";
 
 type Summary = {
   totalMoney: number;
@@ -148,7 +149,14 @@ export default function HomePage() {
   const [error, setError] = useState("");
   const [flash, setFlash] = useState("");
   const [busyEdit, setBusyEdit] = useState(false);
-  const [personalMoneyVisible, setPersonalMoneyVisible] = useState(false);
+  const [personalMoneyVisible, setPersonalMoneyVisible] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return !readUiPrefs().hideBalances;
+  });
+
+  useEffect(() => {
+    setPersonalMoneyVisible(!readUiPrefs().hideBalances);
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined") return;

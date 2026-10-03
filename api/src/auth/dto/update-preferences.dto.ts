@@ -13,7 +13,20 @@ export const CURRENCIES = [
   'BHD',
 ] as const;
 
-export const THEMES = ['light', 'dark', 'blue', 'ocean', 'sand', 'rose'] as const;
+export const THEMES = [
+  'light',
+  'dark',
+  'midnight',
+  'blue',
+  'ocean',
+  'mint',
+  'forest',
+  'sand',
+  'amber',
+  'rose',
+  'grape',
+  'slate',
+] as const;
 
 export class UpdatePreferencesDto {
   @IsOptional()
