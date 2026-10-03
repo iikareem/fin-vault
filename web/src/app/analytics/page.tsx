@@ -197,7 +197,7 @@ function CompareChip({
 
   return (
     <span
-      className={`mt-2 inline-flex max-w-full items-center rounded-full px-2 py-0.5 text-[11px] font-semibold leading-snug ${
+      className={`mt-1 inline-flex max-w-full items-center rounded-full px-2 py-0.5 text-[11px] font-semibold leading-snug ${
         flat
           ? "bg-stone-100 text-stone-600"
           : good
@@ -555,13 +555,13 @@ export default function AnalyticsPage() {
     <PageShell>
       <h1 className="page-title">📊 {t("navCharts")}</h1>
       <Hint>{t("chartsHint")}</Hint>
-      <div className="seg mt-4 grid w-full min-w-0 grid-cols-5">
+      <div className="seg mt-3 grid w-full min-w-0 grid-cols-5">
         {(["day", "week", "month", "year", "range"] as Period[]).map((p) => (
           <button
             key={p}
             type="button"
             onClick={() => setPeriodMode(p)}
-            className={`min-w-0 rounded-2xl px-0.5 py-2.5 text-center text-[11px] font-bold transition sm:px-1 sm:text-sm ${
+            className={`min-w-0 rounded-xl px-0.5 py-2 text-center text-[11px] font-bold transition sm:px-1 sm:text-sm ${
               period === p
                 ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
                 : "text-[var(--muted)]"
@@ -579,9 +579,8 @@ export default function AnalyticsPage() {
           </button>
         ))}
       </div>
-      <Hint>{t("periodHint")}</Hint>
       {period === "range" ? (
-        <div className="period-range mt-4 space-y-2">
+        <div className="period-range mt-3 space-y-2">
           <DateField
             label={t("fromDate")}
             value={rangeFrom}
@@ -599,10 +598,10 @@ export default function AnalyticsPage() {
           />
         </div>
       ) : (
-        <div className="mt-4 flex items-center gap-2">
+        <div className="mt-3 flex items-center gap-2">
           <button
             type="button"
-            className="icon-btn shrink-0 px-3 text-xl sm:px-4"
+            className="icon-btn shrink-0 !min-h-11 !min-w-11 px-3 text-xl sm:px-4"
             onClick={() => setCursor((c) => shift(period, c, -1, startDay))}
           >
             ‹
@@ -615,12 +614,12 @@ export default function AnalyticsPage() {
                 onChange={(v) => setCursor(new Date(`${v}T12:00:00`))}
               />
             ) : period === "week" && activeWeek ? (
-              <div className="field flex min-h-[3.25rem] w-full flex-col items-center justify-center gap-0.5 !py-1.5">
-                <span className="text-base font-semibold leading-tight">
+              <div className="field flex min-h-[2.75rem] w-full flex-col items-center justify-center gap-0.5 !py-1">
+                <span className="text-sm font-semibold leading-tight sm:text-base">
                   {fill(t("weekOfMonth"), { n: String(activeWeek.index) })}
                 </span>
                 <span
-                  className="text-xs font-medium tabular-nums text-[var(--muted)]"
+                  className="text-[11px] font-medium tabular-nums text-[var(--muted)] sm:text-xs"
                   dir="ltr"
                 >
                   {weekRangeLabel(activeWeek.from, activeWeek.to, locale)}
@@ -642,9 +641,9 @@ export default function AnalyticsPage() {
               />
             ) : (
               <label className="block min-w-0">
-                <span className="field relative flex min-h-[3.25rem] w-full items-center justify-center overflow-hidden !py-0">
+                <span className="field relative flex min-h-[2.75rem] w-full items-center justify-center overflow-hidden !py-0">
                   <span
-                    className="px-2 text-center text-lg font-semibold tabular-nums"
+                    className="px-2 text-center text-base font-semibold tabular-nums sm:text-lg"
                     dir="ltr"
                   >
                     {cursor.getFullYear()}
@@ -667,182 +666,181 @@ export default function AnalyticsPage() {
           </div>
           <button
             type="button"
-            className="icon-btn shrink-0 px-3 text-xl sm:px-4"
+            className="icon-btn shrink-0 !min-h-11 !min-w-11 px-3 text-xl sm:px-4"
             onClick={() => setCursor((c) => shift(period, c, 1, startDay))}
           >
             ›
           </button>
         </div>
       )}
-      <Hint>{t("pickPeriodHint")}</Hint>
       {period === "week" && weekInProgress ? (
-        <p className="mt-2 text-center text-sm text-[var(--muted)]">
+        <p className="mt-1.5 text-center text-xs text-[var(--muted)]">
           {t("weekSoFar")}
         </p>
       ) : null}
       {period === "month" && startDay !== 1 ? (
-        <p className="mt-2 text-center text-sm text-[var(--muted)]" dir="ltr">
+        <p className="mt-1.5 text-center text-xs text-[var(--muted)]" dir="ltr">
           {from} → {to}
         </p>
       ) : null}
-      {error ? <p className="mt-3 text-red-700">{error}</p> : null}
-      {hideAggregates ? (
-        <p className="surface mt-4 rounded-3xl px-4 py-3 text-sm text-stone-500">
-          {t("aggregatesAdminOnly")}
-        </p>
-      ) : null}
+      {error ? <p className="mt-2 text-red-700">{error}</p> : null}
 
-      {period === "month" && !hideAggregates ? (
-        <section className="surface mt-5 rounded-3xl p-4">
-          <h2 className="text-xl font-semibold">{t("savingsTitle")}</h2>
-          <Hint>{t("chartsSavingsHint")}</Hint>
-          <div className="mt-3 grid grid-cols-1 gap-2 text-base">
-            <p className="money-row">
-              <span className="text-stone-500" dir="auto">
-                {t("broughtFromBefore")}
-              </span>
-              <span className="font-semibold">
-                <Money
-                  amount={monthSavings.broughtForward}
-                  currency={currency}
-                  locale={locale}
-                />
-              </span>
-            </p>
-            <p className="money-row">
-              <span className="text-stone-500" dir="auto">
-                {monthSavings.saved < 0
-                  ? t("usedFromSavings")
-                  : t("savedInMonth")}
-              </span>
-              <span
-                className={`font-semibold ${
-                  monthSavings.saved < 0 ? "text-red-800" : "text-emerald-800"
-                }`}
-              >
-                <Money
-                  amount={monthSavings.saved}
-                  currency={currency}
-                  locale={locale}
-                />
-              </span>
-            </p>
-            <p className="money-row">
-              <span className="text-stone-500" dir="auto">
-                {t("goesToNextMonth")}
-              </span>
-              <span className="font-semibold">
-                <Money
-                  amount={monthSavings.remaining}
-                  currency={currency}
-                  locale={locale}
-                />
-              </span>
-            </p>
-          </div>
-        </section>
-      ) : null}
+      <section className="surface mt-3 overflow-hidden rounded-2xl">
+        {hideAggregates ? (
+          <p className="px-3.5 py-3 text-sm text-stone-500">
+            {t("aggregatesAdminOnly")}
+          </p>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 divide-x divide-[var(--surface-border)] rtl:divide-x-reverse">
+              <div className="flex flex-col px-3.5 py-3">
+                <p className="text-xs text-[var(--muted)]">{t("periodTotalIn")}</p>
+                <p className="mt-0.5 text-lg font-semibold leading-tight text-emerald-800 sm:text-xl">
+                  <Money amount={totalIn} currency={currency} locale={locale} />
+                </p>
+                {prevIn != null && compareLabel ? (
+                  <CompareChip
+                    current={totalIn}
+                    previous={prevIn}
+                    kind="in"
+                    label={compareLabel}
+                    t={t}
+                  />
+                ) : null}
+              </div>
+              <div className="flex flex-col px-3.5 py-3">
+                <p className="text-xs text-[var(--muted)]">{t("periodTotalOut")}</p>
+                <p className="mt-0.5 text-lg font-semibold leading-tight text-red-800 sm:text-xl">
+                  <Money amount={totalOut} currency={currency} locale={locale} />
+                </p>
+                {prevOut != null && compareLabel ? (
+                  <CompareChip
+                    current={totalOut}
+                    previous={prevOut}
+                    kind="out"
+                    label={compareLabel}
+                    t={t}
+                  />
+                ) : null}
+              </div>
+            </div>
+
+            {period === "month" ? (
+              <div className="border-t border-[var(--surface-border)] px-3.5 py-3">
+                <div className="flex items-baseline justify-between gap-2">
+                  <h2 className="text-sm font-semibold">{t("savingsTitle")}</h2>
+                  <span
+                    className={`text-sm font-semibold tabular-nums ${
+                      monthSavings.saved < 0 ? "text-red-800" : "text-emerald-800"
+                    }`}
+                  >
+                    <Money
+                      amount={monthSavings.saved}
+                      currency={currency}
+                      locale={locale}
+                    />
+                  </span>
+                </div>
+                <p className="mt-0.5 text-[11px] text-[var(--muted)]">
+                  {monthSavings.saved < 0
+                    ? t("usedFromSavings")
+                    : t("savedInMonth")}
+                </p>
+                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                  <p className="flex min-w-0 items-baseline justify-between gap-2">
+                    <span className="truncate text-[var(--muted)]" dir="auto">
+                      {t("broughtFromBefore")}
+                    </span>
+                    <span className="shrink-0 font-medium tabular-nums">
+                      <Money
+                        amount={monthSavings.broughtForward}
+                        currency={currency}
+                        locale={locale}
+                      />
+                    </span>
+                  </p>
+                  <p className="flex min-w-0 items-baseline justify-between gap-2">
+                    <span className="truncate text-[var(--muted)]" dir="auto">
+                      {t("goesToNextMonth")}
+                    </span>
+                    <span className="shrink-0 font-medium tabular-nums">
+                      <Money
+                        amount={monthSavings.remaining}
+                        currency={currency}
+                        locale={locale}
+                      />
+                    </span>
+                  </p>
+                </div>
+              </div>
+            ) : null}
+          </>
+        )}
+      </section>
 
       {period === "year" && !hideAggregates ? (
-        <>
-          <h2 className="mt-8 text-xl font-semibold">{t("savedByMonth")}</h2>
-          <div className="mt-3 space-y-2">
-            {yearSavings.length === 0 ? (
-              <p className="text-stone-500">{t("noPeriodData")}</p>
-            ) : (
-              yearSavings.map((row) => (
+        <section className="surface mt-3 overflow-hidden rounded-2xl">
+          <div className="flex items-center justify-between gap-2 px-3.5 py-2.5">
+            <h2 className="text-sm font-semibold">{t("savedByMonth")}</h2>
+          </div>
+          {yearSavings.length === 0 ? (
+            <p className="border-t border-[var(--surface-border)] px-3.5 py-3 text-sm text-stone-500">
+              {t("noPeriodData")}
+            </p>
+          ) : (
+            <div className="divide-y divide-[var(--surface-border)] border-t border-[var(--surface-border)]">
+              {yearSavings.map((row) => (
                 <button
                   key={row.month}
                   type="button"
-                  className="list-row w-full text-start"
+                  className="flex w-full items-center gap-3 px-3.5 py-2 text-start transition hover:bg-[var(--panel-soft)] active:scale-[0.99]"
                   onClick={() => {
                     const [y, m] = row.month.split("-").map(Number);
                     setCursor(new Date(y, m - 1, 1));
                     setPeriod("month");
                   }}
                 >
-                  <div className="flex justify-between text-sm">
-                    <span>{monthLabel(row.month, locale)}</span>
-                    <span
-                      className={
-                        row.saved < 0 ? "text-red-800" : "text-emerald-800"
-                      }
-                    >
-                      <Money
-                        amount={row.saved}
-                        currency={currency}
-                        locale={locale}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-baseline justify-between gap-2 text-sm">
+                      <span className="truncate font-medium">
+                        {monthLabel(row.month, locale)}
+                      </span>
+                      <span
+                        className={`shrink-0 tabular-nums ${
+                          row.saved < 0 ? "text-red-800" : "text-emerald-800"
+                        }`}
+                      >
+                        <Money
+                          amount={row.saved}
+                          currency={currency}
+                          locale={locale}
+                        />
+                      </span>
+                    </div>
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-stone-200">
+                      <div
+                        className={`h-full rounded-full ${
+                          row.saved < 0 ? "bg-red-700" : "bg-emerald-700"
+                        }`}
+                        style={{
+                          width: `${(Math.abs(row.saved) / maxSaved) * 100}%`,
+                        }}
                       />
-                    </span>
+                    </div>
                   </div>
-                  <div className="mt-1 h-3 overflow-hidden rounded-full bg-stone-200">
-                    <div
-                      className={`h-full rounded-full ${
-                        row.saved < 0 ? "bg-red-700" : "bg-emerald-700"
-                      }`}
-                      style={{
-                        width: `${(Math.abs(row.saved) / maxSaved) * 100}%`,
-                      }}
-                    />
-                  </div>
-                  <p className="mt-1 text-sm text-stone-500">
-                    {t("goesToNextMonth")}:{" "}
+                  <span className="shrink-0 text-[11px] tabular-nums text-[var(--muted)]">
                     <Money
                       amount={row.remaining}
                       currency={currency}
                       locale={locale}
                     />
-                  </p>
+                  </span>
                 </button>
-              ))
-            )}
-          </div>
-        </>
+              ))}
+            </div>
+          )}
+        </section>
       ) : null}
-
-      <div className="mt-5 grid grid-cols-2 gap-3">
-        <div className="surface flex flex-col rounded-2xl p-4">
-          <p className="text-[var(--muted)]">{t("periodTotalIn")}</p>
-          <p className="text-xl font-semibold text-emerald-800">
-            {hideAggregates ? (
-              "••••"
-            ) : (
-              <Money amount={totalIn} currency={currency} locale={locale} />
-            )}
-          </p>
-          {!hideAggregates && prevIn != null && compareLabel ? (
-            <CompareChip
-              current={totalIn}
-              previous={prevIn}
-              kind="in"
-              label={compareLabel}
-              t={t}
-            />
-          ) : null}
-        </div>
-        <div className="surface flex flex-col rounded-2xl p-4">
-          <p className="text-[var(--muted)]">{t("periodTotalOut")}</p>
-          <p className="text-xl font-semibold text-red-800">
-            {hideAggregates ? (
-              "••••"
-            ) : (
-              <Money amount={totalOut} currency={currency} locale={locale} />
-            )}
-          </p>
-          {!hideAggregates && prevOut != null && compareLabel ? (
-            <CompareChip
-              current={totalOut}
-              previous={prevOut}
-              kind="out"
-              label={compareLabel}
-              t={t}
-            />
-          ) : null}
-        </div>
-      </div>
-      <Hint>
-        {hideAggregates ? t("aggregatesAdminOnly") : t("periodTotalsHint")}
-      </Hint>
 
       {period !== "day" ? (
         <>
