@@ -76,6 +76,15 @@ type Subscription = {
   } | null;
 };
 
+function stillNeedsInstallmentPayment(s: Subscription) {
+  return (
+    s.kind === "INSTALLMENT" &&
+    !s.active &&
+    s.totalInstallments != null &&
+    s.installmentsPaid < s.totalInstallments
+  );
+}
+
 type SubsSummary = {
   periodKey: string;
   periodFrom: string;
@@ -384,9 +393,13 @@ export default function SubscriptionsPage() {
   }
 
   function load(householdId: string, periodKey: string) {
+    const asOf = todayISO();
     return Promise.all([
       api<SubsSummary>(
-        householdPath(householdId, `/subscriptions?period=${periodKey}`),
+        householdPath(
+          householdId,
+          `/subscriptions?period=${periodKey}&asOf=${asOf}`,
+        ),
       ),
       api<Account[]>(householdPath(householdId, "/accounts")),
       api<Category[]>(householdPath(householdId, "/categories")),
@@ -430,7 +443,9 @@ export default function SubscriptionsPage() {
       (data?.subscriptions ?? [])
         .filter(
           (s) =>
-            s.active && s.status !== "paid" && s.status !== "scheduled",
+            s.status !== "paid" &&
+            s.status !== "scheduled" &&
+            (s.active || stillNeedsInstallmentPayment(s)),
         )
         .sort((a, b) => {
           const rank = (s: SubStatus) =>
@@ -448,15 +463,17 @@ export default function SubscriptionsPage() {
   );
   const paid = useMemo(
     () =>
-      (data?.subscriptions ?? []).filter(
-        (s) => s.active && s.status === "paid",
-      ),
+      (data?.subscriptions ?? []).filter((s) => s.status === "paid"),
     [data],
   );
   const closedInstallments = useMemo(
     () =>
       (data?.subscriptions ?? []).filter(
-        (s) => !s.active && s.kind === "INSTALLMENT",
+        (s) =>
+          !s.active &&
+          s.kind === "INSTALLMENT" &&
+          s.status !== "paid" &&
+          !stillNeedsInstallmentPayment(s),
       ),
     [data],
   );
@@ -471,7 +488,7 @@ export default function SubscriptionsPage() {
 
   function withPeriod(path: string) {
     const sep = path.includes("?") ? "&" : "?";
-    return `${path}${sep}period=${encodeURIComponent(period)}`;
+    return `${path}${sep}period=${encodeURIComponent(period)}&asOf=${encodeURIComponent(todayISO())}`;
   }
 
   async function onAdd(e: FormEvent) {
@@ -723,19 +740,26 @@ export default function SubscriptionsPage() {
     );
   }
 
-  const total =
-    data?.subscriptions.filter((s) => s.active).length ?? 0;
   const paidN = data?.paidCount ?? 0;
+  const unpaidN = data?.unpaidCount ?? 0;
+  const total = paidN + unpaidN;
   const accent = "var(--accent-b, #0369a1)";
 
   function installmentProgress(sub: Subscription) {
     if (sub.kind !== "INSTALLMENT") return null;
     if (sub.totalInstallments != null) {
-      if (sub.remainingInstallments === 1) {
+      const left = sub.remainingInstallments ?? 0;
+      if (left <= 0) {
+        return fill(t("subsInstallmentsLeft"), {
+          n: "0",
+          total: String(sub.totalInstallments),
+        });
+      }
+      if (left === 1) {
         return t("subsInstallmentDone");
       }
       return fill(t("subsInstallmentsLeft"), {
-        n: String(sub.remainingInstallments ?? 0),
+        n: String(left),
         total: String(sub.totalInstallments),
       });
     }
@@ -1612,7 +1636,9 @@ export default function SubscriptionsPage() {
       ) : null}
 
       {data &&
-      data.subscriptions.filter((s) => s.active).length === 0 &&
+      unpaid.length === 0 &&
+      paid.length === 0 &&
+      scheduled.length === 0 &&
       closedInstallments.length === 0 &&
       !showAdd ? (
         <p className="mt-8 text-center text-sm text-[var(--muted)]">

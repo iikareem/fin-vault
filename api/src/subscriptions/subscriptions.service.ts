@@ -89,14 +89,21 @@ export class SubscriptionsService {
     const day = clampBudgetStartDay(billingDay);
     const [fy, fm] = periodFrom.split('-').map(Number);
     if (startDay === 1) {
-      return `${fy}-${pad2(fm)}-${pad2(day)}`;
+      const dim = new Date(fy, fm, 0).getDate();
+      return `${fy}-${pad2(fm)}-${pad2(Math.min(day, dim))}`;
     }
     // Custom budget period: [startDay of M … startDay-1 of M+1]
     if (day >= startDay) {
-      return `${fy}-${pad2(fm)}-${pad2(day)}`;
+      const dim = new Date(fy, fm, 0).getDate();
+      return `${fy}-${pad2(fm)}-${pad2(Math.min(day, dim))}`;
     }
-    const next = new Date(fy, fm, day); // month fm is 1-indexed → Date month fm = next calendar month
-    return isoLocal(next);
+    // month fm is 1-indexed → Date month fm = next calendar month
+    const next = new Date(fy, fm, day);
+    const clamped = isoLocal(next);
+    // Keep due date inside the budget period when the month is short.
+    if (clamped > periodTo) return periodTo;
+    if (clamped < periodFrom) return periodFrom;
+    return clamped;
   }
 
   private statusFor(
@@ -110,17 +117,37 @@ export class SubscriptionsService {
   ): SubStatus {
     if (periodKey < startPeriodKey) return 'scheduled';
     if (paid) return 'paid';
+    // Future period that has not started yet (e.g. viewing next month).
     if (today < periodFrom) return 'upcoming';
+    // Past period left unpaid.
     if (today > periodTo) return 'overdue';
+    // Inside the active period: needs payment from day 1 of the period.
+    // After the bill day it becomes overdue; on/before bill day it is due.
     if (today > dueOn) return 'overdue';
-    if (today === dueOn) return 'due';
-    return 'upcoming';
+    return 'due';
+  }
+
+  private parseAsOf(asOf?: string, fallback = new Date()) {
+    if (!asOf || !/^\d{4}-\d{2}-\d{2}$/.test(asOf)) return isoLocal(fallback);
+    // Accept the client's local calendar day when it is close to the server
+    // clock, so status badges match the user's timezone near midnight.
+    const server = isoLocal(fallback);
+    const [sy, sm, sd] = server.split('-').map(Number);
+    const serverDate = new Date(sy, sm - 1, sd);
+    const [ay, am, ad] = asOf.split('-').map(Number);
+    const clientDate = new Date(ay, am - 1, ad);
+    const diffDays = Math.round(
+      (clientDate.getTime() - serverDate.getTime()) / 86_400_000,
+    );
+    if (Math.abs(diffDays) > 1) return server;
+    return asOf;
   }
 
   private async periodContext(
     userId: string,
     periodKey?: string,
     now = new Date(),
+    asOf?: string,
   ): Promise<PeriodCtx> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -131,7 +158,7 @@ export class SubscriptionsService {
       ? this.assertPeriodKey(periodKey)
       : budgetMonthRange(now, startDay).key;
     const range = budgetMonthRange(key, startDay);
-    const today = isoLocal(now);
+    const today = this.parseAsOf(asOf, now);
     return {
       startDay,
       periodKey: range.key,
@@ -257,13 +284,23 @@ export class SubscriptionsService {
     householdId: string,
     userId: string,
     periodKey?: string,
+    asOf?: string,
   ) {
-    const ctx = await this.periodContext(userId, periodKey);
+    const ctx = await this.periodContext(userId, periodKey, new Date(), asOf);
     const rows = await this.loadVisible(householdId, ctx.periodKey);
     const subscriptions = rows.map((s) => this.shape(s as SubRow, ctx));
-    const open = subscriptions.filter((s) => s.active);
-    // Only count commitments that have started in this period
-    const dueNow = open.filter((s) => s.status !== 'scheduled');
+    // Count commitments that apply to this period:
+    // active ones that have started, closed installments paid this month
+    // (final payment still counts), and unfinished closed installments.
+    const dueNow = subscriptions.filter((s) => {
+      if (s.status === 'scheduled') return false;
+      if (s.active || s.status === 'paid') return true;
+      return (
+        s.kind === SubscriptionKind.INSTALLMENT &&
+        s.totalInstallments != null &&
+        s.installmentsPaid < s.totalInstallments
+      );
+    });
 
     const monthlyTotal =
       Math.round(dueNow.reduce((s, r) => s + r.amount, 0) * 100) / 100;
@@ -463,7 +500,13 @@ export class SubscriptionsService {
     dto: PaySubscriptionDto,
   ) {
     const sub = await this.requireOwn(householdId, userId, id);
-    if (!sub.active) throw new BadRequestException('Commitment is archived');
+    // Closed installments may still need a payment recorded for a period.
+    if (
+      !sub.active &&
+      sub.kind !== SubscriptionKind.INSTALLMENT
+    ) {
+      throw new BadRequestException('Commitment is archived');
+    }
 
     const ctx = await this.periodContext(userId, dto.periodKey);
     if (ctx.periodKey < sub.startPeriodKey) {

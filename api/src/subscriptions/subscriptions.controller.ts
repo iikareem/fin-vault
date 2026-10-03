@@ -32,11 +32,13 @@ export class SubscriptionsController {
     @CurrentMembership() membership: MembershipContext,
     @CurrentUser() user: AuthUser,
     @Query('period') period?: string,
+    @Query('asOf') asOf?: string,
   ) {
     return this.subscriptions.summary(
       membership.householdId,
       user.id,
       period,
+      asOf,
     );
   }
 
