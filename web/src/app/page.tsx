@@ -238,7 +238,7 @@ export default function HomePage() {
       jobs.push(
         api<GoldHome>(householdPath(active.householdId, "/gold")),
         api<GoalsHome>(householdPath(active.householdId, "/savings-goals")),
-        api<TravelsHome>(householdPath(active.householdId, "/travels")),
+        api<TravelsHome>(householdPath(active.householdId, "/travels/home")),
         api<SubsHome>(householdPath(active.householdId, "/subscriptions")),
         api<OutsideHome>(
           householdPath(active.householdId, "/outside-loans"),

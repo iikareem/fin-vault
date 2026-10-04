@@ -30,6 +30,12 @@ export class TravelsController {
     return this.travels.list(membership.householdId);
   }
 
+  /** Must stay above `:travelId` so "home" is not parsed as an id. */
+  @Get('home')
+  home(@CurrentMembership() membership: MembershipContext) {
+    return this.travels.homeSummary(membership.householdId);
+  }
+
   @Get(':travelId')
   get(
     @CurrentMembership() membership: MembershipContext,

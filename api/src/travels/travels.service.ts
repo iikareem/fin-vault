@@ -48,6 +48,24 @@ export class TravelsService {
     return Number(agg._sum.amount ?? 0);
   }
 
+  private async spentByTravelIds(travelIds: string[]) {
+    const map = new Map<string, number>();
+    if (travelIds.length === 0) return map;
+    const rows = await this.prisma.transaction.groupBy({
+      by: ['travelId'],
+      where: {
+        travelId: { in: travelIds },
+        type: { in: ['EXPENSE', 'TRACK'] },
+      },
+      _sum: { amount: true },
+    });
+    for (const row of rows) {
+      if (!row.travelId) continue;
+      map.set(row.travelId, Number(row._sum.amount ?? 0));
+    }
+    return map;
+  }
+
   private shape(
     travel: {
       id: string;
@@ -143,8 +161,9 @@ export class TravelsService {
       where: { householdId },
       orderBy: [{ startsOn: 'desc' }, { createdAt: 'desc' }],
     });
-    const shaped = await Promise.all(
-      rows.map(async (row) => this.shape(row, await this.spentTotal(row.id))),
+    const spentMap = await this.spentByTravelIds(rows.map((r) => r.id));
+    const shaped = rows.map((row) =>
+      this.shape(row, spentMap.get(row.id) ?? 0),
     );
     const active = shaped.find((t) => t.status === 'active') ?? null;
     const upcoming = shaped.filter((t) => t.status === 'upcoming');
@@ -161,14 +180,27 @@ export class TravelsService {
     };
   }
 
+  /** Lightweight payload for the home travel strip (one open trip max). */
+  async homeSummary(householdId: string) {
+    const open = await this.prisma.travel.findFirst({
+      where: { householdId, endedAt: null },
+      orderBy: [{ startsOn: 'desc' }, { createdAt: 'desc' }],
+    });
+    if (!open) {
+      return { active: null, open: null };
+    }
+    const shaped = this.shape(open, await this.spentTotal(open.id));
+    return {
+      active: shaped.status === 'active' ? shaped : null,
+      open: shaped,
+    };
+  }
+
   async get(householdId: string, id: string) {
     const travel = await this.prisma.travel.findFirst({
       where: { id, householdId },
     });
     if (!travel) throw new NotFoundException();
-
-    const spent = await this.spentTotal(id);
-    const base = this.shape(travel, spent);
 
     const txs = await this.prisma.transaction.findMany({
       where: { travelId: id, type: { in: ['EXPENSE', 'TRACK'] } },
@@ -203,9 +235,11 @@ export class TravelsService {
     const byDayMap = new Map<string, number>();
     let fromWallet = 0;
     let fromCash = 0;
+    let spent = 0;
 
     const items = txs.map((tx) => {
       const amount = Number(tx.amount);
+      spent += amount;
       const day = isoFromDbDate(tx.occurredOn);
       byDayMap.set(day, (byDayMap.get(day) ?? 0) + amount);
       if (tx.type === 'EXPENSE') fromWallet += amount;
@@ -244,7 +278,7 @@ export class TravelsService {
     );
 
     return {
-      ...base,
+      ...this.shape(travel, spent),
       fromWallet,
       fromCash,
       byCategory,

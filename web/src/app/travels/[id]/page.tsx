@@ -132,31 +132,52 @@ export default function TravelDetailPage() {
     );
   }
 
-  function load(householdId: string, id: string) {
-    return Promise.all([
-      api<TravelDetail>(householdPath(householdId, `/travels/${id}`)),
-      api<Cat[]>(householdPath(householdId, "/categories")),
-    ]).then(([detail, list]) => {
+  function pickDefaultCategory(list: Cat[]) {
+    const travelParent = list.find(
+      (c) =>
+        c.kind === "EXPENSE" &&
+        !c.parentId &&
+        (c.name === "Travel & trips" || c.name === "Travel"),
+    );
+    const travelChild = list.find(
+      (c) =>
+        c.kind === "EXPENSE" &&
+        travelParent &&
+        c.parentId === travelParent.id &&
+        !c.hidden,
+    );
+    setCategoryId((prev) => prev || travelChild?.id || travelParent?.id || "");
+  }
+
+  function loadTrip(householdId: string, id: string) {
+    return api<TravelDetail>(
+      householdPath(householdId, `/travels/${id}`),
+    ).then((detail) => {
       setTrip(detail);
-      setCats(list);
       syncEditForm(detail);
       setOccurredOn(todayISO());
       setShowSpend(false);
       setShowEdit(false);
-      const travelParent = list.find(
-        (c) =>
-          c.kind === "EXPENSE" &&
-          !c.parentId &&
-          (c.name === "Travel & trips" || c.name === "Travel"),
-      );
-      const travelChild = list.find(
-        (c) =>
-          c.kind === "EXPENSE" &&
-          travelParent &&
-          c.parentId === travelParent.id &&
-          !c.hidden,
-      );
-      setCategoryId((prev) => prev || travelChild?.id || travelParent?.id || "");
+    });
+  }
+
+  function loadCategories(householdId: string) {
+    if (cats.length > 0) return Promise.resolve(cats);
+    return api<Cat[]>(householdPath(householdId, "/categories")).then(
+      (list) => {
+        setCats(list);
+        pickDefaultCategory(list);
+        return list;
+      },
+    );
+  }
+
+  function load(householdId: string, id: string) {
+    // Trip first so the screen paints fast; categories are heavy (seed sync).
+    return loadTrip(householdId, id).then(() => {
+      void loadCategories(householdId).catch(() => {
+        /* spend form will retry */
+      });
     });
   }
 
@@ -335,6 +356,11 @@ export default function TravelDetailPage() {
     setConfirmEnd(false);
     setConfirmDelete(false);
     setError("");
+    if (hid) {
+      void loadCategories(hid).catch((e) =>
+        setError(e instanceof Error ? e.message : t("travelsSaveFailed")),
+      );
+    }
   }
 
   function openEdit() {
