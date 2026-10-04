@@ -583,11 +583,12 @@ export class CategoriesService {
     const kind: CategoryKind = dto.kind ?? 'EXPENSE';
     const nameAr = dto.nameAr?.trim() || nameArFor(name) || '';
     const color = dto.color ?? ACCENT_FALLBACK;
+    const emoji = (dto.emoji ?? '').trim().slice(0, 16);
 
     let parentId: string | null = dto.parentId?.trim() || null;
     if (parentId) {
       const parent = await this.prisma.category.findFirst({
-        where: { id: parentId, householdId, kind },
+        where: { id: parentId, householdId, kind, hidden: false },
       });
       if (!parent) throw new BadRequestException('Parent category not found');
       if (parent.parentId) {
@@ -595,15 +596,35 @@ export class CategoriesService {
       }
     }
 
+    // Names are unique per household+kind, including soft-deleted (hidden) rows.
+    // Recreating a deleted seeded category must restore it instead of erroring.
     const clash = await this.prisma.category.findFirst({
       where: { householdId, name, kind },
     });
-    if (clash) throw new BadRequestException('A category with this name already exists');
+    if (clash && !clash.hidden) {
+      throw new BadRequestException('A category with this name already exists');
+    }
 
     const maxSort = await this.prisma.category.aggregate({
-      where: { householdId, parentId, kind },
+      where: { householdId, parentId, kind, hidden: false },
       _max: { sortOrder: true },
     });
+    const sortOrder = (maxSort._max.sortOrder ?? -1) + 1;
+
+    if (clash?.hidden) {
+      return this.prisma.category.update({
+        where: { id: clash.id },
+        data: {
+          hidden: false,
+          nameAr: nameAr || clash.nameAr,
+          color,
+          emoji,
+          parentId,
+          sortOrder,
+          isUserManaged: true,
+        },
+      });
+    }
 
     return this.prisma.category.create({
       data: {
@@ -612,9 +633,9 @@ export class CategoriesService {
         nameAr,
         kind,
         color,
-        emoji: (dto.emoji ?? '').trim().slice(0, 16),
+        emoji,
         parentId,
-        sortOrder: (maxSort._max.sortOrder ?? -1) + 1,
+        sortOrder,
         seedKey: null,
         isUserManaged: true,
       },
@@ -660,8 +681,16 @@ export class CategoriesService {
             NOT: { id: cat.id },
           },
         });
-        if (clash) {
+        if (clash && !clash.hidden) {
           throw new BadRequestException('A category with this name already exists');
+        }
+        if (clash?.hidden) {
+          // Free the unique (householdId, name, kind) slot held by a soft-deleted row.
+          // Keep the row + seedKey so sync does not recreate the built-in.
+          await this.prisma.category.update({
+            where: { id: clash.id },
+            data: { name: `${name}__hidden__${clash.id}` },
+          });
         }
         data.name = name;
       }
@@ -688,14 +717,14 @@ export class CategoriesService {
       }
       if (parentId) {
         const parent = await this.prisma.category.findFirst({
-          where: { id: parentId, householdId, kind: cat.kind },
+          where: { id: parentId, householdId, kind: cat.kind, hidden: false },
         });
         if (!parent) throw new BadRequestException('Parent category not found');
         if (parent.parentId) {
           throw new BadRequestException('Subcategories cannot have children');
         }
         const kidCount = await this.prisma.category.count({
-          where: { parentId: cat.id },
+          where: { parentId: cat.id, hidden: false },
         });
         if (kidCount > 0) {
           throw new BadRequestException(
