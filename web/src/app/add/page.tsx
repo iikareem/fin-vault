@@ -458,14 +458,8 @@ function AddForm() {
     if (space) writeLastWalletId(space.householdId, wallet.id);
   }
 
-  function walletBtn(active: boolean, tone: "stone" | "emerald" = "emerald") {
-    return `rounded-2xl px-3 py-2.5 text-sm font-bold transition ${
-      active
-        ? tone === "stone"
-          ? "bg-stone-900 text-white shadow"
-          : "bg-emerald-800 text-white shadow"
-        : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
-    }`;
+  function walletBtn(active: boolean) {
+    return `seg-item px-3 ${active ? "seg-active" : "ring-1 ring-[var(--input-border)]"}`;
   }
 
   const modeChip = (active: boolean) =>
@@ -606,7 +600,7 @@ function AddForm() {
                         if (other) setToAccountId(other.id);
                       }
                     }}
-                    className={walletBtn(accountId === a.id, "stone")}
+                    className={walletBtn(accountId === a.id)}
                   >
                     {isSavingsWallet(a)
                       ? "💰 " + t("savingsWallet")
@@ -723,33 +717,24 @@ function AddForm() {
               <button
                 type="button"
                 onClick={() => setPaidFrom("current")}
-                className={`rounded-2xl px-1 py-2.5 text-center text-xs font-bold transition sm:text-sm ${
-                  paidFromCurrent
-                    ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
-                    : "text-[var(--muted)]"
-                }`}
+                className={`seg-item ${paidFromCurrent ? "seg-active" : ""}`}
+                aria-pressed={paidFromCurrent}
               >
                 💵 {t("currentWallet")}
               </button>
               <button
                 type="button"
                 onClick={() => setPaidFrom("savings")}
-                className={`rounded-2xl px-1 py-2.5 text-center text-xs font-bold transition sm:text-sm ${
-                  paidFromSavings
-                    ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
-                    : "text-[var(--muted)]"
-                }`}
+                className={`seg-item ${paidFromSavings ? "seg-active" : ""}`}
+                aria-pressed={paidFromSavings}
               >
                 💰 {t("savingsWallet")}
               </button>
               <button
                 type="button"
                 onClick={() => setPaidFrom("track")}
-                className={`rounded-2xl px-1 py-2.5 text-center text-xs font-bold transition sm:text-sm ${
-                  trackOnly
-                    ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
-                    : "text-[var(--muted)]"
-                }`}
+                className={`seg-item ${trackOnly ? "seg-active" : ""}`}
+                aria-pressed={!!trackOnly}
               >
                 📋 {t("spendTrackOnly")}
               </button>
@@ -847,11 +832,8 @@ function AddForm() {
                       writeLastWalletId(space.householdId, a.id);
                     }
                   }}
-                  className={`rounded-2xl px-2 py-2.5 text-center text-sm font-bold transition ${
-                    accountId === a.id
-                      ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
-                      : "text-[var(--muted)]"
-                  }`}
+                  className={`seg-item ${accountId === a.id ? "seg-active" : ""}`}
+                  aria-pressed={accountId === a.id}
                 >
                   {isSavingsWallet(a)
                     ? "💰 " + t("savingsWallet")

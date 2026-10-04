@@ -336,11 +336,10 @@ function CategoryLogInner() {
                       setCustomTo(bounds.to);
                     }
                   }}
-                  className={`rounded-2xl py-2.5 text-base font-bold transition ${
-                    rangeMode === mode
-                      ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
-                      : "text-[var(--muted)]"
+                  className={`seg-item text-base ${
+                    rangeMode === mode ? "seg-active" : ""
                   }`}
+                  aria-pressed={rangeMode === mode}
                 >
                   {mode === "month" ? t("monthRange") : t("customRange")}
                 </button>

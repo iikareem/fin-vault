@@ -1118,17 +1118,18 @@ export default function HomePage() {
                           <p className="text-sm text-stone-500">
                             {t("payFromWhich")}
                           </p>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="seg grid-cols-2">
                             {cashAccounts.map((a) => (
                               <button
                                 key={a.id}
                                 type="button"
                                 onClick={() => setPayWalletId(a.id)}
-                                className={`rounded-2xl px-3 py-2 font-semibold ${
+                                className={`seg-item ${
                                   (payWalletId || cashId) === a.id
-                                    ? "bg-emerald-800 text-white"
-                                    : "bg-white text-stone-700"
+                                    ? "seg-active"
+                                    : ""
                                 }`}
+                                aria-pressed={(payWalletId || cashId) === a.id}
                               >
                                 {isSavingsWallet(a)
                                   ? "💰 " + t("savingsWallet")
@@ -1266,17 +1267,20 @@ export default function HomePage() {
                             <p className="text-sm text-stone-500">
                               {t("payFromWhich")}
                             </p>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="seg grid-cols-2">
                               {personalCashAccounts.map((a) => (
                                 <button
                                   key={a.id}
                                   type="button"
                                   onClick={() => setRepayWalletId(a.id)}
-                                  className={`rounded-2xl px-3 py-2 font-semibold ${
+                                  className={`seg-item ${
                                     (repayWalletId || personalCashId) === a.id
-                                      ? "bg-indigo-800 text-white"
-                                      : "bg-white text-stone-700"
+                                      ? "seg-active"
+                                      : ""
                                   }`}
+                                  aria-pressed={
+                                    (repayWalletId || personalCashId) === a.id
+                                  }
                                 >
                                   {isSavingsWallet(a)
                                     ? "💰 " + t("savingsWallet")
@@ -1441,17 +1445,16 @@ export default function HomePage() {
                 {isAdmin ? (
                   <div className="mt-3 space-y-2">
                     <p className="text-sm text-stone-500">{t("payFromWhich")}</p>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="seg grid-cols-2">
                       {cashAccounts.map((a) => (
                         <button
                           key={a.id}
                           type="button"
                           onClick={() => setPayWalletId(a.id)}
-                          className={`rounded-2xl px-3 py-2 font-semibold ${
-                            (payWalletId || cashId) === a.id
-                              ? "bg-emerald-800 text-white"
-                              : "bg-white text-stone-700"
+                          className={`seg-item ${
+                            (payWalletId || cashId) === a.id ? "seg-active" : ""
                           }`}
+                          aria-pressed={(payWalletId || cashId) === a.id}
                         >
                           {isSavingsWallet(a)
                             ? "💰 " + t("savingsWallet")
@@ -1587,17 +1590,20 @@ export default function HomePage() {
                   {canRepay ? (
                     <div className="mt-3 space-y-2">
                       <p className="text-sm text-stone-500">{t("payFromWhich")}</p>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="seg grid-cols-2">
                         {personalCashAccounts.map((a) => (
                           <button
                             key={a.id}
                             type="button"
                             onClick={() => setRepayWalletId(a.id)}
-                            className={`rounded-2xl px-3 py-2 font-semibold ${
+                            className={`seg-item ${
                               (repayWalletId || personalCashId) === a.id
-                                ? "bg-indigo-800 text-white"
-                                : "bg-white text-stone-700"
+                                ? "seg-active"
+                                : ""
                             }`}
+                            aria-pressed={
+                              (repayWalletId || personalCashId) === a.id
+                            }
                           >
                             {isSavingsWallet(a)
                               ? "💰 " + t("savingsWallet")

@@ -562,11 +562,10 @@ export default function AnalyticsPage() {
             key={p}
             type="button"
             onClick={() => setPeriodMode(p)}
-            className={`min-w-0 rounded-xl px-0.5 py-2 text-center text-[11px] font-bold transition sm:px-1 sm:text-sm ${
-              period === p
-                ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
-                : "text-[var(--muted)]"
+            className={`seg-item min-w-0 px-0.5 text-[11px] sm:px-1 sm:text-sm ${
+              period === p ? "seg-active" : ""
             }`}
+            aria-pressed={period === p}
           >
             {p === "day"
               ? t("periodDay")

@@ -878,11 +878,8 @@ export default function SubscriptionsPage() {
                   key={k}
                   type="button"
                   onClick={() => selectAddKind(k)}
-                  className={`rounded-2xl px-1 py-2 text-center text-xs font-bold transition sm:text-sm ${
-                    kind === k
-                      ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
-                      : "text-[var(--muted)]"
-                  }`}
+                  className={`seg-item ${kind === k ? "seg-active" : ""}`}
+                  aria-pressed={kind === k}
                 >
                   {kindLabel(k, t)}
                 </button>
@@ -1154,11 +1151,8 @@ export default function SubscriptionsPage() {
                               key={k}
                               type="button"
                               onClick={() => selectEditKind(k)}
-                              className={`rounded-2xl px-1 py-2 text-center text-xs font-bold ${
-                                editKind === k
-                                  ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
-                                  : "text-[var(--muted)]"
-                              }`}
+                              className={`seg-item ${editKind === k ? "seg-active" : ""}`}
+                              aria-pressed={editKind === k}
                             >
                               {kindLabel(k, t)}
                             </button>
@@ -1471,11 +1465,8 @@ export default function SubscriptionsPage() {
                             key={k}
                             type="button"
                             onClick={() => selectEditKind(k)}
-                            className={`rounded-2xl px-1 py-2 text-center text-xs font-bold ${
-                              editKind === k
-                                ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
-                                : "text-[var(--muted)]"
-                            }`}
+                            className={`seg-item ${editKind === k ? "seg-active" : ""}`}
+                            aria-pressed={editKind === k}
                           >
                             {kindLabel(k, t)}
                           </button>

@@ -600,22 +600,16 @@ export default function TravelDetailPage() {
               <button
                 type="button"
                 onClick={() => setPaidFrom("CURRENT")}
-                className={`rounded-2xl px-2 py-2.5 text-center text-sm font-bold transition ${
-                  paidFrom === "CURRENT"
-                    ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
-                    : "text-[var(--muted)]"
-                }`}
+                className={`seg-item ${paidFrom === "CURRENT" ? "seg-active" : ""}`}
+                aria-pressed={paidFrom === "CURRENT"}
               >
                 💵 {t("travelsFromCurrent")}
               </button>
               <button
                 type="button"
                 onClick={() => setPaidFrom("CASH")}
-                className={`rounded-2xl px-2 py-2.5 text-center text-sm font-bold transition ${
-                  paidFrom === "CASH"
-                    ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
-                    : "text-[var(--muted)]"
-                }`}
+                className={`seg-item ${paidFrom === "CASH" ? "seg-active" : ""}`}
+                aria-pressed={paidFrom === "CASH"}
               >
                 📋 {t("travelsFromCash")}
               </button>

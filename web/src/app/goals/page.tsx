@@ -678,7 +678,7 @@ export default function GoalsPage() {
                           ) : null}
 
                           {actionMode === "allocate" ? (
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="seg grid-cols-2">
                               <button
                                 type="button"
                                 onClick={() => {
@@ -694,11 +694,10 @@ export default function GoalsPage() {
                                     );
                                   }
                                 }}
-                                className={`rounded-2xl px-2 py-3 text-sm font-bold ${
-                                  fromSource === "CURRENT"
-                                    ? "bg-teal-800 text-white shadow"
-                                    : "bg-[var(--surface-bg)]"
+                                className={`seg-item ${
+                                  fromSource === "CURRENT" ? "seg-active" : ""
                                 }`}
+                                aria-pressed={fromSource === "CURRENT"}
                               >
                                 💵 {t("goalsFromCurrent")}
                               </button>
@@ -717,11 +716,10 @@ export default function GoalsPage() {
                                     );
                                   }
                                 }}
-                                className={`rounded-2xl px-2 py-3 text-sm font-bold ${
-                                  fromSource === "SAVINGS"
-                                    ? "bg-teal-800 text-white shadow"
-                                    : "bg-[var(--surface-bg)]"
+                                className={`seg-item ${
+                                  fromSource === "SAVINGS" ? "seg-active" : ""
                                 }`}
+                                aria-pressed={fromSource === "SAVINGS"}
                               >
                                 💰 {t("goalsFromSavings")}
                               </button>

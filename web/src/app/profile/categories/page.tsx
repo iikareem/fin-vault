@@ -536,11 +536,8 @@ export default function MyCategoriesPage() {
               setKindTab(k);
               closeEditor();
             }}
-            className={`rounded-2xl py-2.5 text-base font-bold transition ${
-              kind === k
-                ? "bg-[var(--surface-bg)] text-[var(--foreground)] shadow-sm"
-                : "text-[var(--muted)]"
-            }`}
+            className={`seg-item text-base ${kind === k ? "seg-active" : ""}`}
+            aria-pressed={kind === k}
           >
             {k === "EXPENSE" ? t("catsExpense") : t("catsIncome")}
           </button>
