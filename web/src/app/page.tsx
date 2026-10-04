@@ -1131,9 +1131,12 @@ export default function HomePage() {
                                 }`}
                                 aria-pressed={(payWalletId || cashId) === a.id}
                               >
+                                <span className="seg-ico" aria-hidden>
+                                  {isSavingsWallet(a) ? "💰" : "💵"}
+                                </span>
                                 {isSavingsWallet(a)
-                                  ? "💰 " + t("savingsWallet")
-                                  : "💵 " + t("currentWallet")}
+                                  ? t("savingsWallet")
+                                  : t("currentWallet")}
                               </button>
                             ))}
                           </div>
@@ -1282,9 +1285,12 @@ export default function HomePage() {
                                     (repayWalletId || personalCashId) === a.id
                                   }
                                 >
+                                  <span className="seg-ico" aria-hidden>
+                                    {isSavingsWallet(a) ? "💰" : "💵"}
+                                  </span>
                                   {isSavingsWallet(a)
-                                    ? "💰 " + t("savingsWallet")
-                                    : "💵 " + t("currentWallet")}
+                                    ? t("savingsWallet")
+                                    : t("currentWallet")}
                                 </button>
                               ))}
                             </div>
@@ -1456,9 +1462,12 @@ export default function HomePage() {
                           }`}
                           aria-pressed={(payWalletId || cashId) === a.id}
                         >
+                          <span className="seg-ico" aria-hidden>
+                            {isSavingsWallet(a) ? "💰" : "💵"}
+                          </span>
                           {isSavingsWallet(a)
-                            ? "💰 " + t("savingsWallet")
-                            : "💵 " + t("currentWallet")}
+                            ? t("savingsWallet")
+                            : t("currentWallet")}
                         </button>
                       ))}
                     </div>
@@ -1605,9 +1614,12 @@ export default function HomePage() {
                               (repayWalletId || personalCashId) === a.id
                             }
                           >
+                            <span className="seg-ico" aria-hidden>
+                              {isSavingsWallet(a) ? "💰" : "💵"}
+                            </span>
                             {isSavingsWallet(a)
-                              ? "💰 " + t("savingsWallet")
-                              : "💵 " + t("currentWallet")}
+                              ? t("savingsWallet")
+                              : t("currentWallet")}
                           </button>
                         ))}
                       </div>

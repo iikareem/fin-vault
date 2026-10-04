@@ -720,7 +720,10 @@ function AddForm() {
                 className={`seg-item ${paidFromCurrent ? "seg-active" : ""}`}
                 aria-pressed={paidFromCurrent}
               >
-                💵 {t("currentWallet")}
+                <span className="seg-ico" aria-hidden>
+                  💵
+                </span>
+                {t("currentWallet")}
               </button>
               <button
                 type="button"
@@ -728,7 +731,10 @@ function AddForm() {
                 className={`seg-item ${paidFromSavings ? "seg-active" : ""}`}
                 aria-pressed={paidFromSavings}
               >
-                💰 {t("savingsWallet")}
+                <span className="seg-ico" aria-hidden>
+                  💰
+                </span>
+                {t("savingsWallet")}
               </button>
               <button
                 type="button"
@@ -736,7 +742,10 @@ function AddForm() {
                 className={`seg-item ${trackOnly ? "seg-active" : ""}`}
                 aria-pressed={!!trackOnly}
               >
-                📋 {t("spendTrackOnly")}
+                <span className="seg-ico" aria-hidden>
+                  📋
+                </span>
+                {t("spendTrackOnly")}
               </button>
             </div>
           </div>
@@ -835,9 +844,12 @@ function AddForm() {
                   className={`seg-item ${accountId === a.id ? "seg-active" : ""}`}
                   aria-pressed={accountId === a.id}
                 >
+                  <span className="seg-ico" aria-hidden>
+                    {isSavingsWallet(a) ? "💰" : "💵"}
+                  </span>
                   {isSavingsWallet(a)
-                    ? "💰 " + t("savingsWallet")
-                    : "💵 " + t("currentWallet")}
+                    ? t("savingsWallet")
+                    : t("currentWallet")}
                 </button>
               ))}
             </div>

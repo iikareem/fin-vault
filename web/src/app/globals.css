@@ -754,15 +754,20 @@ input[type="month"].field {
 
 /** Segment control option — idle state. Pair with `seg-active` when selected. */
 @utility seg-item {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.15rem;
   border-radius: 1rem;
   border: 2px solid transparent;
-  padding: 0.65rem 0.25rem;
+  padding: 0.7rem 0.35rem;
   text-align: center;
-  font-size: 0.75rem;
+  font-size: 0.8125rem;
   font-weight: 700;
-  line-height: 1.2;
+  line-height: 1.25;
   color: var(--muted);
-  opacity: 0.85;
+  opacity: 0.72;
   transition:
     background-color 0.15s ease,
     color 0.15s ease,
@@ -774,7 +779,7 @@ input[type="month"].field {
 
 @media (min-width: 640px) {
   .seg-item {
-    font-size: 0.875rem;
+    font-size: 0.9375rem;
   }
 }
 
@@ -783,15 +788,44 @@ input[type="month"].field {
  * (dark pill on light themes, light pill on dark themes).
  */
 @utility seg-active {
-  border-color: color-mix(in srgb, var(--cta-fg) 22%, transparent);
+  border-color: color-mix(in srgb, var(--cta-fg) 28%, transparent);
   background-color: var(--cta-bg);
   color: var(--cta-fg);
   opacity: 1;
   transform: translateY(-1px);
   box-shadow:
-    0 0 0 2px color-mix(in srgb, var(--cta-bg) 45%, transparent),
-    0 1px 0 color-mix(in srgb, var(--cta-fg) 14%, transparent) inset,
-    0 8px 18px color-mix(in srgb, var(--cta-bg) 40%, transparent);
+    0 0 0 2px color-mix(in srgb, var(--cta-bg) 50%, transparent),
+    0 1px 0 color-mix(in srgb, var(--cta-fg) 16%, transparent) inset,
+    0 8px 18px color-mix(in srgb, var(--cta-bg) 42%, transparent);
+}
+
+/* Beat idle color/size so the label itself reads as selected. */
+.seg-item.seg-active {
+  color: var(--cta-fg);
+  font-weight: 800;
+  font-size: 0.875rem;
+  letter-spacing: 0.015em;
+}
+
+@media (min-width: 640px) {
+  .seg-item.seg-active {
+    font-size: 1rem;
+  }
+}
+
+.seg-item .seg-ico {
+  display: block;
+  font-size: 1.15em;
+  line-height: 1;
+  filter: grayscale(0.35) opacity(0.75);
+  transition:
+    filter 0.15s ease,
+    transform 0.15s ease;
+}
+
+.seg-item.seg-active .seg-ico {
+  filter: none;
+  transform: scale(1.08);
 }
 
 @utility flash {

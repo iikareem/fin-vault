@@ -699,7 +699,10 @@ export default function GoalsPage() {
                                 }`}
                                 aria-pressed={fromSource === "CURRENT"}
                               >
-                                💵 {t("goalsFromCurrent")}
+                                <span className="seg-ico" aria-hidden>
+                                  💵
+                                </span>
+                                {t("goalsFromCurrent")}
                               </button>
                               <button
                                 type="button"
@@ -721,7 +724,10 @@ export default function GoalsPage() {
                                 }`}
                                 aria-pressed={fromSource === "SAVINGS"}
                               >
-                                💰 {t("goalsFromSavings")}
+                                <span className="seg-ico" aria-hidden>
+                                  💰
+                                </span>
+                                {t("goalsFromSavings")}
                               </button>
                             </div>
                           ) : null}

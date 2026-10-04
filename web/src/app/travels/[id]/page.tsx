@@ -603,7 +603,10 @@ export default function TravelDetailPage() {
                 className={`seg-item ${paidFrom === "CURRENT" ? "seg-active" : ""}`}
                 aria-pressed={paidFrom === "CURRENT"}
               >
-                💵 {t("travelsFromCurrent")}
+                <span className="seg-ico" aria-hidden>
+                  💵
+                </span>
+                {t("travelsFromCurrent")}
               </button>
               <button
                 type="button"
@@ -611,7 +614,10 @@ export default function TravelDetailPage() {
                 className={`seg-item ${paidFrom === "CASH" ? "seg-active" : ""}`}
                 aria-pressed={paidFrom === "CASH"}
               >
-                📋 {t("travelsFromCash")}
+                <span className="seg-ico" aria-hidden>
+                  📋
+                </span>
+                {t("travelsFromCash")}
               </button>
             </div>
             <Hint>
