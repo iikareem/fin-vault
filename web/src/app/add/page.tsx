@@ -475,13 +475,7 @@ function AddForm() {
             ? t("giveFromHouseHint")
             : type === "INCOME"
               ? t("moneyInHint")
-              : personalPaid && trackOnly
-                ? t("spendTrackOnlyHint")
-                : personalPaid && paidFromSavings
-                  ? t("spendFromSavingsHint")
-                  : personalPaid && paidFromCurrent
-                    ? t("currentHint")
-                    : t("paidHint");
+              : t("paidHint");
 
   function setPaidFrom(source: "current" | "savings" | "track") {
     if (source === "track") {
@@ -493,14 +487,6 @@ function AddForm() {
     if (!wallet) return;
     setAccountId(wallet.id);
     if (space) writeLastWalletId(space.householdId, wallet.id);
-  }
-
-  /** Leave track-only; restore Savings if that wallet was still selected underneath. */
-  function setDeductFromWallet() {
-    if (!trackOnly && (paidFromCurrent || paidFromSavings)) return;
-    const preferSavings =
-      !!savingsWallet && accountId === savingsWallet.id;
-    setPaidFrom(preferSavings ? "savings" : "current");
   }
 
   function walletBtn(active: boolean) {
@@ -788,67 +774,36 @@ function AddForm() {
         ) : null}
 
         {personalPaid ? (
-          <div className="space-y-3">
-            <div>
-              <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">
-                {t("spendHowLabel")}
-              </p>
-              <div className="seg grid-cols-2">
-                <button
-                  type="button"
-                  onClick={setDeductFromWallet}
-                  className={`seg-item ${!trackOnly ? "seg-active" : ""}`}
-                  aria-pressed={!trackOnly}
-                >
-                  <span className="seg-ico" aria-hidden>
-                    👛
-                  </span>
-                  {t("spendDeduct")}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPaidFrom("track")}
-                  className={`seg-item ${trackOnly ? "seg-active" : ""}`}
-                  aria-pressed={!!trackOnly}
-                >
-                  <span className="seg-ico" aria-hidden>
-                    📋
-                  </span>
-                  {t("spendTrackOnly")}
-                </button>
-              </div>
+          <div>
+            <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">
+              {t("addPaidFrom")}
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                onClick={() => setPaidFrom("current")}
+                className={modeChip(paidFromCurrent)}
+                aria-pressed={paidFromCurrent}
+              >
+                💵 {t("currentWallet")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaidFrom("savings")}
+                className={modeChip(paidFromSavings)}
+                aria-pressed={paidFromSavings}
+              >
+                💰 {t("savingsWallet")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaidFrom("track")}
+                className={modeChip(!!trackOnly)}
+                aria-pressed={!!trackOnly}
+              >
+                📋 {t("spendTrackOnly")}
+              </button>
             </div>
-            {!trackOnly ? (
-              <div>
-                <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">
-                  {t("pickWalletSpend")}
-                </p>
-                <div className="seg grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={() => setPaidFrom("current")}
-                    className={`seg-item ${paidFromCurrent ? "seg-active" : ""}`}
-                    aria-pressed={paidFromCurrent}
-                  >
-                    <span className="seg-ico" aria-hidden>
-                      💵
-                    </span>
-                    {t("currentWallet")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPaidFrom("savings")}
-                    className={`seg-item ${paidFromSavings ? "seg-active" : ""}`}
-                    aria-pressed={paidFromSavings}
-                  >
-                    <span className="seg-ico" aria-hidden>
-                      💰
-                    </span>
-                    {t("savingsWallet")}
-                  </button>
-                </div>
-              </div>
-            ) : null}
           </div>
         ) : null}
 
