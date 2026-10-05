@@ -14,15 +14,15 @@ export class UpsertMonthSoftLimitDto {
   @Matches(/^\d{4}-\d{2}$/)
   periodKey?: string;
 
-  /** Day-to-day ceiling. Null clears it. Omit to leave unchanged is not supported — send both. */
+  /** Day-to-day spend ceiling. Null clears it. */
   @ValidateIf((_, v) => v !== null && v !== undefined)
   @IsNumber()
   @Min(0.01)
   personalAmount?: number | null;
 
-  /** All-spend ceiling (incl. commitments). Null clears it. */
+  /** Net save target for the period. Null clears it. */
   @ValidateIf((_, v) => v !== null && v !== undefined)
   @IsNumber()
   @Min(0.01)
-  totalAmount?: number | null;
+  saveTargetAmount?: number | null;
 }

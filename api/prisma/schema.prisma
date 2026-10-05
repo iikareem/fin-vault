@@ -268,9 +268,9 @@ model Travel {
 }
 
 /**
- * Optional soft spending ceilings for one personal budget period (YYYY-MM).
- * Never blocks spend — progress / warning only.
- * Set either or both: personal (day-to-day) and total (incl. commitments).
+ * Optional month plan for one personal budget period (YYYY-MM).
+ * Soft only — never blocks spend.
+ * Set either or both: personal spend ceiling + save target.
  */
 model MonthSoftLimit {
   id          String        @id @default(cuid())
@@ -278,10 +278,10 @@ model MonthSoftLimit {
   household   Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
   /** Personal budget period key YYYY-MM. */
   periodKey   String
-  /** Day-to-day ceiling (excludes commitment Mark Paid). Null = unset. */
-  personalAmount Decimal?   @db.Decimal(14, 2)
-  /** All-spend ceiling including paid commitments. Null = unset. */
-  totalAmount    Decimal?   @db.Decimal(14, 2)
+  /** Day-to-day spend ceiling (excludes commitment Mark Paid). Null = unset. */
+  personalAmount   Decimal? @db.Decimal(14, 2)
+  /** Net cash to save this period (income − cash outflow). Null = unset. */
+  saveTargetAmount Decimal? @db.Decimal(14, 2)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
