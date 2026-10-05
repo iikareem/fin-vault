@@ -56,6 +56,14 @@ type SnapshotRow = {
   score: number;
 };
 
+type ToolTile = {
+  key: string;
+  href: string;
+  emoji: string;
+  title: string;
+  attention?: boolean;
+};
+
 type Props = {
   householdId: string;
   currency: string;
@@ -99,123 +107,117 @@ export function MoneyToolsHomeCard({
     };
   }, [householdId]);
 
+  const tiles = useMemo((): ToolTile[] => {
+    const unpaid = (subs?.unpaidCount ?? 0) > 0;
+    const owed =
+      (outside?.owedToYou ?? 0) > 0.001 || (outside?.youOwe ?? 0) > 0.001;
+    const tripWarn = Boolean(travels?.active?.overLimit);
+    return [
+      {
+        key: "goals",
+        href: "/goals",
+        emoji: "🎯",
+        title: t("navGoals"),
+      },
+      {
+        key: "subs",
+        href: "/commitments",
+        emoji: "📌",
+        title: t("navSubs"),
+        attention: unpaid,
+      },
+      {
+        key: "gold",
+        href: "/gold",
+        emoji: "🥇",
+        title: t("navGold"),
+      },
+      {
+        key: "outside",
+        href: "/outside-loans",
+        emoji: "🤝",
+        title: t("navOutsideLoans"),
+        attention: owed,
+      },
+      {
+        key: "travel",
+        href: travels?.active ? `/travels/${travels.active.id}` : "/travels",
+        emoji: "✈",
+        title: t("navTravels"),
+        attention: tripWarn,
+      },
+    ];
+  }, [subs, outside, travels, t]);
+
   const rows = useMemo(() => {
     const next: SnapshotRow[] = [];
 
     if (subs && subs.subscriptions.length > 0) {
       const unpaid = subs.unpaidCount > 0;
-      next.push({
-        key: "subs",
-        href: "/commitments",
-        emoji: "📌",
-        title: t("navSubs"),
-        detail: unpaid
-          ? subs.unpaidCount === 1
-            ? t("subsHomeUnpaidOne")
-            : fill(t("subsHomeUnpaid"), { n: String(subs.unpaidCount) })
-          : t("subsHomeAllPaid"),
-        detailTone: unpaid ? "warn" : "good",
-        amount: unpaid ? subs.dueAmount : subs.monthlyTotal,
-        score: unpaid ? 100 : 35,
-      });
+      if (unpaid) {
+        next.push({
+          key: "subs",
+          href: "/commitments",
+          emoji: "📌",
+          title: t("navSubs"),
+          detail:
+            subs.unpaidCount === 1
+              ? t("subsHomeUnpaidOne")
+              : fill(t("subsHomeUnpaid"), { n: String(subs.unpaidCount) }),
+          detailTone: "warn",
+          amount: subs.dueAmount,
+          score: 100,
+        });
+      }
     }
 
-    if (travels?.active) {
+    if (travels?.active?.overLimit) {
       const trip = travels.active;
       next.push({
         key: "travel",
         href: `/travels/${trip.id}`,
         emoji: "✈",
         title: trip.name,
-        detail: trip.overLimit
-          ? t("travelsHomeOverLimit")
-          : t("travelsHomeActive"),
-        detailTone: trip.overLimit ? "warn" : "muted",
+        detail: t("travelsHomeOverLimit"),
+        detailTone: "warn",
         amount: trip.spent,
         amountCurrency: trip.currency,
-        score: trip.overLimit ? 95 : 80,
+        score: 95,
       });
     }
 
     if (outside && outside.open.length > 0) {
       const owed = outside.owedToYou > 0.001;
       const borrow = (outside.youOwe ?? 0) > 0.001;
-      next.push({
-        key: "outside",
-        href: "/outside-loans",
-        emoji: "🤝",
-        title: t("navOutsideLoans"),
-        detail: owed
-          ? t("outsideOwedToYou")
-          : borrow
-            ? t("outsideYouOwe")
-            : fill(t("outsideOpenCount"), {
-                n: String(outside.open.length),
-              }),
-        detailTone: owed || borrow ? "warn" : "muted",
-        amount: owed
-          ? outside.owedToYou
-          : borrow
-            ? outside.youOwe
-            : undefined,
-        score: owed || borrow ? 70 : 25,
-      });
+      if (owed || borrow) {
+        next.push({
+          key: "outside",
+          href: "/outside-loans",
+          emoji: "🤝",
+          title: t("navOutsideLoans"),
+          detail: owed ? t("outsideOwedToYou") : t("outsideYouOwe"),
+          detailTone: "warn",
+          amount: owed ? outside.owedToYou : outside.youOwe,
+          score: 70,
+        });
+      }
     }
 
-    if (goals && goals.goals.length > 0) {
-      next.push({
-        key: "goals",
-        href: "/goals",
-        emoji: "🎯",
-        title: t("navGoals"),
-        detail:
-          goals.goals.length === 1
-            ? t("goalsCountOne")
-            : fill(t("goalsCount"), { n: String(goals.goals.length) }),
-        detailTone: "muted",
-        amount: goals.allocated,
-        score: 45,
-      });
-    }
+    return next.sort((a, b) => b.score - a.score).slice(0, 2);
+  }, [outside, travels, subs, t]);
 
-    if (gold && gold.totalValue > 0.001) {
-      const gain = gold.totalGainLoss;
-      next.push({
-        key: "gold",
-        href: "/gold",
-        emoji: "🥇",
-        title: t("navGold"),
-        detail:
-          gain == null
-            ? t("goldHomeHintShort")
-            : gain >= 0
-              ? t("goldHomeUp")
-              : t("goldHomeDown"),
-        detailTone:
-          gain == null ? "muted" : gain >= 0 ? "good" : "warn",
-        amount: gain != null ? Math.abs(gain) : gold.totalValue,
-        amountSign:
-          gain == null ? undefined : gain >= 0 ? "+" : "−",
-        score: 40,
-      });
-    }
-
-    return next.sort((a, b) => b.score - a.score).slice(0, 3);
-  }, [goals, gold, outside, travels, subs, t]);
-
-  const attentionCount = rows.filter((r) => r.detailTone === "warn").length;
-  const loaded = goals != null || gold != null || outside != null || travels != null;
+  const attentionCount = tiles.filter((tile) => tile.attention).length;
+  const loaded =
+    goals != null || gold != null || outside != null || travels != null;
 
   const subtitle =
     attentionCount > 0
       ? attentionCount === 1
         ? t("toolsHomeAttentionOne")
         : fill(t("toolsHomeAttention"), { n: String(attentionCount) })
-      : rows.length > 0
+      : loaded
         ? t("toolsHomeQuiet")
-        : loaded
-          ? t("toolsHomeEmpty")
-          : t("toolsHomeHint");
+        : t("toolsHomeHint");
 
   return (
     <section className="surface mt-5 overflow-hidden rounded-[1.75rem]">
@@ -241,6 +243,32 @@ export function MoneyToolsHomeCard({
           →
         </span>
       </Link>
+
+      <div className="border-t border-[var(--surface-border)] px-3 py-3">
+        <div className="grid grid-cols-5 gap-1.5">
+          {tiles.map((tile) => (
+            <Link
+              key={tile.key}
+              href={tile.href}
+              aria-label={tile.title}
+              className="relative flex min-h-[4.25rem] flex-col items-center justify-center gap-1 rounded-2xl bg-[var(--panel-soft)] px-1 py-2 text-center transition hover:opacity-95 active:scale-[0.98]"
+            >
+              {tile.attention ? (
+                <span
+                  className="absolute end-1.5 top-1.5 h-2 w-2 rounded-full bg-amber-500"
+                  aria-hidden
+                />
+              ) : null}
+              <span className="text-lg leading-none" aria-hidden>
+                {tile.emoji}
+              </span>
+              <span className="max-w-full truncate text-[0.65rem] font-semibold leading-tight text-[var(--foreground)]">
+                {tile.title}
+              </span>
+            </Link>
+          ))}
+        </div>
+      </div>
 
       {rows.length > 0 ? (
         <ul className="border-t border-[var(--surface-border)]">
@@ -276,15 +304,7 @@ export function MoneyToolsHomeCard({
                       </span>
                     ) : null}
                   </span>
-                  <span
-                    className={`mt-0.5 block truncate text-xs leading-snug ${
-                      row.detailTone === "warn"
-                        ? "font-semibold text-amber-800 dark:text-amber-300"
-                        : row.detailTone === "good"
-                          ? "font-medium text-[var(--accent-a-text)]"
-                          : "text-[var(--muted)]"
-                    }`}
-                  >
+                  <span className="mt-0.5 block truncate text-xs font-semibold leading-snug text-amber-800 dark:text-amber-300">
                     {row.detail}
                   </span>
                 </span>
@@ -293,13 +313,6 @@ export function MoneyToolsHomeCard({
           ))}
         </ul>
       ) : null}
-
-      <Link
-        href="/tools"
-        className="block border-t border-[var(--surface-border)] px-4 py-2.5 text-center text-sm font-semibold text-[var(--accent-a-text)] transition hover:bg-[var(--panel-soft)]"
-      >
-        {t("toolsHomeOpenAll")}
-      </Link>
     </section>
   );
 }

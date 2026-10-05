@@ -258,6 +258,11 @@ export default function HomePage() {
   const personalTransferHref = suggestTransferToCurrent
     ? "/add?mode=transfer&from=savings&to=current"
     : "/add?mode=transfer&from=current&to=savings";
+  const personalTransferTitle = suggestTransferToCurrent
+    ? t("homeTransferToCurrent")
+    : currentBal > 0.001 || savingsBal > 0.001
+      ? t("homeTransferToSavings")
+      : t("transferWallets");
   const personalTransferHint = suggestTransferToCurrent
     ? t("homeTransferToCurrentHint")
     : currentBal > savingsBal && currentBal > 0.001
@@ -787,13 +792,22 @@ export default function HomePage() {
           </div>
           <Link
             href={personalTransferHref}
-            className="flex min-h-11 w-full flex-col items-center justify-center gap-0.5 rounded-2xl px-3 py-2.5 text-center transition hover:opacity-90 active:scale-[0.99]"
+            className="flex min-h-14 items-center justify-between gap-3 rounded-[1.5rem] px-4 py-3 shadow-md transition hover:opacity-95 active:scale-[0.99]"
+            style={{
+              background: "var(--accent-b)",
+              color: "var(--accent-b-fg)",
+            }}
           >
-            <span className="text-sm font-semibold text-[var(--accent-b-text)]">
-              {t("homeMoveMoney")}
+            <span className="min-w-0 text-start">
+              <span className="block text-base font-semibold leading-snug">
+                {personalTransferTitle}
+              </span>
+              <span className="mt-0.5 block text-xs font-medium leading-snug opacity-70">
+                {personalTransferHint}
+              </span>
             </span>
-            <span className="max-w-[18rem] text-xs font-medium leading-snug text-[var(--muted)]">
-              {personalTransferHint}
+            <span className="shrink-0 text-lg opacity-80" aria-hidden>
+              →
             </span>
           </Link>
         </div>
