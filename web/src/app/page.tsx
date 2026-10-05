@@ -26,6 +26,7 @@ import {
   MonthSoftLimitCard,
   type MonthSoftLimitStatus,
 } from "@/components/MonthSoftLimitCard";
+import { MoneyToolsHomeCard } from "@/components/MoneyToolsHomeCard";
 
 type Summary = {
   totalMoney: number;
@@ -1649,24 +1650,14 @@ export default function HomePage() {
             )}
           </span>
         </Link>
-      ) : (
-        <Link
-          href="/tools"
-          className="surface mt-5 flex min-h-16 items-center justify-between gap-3 rounded-[1.75rem] px-4 py-3.5 transition hover:bg-[var(--panel-soft)] active:scale-[0.99]"
-        >
-          <span className="min-w-0">
-            <span className="block text-base font-semibold text-[var(--foreground)]">
-              {t("toolsHomeTitle")}
-            </span>
-            <span className="mt-0.5 block text-xs leading-snug text-[var(--muted)]">
-              {t("toolsHomeHint")}
-            </span>
-          </span>
-          <span className="shrink-0 text-lg opacity-60" aria-hidden>
-            →
-          </span>
-        </Link>
-      )}
+      ) : active ? (
+        <MoneyToolsHomeCard
+          householdId={active.householdId}
+          currency={currency}
+          moneyVisible={moneyVisible}
+          subs={subs}
+        />
+      ) : null}
 
       {isHouse ? (
         <Link
@@ -1706,10 +1697,22 @@ export default function HomePage() {
 
       {txs.length > 0 ? (
         <>
-          <h2 className="mt-8 text-xl font-semibold">
-            {isHouse ? `🕒 ${t("latest")}` : t("latest")}
-          </h2>
-          {isHouse ? <Hint>{t("latestHint")}</Hint> : null}
+          <div className="mt-8 flex items-end justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-xl font-semibold">
+                {isHouse ? `🕒 ${t("latest")}` : t("latest")}
+              </h2>
+              <Hint>{isHouse ? t("latestHint") : t("latestHintPersonal")}</Hint>
+            </div>
+            {!isHouse ? (
+              <Link
+                href="/history"
+                className="shrink-0 text-sm font-semibold text-[var(--accent-a-text)]"
+              >
+                {t("latestSeeAll")}
+              </Link>
+            ) : null}
+          </div>
           <ul className="mt-3 space-y-2">
             {txs.map((tx) => (
               <li key={tx.id} className="list-row text-[var(--foreground)]">
@@ -1732,24 +1735,40 @@ export default function HomePage() {
                   <span
                     className={`shrink-0 font-semibold ${
                       tx.type === "INCOME"
-                        ? "text-emerald-800"
+                        ? "text-emerald-800 dark:text-emerald-300"
                         : tx.type === "TRACK"
                           ? "text-[var(--muted)]"
-                          : "text-red-800"
+                          : "text-red-800 dark:text-red-300"
                     }`}
                   >
-                    <Money
-                      amount={Number(tx.amount)}
-                      currency={currency}
-                      locale={locale}
-                      extraSign={
-                        tx.type === "INCOME"
-                          ? "+"
-                          : tx.type === "TRACK"
-                            ? undefined
-                            : "−"
-                      }
-                    />
+                    {isHouse ? (
+                      <Money
+                        amount={Number(tx.amount)}
+                        currency={currency}
+                        locale={locale}
+                        extraSign={
+                          tx.type === "INCOME"
+                            ? "+"
+                            : tx.type === "TRACK"
+                              ? undefined
+                              : "−"
+                        }
+                      />
+                    ) : (
+                      <PrivateMoney
+                        amount={Number(tx.amount)}
+                        currency={currency}
+                        locale={locale}
+                        visible={moneyVisible}
+                        extraSign={
+                          tx.type === "INCOME"
+                            ? "+"
+                            : tx.type === "TRACK"
+                              ? undefined
+                              : "−"
+                        }
+                      />
+                    )}
                   </span>
                 </div>
                 {(() => {
