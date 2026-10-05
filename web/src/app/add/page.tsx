@@ -10,6 +10,8 @@ import { useBooks } from "@/components/BooksProvider";
 import { householdPath, type Space } from "@/lib/space";
 import { CategoryPicker } from "@/components/CategoryPicker";
 import { DateField } from "@/components/DateField";
+import { Money } from "@/components/Money";
+import { ItemDate } from "@/components/ItemDate";
 import {
   isCashWallet,
   isCurrentWallet,
@@ -82,7 +84,7 @@ function AddForm() {
   const router = useRouter();
   const search = useSearchParams();
   const { t, locale } = useI18n();
-  const { active } = useBooks();
+  const { active, preferredCurrency } = useBooks();
   const [space, setSpace] = useState<Space | null>(null);
   const [mode, setMode] = useState<
     "wallet" | "claim" | "cover" | "transfer" | "withdraw"
@@ -104,6 +106,7 @@ function AddForm() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [trackOnly, setTrackOnly] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const houseAdmin = space?.kind === "HOUSE" && space.role === "ADMIN";
   const personalBooks = space?.kind === "PERSONAL";
@@ -263,19 +266,53 @@ function AddForm() {
     recentCategoryIds,
   ]);
 
-  async function onSubmit(e: FormEvent) {
+  function validateBeforeSave(): boolean {
+    setError("");
+    if (transferMode) {
+      const value = parseAmount(amount);
+      if (!accountId || !toAccountId || !(value > 0)) {
+        setError(t("amountHint"));
+        return false;
+      }
+      return true;
+    }
+    if (withdrawMode) {
+      if (!(parseAmount(amount) > 0)) {
+        setError(t("amountHint"));
+        return false;
+      }
+      return true;
+    }
+    if (type === "INCOME" && !claimMode && !coverMode) {
+      const intoCurrent = parseAmount(currentAmt);
+      const intoSavings = parseAmount(savingsAmt);
+      if (intoCurrent <= 0 && intoSavings <= 0) {
+        setError(t("amountHint"));
+        return false;
+      }
+      return true;
+    }
+    if (!(parseAmount(amount) > 0)) {
+      setError(t("amountHint"));
+      return false;
+    }
+    return true;
+  }
+
+  function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!space) return;
+    if (!validateBeforeSave()) return;
+    setConfirmOpen(true);
+  }
+
+  async function confirmSave() {
     if (!space) return;
     setBusy(true);
     setError("");
     try {
       if (transferMode) {
         const value = parseAmount(amount);
-        if (!accountId || !toAccountId || !(value > 0)) {
-          setError(t("amountHint"));
-          setBusy(false);
-          return;
-        }
         await api(householdPath(space.householdId, "/accounts/transfer"), {
           method: "POST",
           body: JSON.stringify({
@@ -291,11 +328,6 @@ function AddForm() {
         }
       } else if (withdrawMode) {
         const value = parseAmount(amount);
-        if (!(value > 0)) {
-          setError(t("amountHint"));
-          setBusy(false);
-          return;
-        }
         await api(
           householdPath(space.householdId, "/accounts/cash-withdraw"),
           {
@@ -414,6 +446,7 @@ function AddForm() {
           }
         }
       }
+      setConfirmOpen(false);
       router.replace("/");
     } catch {
       setError(t("couldNotSave"));
@@ -444,7 +477,11 @@ function AddForm() {
               ? t("moneyInHint")
               : personalPaid && trackOnly
                 ? t("spendTrackOnlyHint")
-                : t("paidHint");
+                : personalPaid && paidFromSavings
+                  ? t("spendFromSavingsHint")
+                  : personalPaid && paidFromCurrent
+                    ? t("currentHint")
+                    : t("paidHint");
 
   function setPaidFrom(source: "current" | "savings" | "track") {
     if (source === "track") {
@@ -458,12 +495,54 @@ function AddForm() {
     if (space) writeLastWalletId(space.householdId, wallet.id);
   }
 
+  /** Leave track-only; restore Savings if that wallet was still selected underneath. */
+  function setDeductFromWallet() {
+    if (!trackOnly && (paidFromCurrent || paidFromSavings)) return;
+    const preferSavings =
+      !!savingsWallet && accountId === savingsWallet.id;
+    setPaidFrom(preferSavings ? "savings" : "current");
+  }
+
   function walletBtn(active: boolean) {
     return `seg-item px-3 ${active ? "seg-active" : "ring-1 ring-[var(--input-border)]"}`;
   }
 
   const modeChip = (active: boolean) =>
     `chip shrink-0 whitespace-nowrap ${active ? "chip-active" : ""}`;
+
+  const selectedCategory = categories.find((c) => c.id === categoryId);
+  const selectedPerson = people.find((p) => p.id === toUserId);
+  const fromWallet = accounts.find((a) => a.id === accountId);
+  const toWallet = accounts.find((a) => a.id === toAccountId);
+  const intoCurrent = parseAmount(currentAmt);
+  const intoSavings = parseAmount(savingsAmt);
+  const confirmAmount = transferMode || withdrawMode || type !== "INCOME" || claimMode || coverMode
+    ? parseAmount(amount)
+    : intoCurrent + intoSavings;
+  const showWalletHighlight =
+    personalPaid ||
+    (!claimMode &&
+      !transferMode &&
+      !withdrawMode &&
+      type !== "INCOME" &&
+      !!fromWallet) ||
+    coverMode ||
+    giveMode;
+  const walletTone = personalPaid && trackOnly
+    ? "track"
+    : fromWallet && isSavingsWallet(fromWallet)
+      ? "savings"
+      : fromWallet && isCurrentWallet(fromWallet)
+        ? "current"
+        : "muted";
+  const walletToneClass =
+    walletTone === "savings"
+      ? "bg-amber-100 text-amber-950 ring-amber-300/80 dark:bg-amber-950/40 dark:text-amber-100 dark:ring-amber-700/60"
+      : walletTone === "current"
+        ? "bg-emerald-100 text-emerald-950 ring-emerald-300/80 dark:bg-emerald-950/40 dark:text-emerald-100 dark:ring-emerald-700/60"
+        : walletTone === "track"
+          ? "bg-stone-100 text-stone-800 ring-stone-300/80 dark:bg-stone-800/60 dark:text-stone-100 dark:ring-stone-600/60"
+          : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-[var(--input-border)]";
 
   return (
     <PageShell>
@@ -709,45 +788,67 @@ function AddForm() {
         ) : null}
 
         {personalPaid ? (
-          <div>
-            <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">
-              {t("addPaidFrom")}
-            </p>
-            <div className="seg grid-cols-3">
-              <button
-                type="button"
-                onClick={() => setPaidFrom("current")}
-                className={`seg-item ${paidFromCurrent ? "seg-active" : ""}`}
-                aria-pressed={paidFromCurrent}
-              >
-                <span className="seg-ico" aria-hidden>
-                  💵
-                </span>
-                {t("currentWallet")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setPaidFrom("savings")}
-                className={`seg-item ${paidFromSavings ? "seg-active" : ""}`}
-                aria-pressed={paidFromSavings}
-              >
-                <span className="seg-ico" aria-hidden>
-                  💰
-                </span>
-                {t("savingsWallet")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setPaidFrom("track")}
-                className={`seg-item ${trackOnly ? "seg-active" : ""}`}
-                aria-pressed={!!trackOnly}
-              >
-                <span className="seg-ico" aria-hidden>
-                  📋
-                </span>
-                {t("spendTrackOnly")}
-              </button>
+          <div className="space-y-3">
+            <div>
+              <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">
+                {t("spendHowLabel")}
+              </p>
+              <div className="seg grid-cols-2">
+                <button
+                  type="button"
+                  onClick={setDeductFromWallet}
+                  className={`seg-item ${!trackOnly ? "seg-active" : ""}`}
+                  aria-pressed={!trackOnly}
+                >
+                  <span className="seg-ico" aria-hidden>
+                    👛
+                  </span>
+                  {t("spendDeduct")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaidFrom("track")}
+                  className={`seg-item ${trackOnly ? "seg-active" : ""}`}
+                  aria-pressed={!!trackOnly}
+                >
+                  <span className="seg-ico" aria-hidden>
+                    📋
+                  </span>
+                  {t("spendTrackOnly")}
+                </button>
+              </div>
             </div>
+            {!trackOnly ? (
+              <div>
+                <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">
+                  {t("pickWalletSpend")}
+                </p>
+                <div className="seg grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaidFrom("current")}
+                    className={`seg-item ${paidFromCurrent ? "seg-active" : ""}`}
+                    aria-pressed={paidFromCurrent}
+                  >
+                    <span className="seg-ico" aria-hidden>
+                      💵
+                    </span>
+                    {t("currentWallet")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaidFrom("savings")}
+                    className={`seg-item ${paidFromSavings ? "seg-active" : ""}`}
+                    aria-pressed={paidFromSavings}
+                  >
+                    <span className="seg-ico" aria-hidden>
+                      💰
+                    </span>
+                    {t("savingsWallet")}
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -899,6 +1000,210 @@ function AddForm() {
           {busy ? t("saving") : `✅ ${t("save")}`}
         </button>
       </form>
+
+      {confirmOpen ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/45 p-3 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="add-confirm-title"
+          onClick={() => {
+            if (!busy) setConfirmOpen(false);
+          }}
+        >
+          <div
+            className="surface w-full max-w-md overflow-hidden rounded-[1.75rem] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="border-b border-[var(--surface-border)] px-4 py-3.5">
+              <p
+                id="add-confirm-title"
+                className="text-base font-semibold text-[var(--foreground)]"
+              >
+                {t("addConfirmTitle")}
+              </p>
+              <p className="mt-0.5 text-xs leading-snug text-[var(--muted)]">
+                {t("addConfirmHint")}
+              </p>
+            </div>
+
+            <div className="space-y-3 px-4 py-4">
+              <div className="text-center">
+                <p className="text-xs font-medium text-[var(--muted)]">
+                  {t("amount")}
+                </p>
+                <p className="mt-1 text-3xl font-bold tabular-nums text-[var(--foreground)]">
+                  <Money
+                    amount={confirmAmount}
+                    currency={preferredCurrency}
+                    locale={locale}
+                  />
+                </p>
+              </div>
+
+              {type === "INCOME" &&
+              !claimMode &&
+              !coverMode &&
+              !transferMode &&
+              !withdrawMode ? (
+                <div className="grid grid-cols-2 gap-2">
+                  {intoCurrent > 0 ? (
+                    <div className="rounded-2xl bg-emerald-100 px-3 py-2.5 ring-1 ring-emerald-300/80 dark:bg-emerald-950/40 dark:ring-emerald-700/60">
+                      <p className="text-[11px] font-medium text-emerald-900/70 dark:text-emerald-200/70">
+                        {t("addConfirmInto")}
+                      </p>
+                      <p className="mt-0.5 text-sm font-bold text-emerald-950 dark:text-emerald-100">
+                        💵 {t("currentWallet")}
+                      </p>
+                      <p className="mt-1 text-sm font-semibold tabular-nums">
+                        <Money
+                          amount={intoCurrent}
+                          currency={preferredCurrency}
+                          locale={locale}
+                        />
+                      </p>
+                    </div>
+                  ) : null}
+                  {intoSavings > 0 ? (
+                    <div className="rounded-2xl bg-amber-100 px-3 py-2.5 ring-1 ring-amber-300/80 dark:bg-amber-950/40 dark:ring-amber-700/60">
+                      <p className="text-[11px] font-medium text-amber-900/70 dark:text-amber-200/70">
+                        {t("addConfirmInto")}
+                      </p>
+                      <p className="mt-0.5 text-sm font-bold text-amber-950 dark:text-amber-100">
+                        💰 {t("savingsWallet")}
+                      </p>
+                      <p className="mt-1 text-sm font-semibold tabular-nums">
+                        <Money
+                          amount={intoSavings}
+                          currency={preferredCurrency}
+                          locale={locale}
+                        />
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {transferMode ? (
+                <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-3 ring-1 ring-[var(--input-border)]">
+                  <p className="text-[11px] font-medium text-[var(--muted)]">
+                    {t("addConfirmMove")}
+                  </p>
+                  <p className="mt-1 text-sm font-bold leading-snug">
+                    {fromWallet && isSavingsWallet(fromWallet)
+                      ? "💰 " + t("savingsWallet")
+                      : "💵 " + t("currentWallet")}
+                    <span className="mx-2 opacity-50">→</span>
+                    {toWallet && isSavingsWallet(toWallet)
+                      ? "💰 " + t("savingsWallet")
+                      : "💵 " + t("currentWallet")}
+                  </p>
+                </div>
+              ) : null}
+
+              {withdrawMode ? (
+                <div className="rounded-2xl bg-emerald-100 px-3 py-3 ring-1 ring-emerald-300/80 dark:bg-emerald-950/40 dark:ring-emerald-700/60">
+                  <p className="text-[11px] font-medium text-emerald-900/70 dark:text-emerald-200/70">
+                    {t("addConfirmSource")}
+                  </p>
+                  <p className="mt-0.5 text-base font-bold text-emerald-950 dark:text-emerald-100">
+                    💵 {t("currentWallet")}
+                  </p>
+                  <p className="mt-1 text-xs leading-snug text-emerald-900/80 dark:text-emerald-200/80">
+                    {t("cashWithdrawHint")}
+                  </p>
+                </div>
+              ) : null}
+
+              {showWalletHighlight && !transferMode && !withdrawMode ? (
+                <div className={`rounded-2xl px-3 py-3 ring-1 ${walletToneClass}`}>
+                  <p className="text-[11px] font-medium opacity-70">
+                    {personalPaid && trackOnly
+                      ? t("addConfirmNoCash")
+                      : t("addConfirmSource")}
+                  </p>
+                  <p className="mt-0.5 text-base font-bold">
+                    {personalPaid && trackOnly
+                      ? `📋 ${t("spendTrackOnly")}`
+                      : fromWallet && isSavingsWallet(fromWallet)
+                        ? `💰 ${t("savingsWallet")}`
+                        : `💵 ${t("currentWallet")}`}
+                  </p>
+                  <p className="mt-1 text-xs leading-snug opacity-80">
+                    {personalPaid && trackOnly
+                      ? t("spendTrackOnlyHint")
+                      : fromWallet && isSavingsWallet(fromWallet)
+                        ? t("spendFromSavingsHint")
+                        : t("currentHint")}
+                  </p>
+                </div>
+              ) : null}
+
+              <dl className="space-y-2 text-sm">
+                {selectedCategory &&
+                !transferMode &&
+                !withdrawMode &&
+                !giveMode ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-[var(--muted)]">{t("forWhat")}</dt>
+                    <dd className="font-semibold text-end">
+                      {categoryLabel(selectedCategory, locale, t)}
+                    </dd>
+                  </div>
+                ) : null}
+                {selectedPerson && (giveMode || coverMode) ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-[var(--muted)]">{t("giveTo")}</dt>
+                    <dd className="font-semibold text-end">
+                      {personLabel(selectedPerson, locale)}
+                    </dd>
+                  </div>
+                ) : null}
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-[var(--muted)]">{t("day")}</dt>
+                  <dd>
+                    <ItemDate value={occurredOn} locale={locale} />
+                  </dd>
+                </div>
+                {note.trim() ? (
+                  <div className="flex items-start justify-between gap-3">
+                    <dt className="shrink-0 text-[var(--muted)]">
+                      {t("noteOptional")}
+                    </dt>
+                    <dd className="text-end font-medium leading-snug">
+                      {note.trim()}
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+
+              {error ? (
+                <p className="text-sm text-red-700">{error}</p>
+              ) : null}
+            </div>
+
+            <div className="flex gap-2 border-t border-[var(--surface-border)] px-4 py-3">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => confirmSave()}
+                className="flex min-h-12 flex-1 items-center justify-center rounded-3xl bg-emerald-800 text-base font-semibold text-white disabled:opacity-60"
+              >
+                {busy ? t("saving") : `✅ ${t("addConfirmAction")}`}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setConfirmOpen(false)}
+                className="min-h-12 rounded-3xl px-4 text-sm font-semibold text-[var(--muted)] disabled:opacity-60"
+              >
+                {t("subsCancel")}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <BottomNav />
     </PageShell>
   );
