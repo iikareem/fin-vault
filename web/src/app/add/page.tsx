@@ -68,14 +68,6 @@ function pushRecentCategory(householdId: string, categoryId: string) {
   localStorage.setItem(recentCatsKey(householdId), JSON.stringify(next));
 }
 
-function readLastWalletId(householdId: string): string | null {
-  try {
-    return localStorage.getItem(lastWalletKey(householdId));
-  } catch {
-    return null;
-  }
-}
-
 function writeLastWalletId(householdId: string, accountId: string) {
   localStorage.setItem(lastWalletKey(householdId), accountId);
 }
@@ -161,13 +153,6 @@ function AddForm() {
         const c = result[1] as Category[];
         setAccounts(a);
         setCategories(c);
-        const remembered =
-          active.kind === "PERSONAL"
-            ? readLastWalletId(active.householdId)
-            : null;
-        const rememberedAccount = remembered
-          ? a.find((x) => x.id === remembered)
-          : null;
         const current = a.find(isCurrentWallet) ?? a[0];
         const savings = a.find(isSavingsWallet);
         const walletByKey = (key: string | null) => {
@@ -188,10 +173,13 @@ function AddForm() {
           if (fromAcc) setAccountId(fromAcc.id);
           if (toAcc) setToAccountId(toAcc.id);
         } else {
-          if (rememberedAccount) setAccountId(rememberedAccount.id);
+          // Personal spend defaults to Current (not last-used wallet).
+          const fromQuery = walletByKey(search.get("from"));
+          if (fromQuery) setAccountId(fromQuery.id);
           else if (current) setAccountId(current.id);
           if (savings) setToAccountId(savings.id);
           else if (a[1]) setToAccountId(a[1].id);
+          setTrackOnly(false);
         }
         if (active.kind === "PERSONAL") {
           setRecentCategoryIds(readRecentCategoryIds(active.householdId));
@@ -778,30 +766,39 @@ function AddForm() {
             <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">
               {t("addPaidFrom")}
             </p>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="seg grid-cols-3">
               <button
                 type="button"
                 onClick={() => setPaidFrom("current")}
-                className={modeChip(paidFromCurrent)}
+                className={`seg-item ${paidFromCurrent ? "seg-active" : ""}`}
                 aria-pressed={paidFromCurrent}
               >
-                💵 {t("currentWallet")}
+                <span className="seg-ico" aria-hidden>
+                  💵
+                </span>
+                {t("currentWallet")}
               </button>
               <button
                 type="button"
                 onClick={() => setPaidFrom("savings")}
-                className={modeChip(paidFromSavings)}
+                className={`seg-item ${paidFromSavings ? "seg-active" : ""}`}
                 aria-pressed={paidFromSavings}
               >
-                💰 {t("savingsWallet")}
+                <span className="seg-ico" aria-hidden>
+                  💰
+                </span>
+                {t("savingsWallet")}
               </button>
               <button
                 type="button"
                 onClick={() => setPaidFrom("track")}
-                className={modeChip(!!trackOnly)}
+                className={`seg-item ${trackOnly ? "seg-active" : ""}`}
                 aria-pressed={!!trackOnly}
               >
-                📋 {t("spendTrackOnly")}
+                <span className="seg-ico" aria-hidden>
+                  📋
+                </span>
+                {t("spendTrackOnly")}
               </button>
             </div>
           </div>
