@@ -736,11 +736,12 @@ export default function HomePage() {
         </p>
       </section>
 
-      {!isHouse && active && moneyVisible && summary?.softLimit ? (
+      {!isHouse && active && summary?.softLimit ? (
         <div className="mt-4">
           <MonthSoftLimitCard
             householdId={active.householdId}
             currency={currency}
+            moneyVisible={moneyVisible}
             status={summary.softLimit}
             onUpdated={(next) =>
               setSummary((prev) => (prev ? { ...prev, softLimit: next } : prev))

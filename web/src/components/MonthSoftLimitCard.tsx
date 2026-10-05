@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api, parseAmount, todayISO } from "@/lib/api";
 import { useI18n } from "@/components/I18nProvider";
-import { Money } from "@/components/Money";
+import { PrivateMoney } from "@/components/PrivateMoney";
 import { Hint } from "@/components/Hint";
 import { LimitBar } from "@/components/LimitBar";
 import { householdPath } from "@/lib/space";
@@ -43,6 +43,7 @@ export type MonthSoftLimitStatus = {
 type Props = {
   householdId: string;
   currency: string;
+  moneyVisible?: boolean;
   status: MonthSoftLimitStatus | null;
   onUpdated: (next: MonthSoftLimitStatus) => void;
 };
@@ -107,6 +108,7 @@ function planVerdict(
 export function MonthSoftLimitCard({
   householdId,
   currency,
+  moneyVisible = true,
   status,
   onUpdated,
 }: Props) {
@@ -257,10 +259,11 @@ export function MonthSoftLimitCard({
             />
             <span className="mt-1.5 block text-xs font-medium tabular-nums text-[var(--muted)]">
               {t("monthLimitSavedSoFar")}{" "}
-              <Money
+              <PrivateMoney
                 amount={status.savedThisMonth}
                 currency={currency}
                 locale={locale}
+                visible={moneyVisible}
               />
             </span>
             {liveSavePct != null ? (
@@ -385,24 +388,27 @@ export function MonthSoftLimitCard({
                 {verdict.kind === "ahead" ||
                 (verdict.kind === "met" && verdict.amount > 0.001) ? (
                   <>
-                    <span aria-hidden>+</span>
-                    <Money
+                    {moneyVisible ? <span aria-hidden>+</span> : null}
+                    <PrivateMoney
                       amount={verdict.amount}
                       currency={currency}
                       locale={locale}
+                      visible={moneyVisible}
                     />
                   </>
                 ) : verdict.kind === "met" ? (
-                  <Money
+                  <PrivateMoney
                     amount={save.saved}
                     currency={currency}
                     locale={locale}
+                    visible={moneyVisible}
                   />
                 ) : (
-                  <Money
+                  <PrivateMoney
                     amount={verdict.amount}
                     currency={currency}
                     locale={locale}
+                    visible={moneyVisible}
                   />
                 )}
               </p>
@@ -411,18 +417,20 @@ export function MonthSoftLimitCard({
             <div>
               <div className="mb-1.5 flex items-baseline justify-between gap-2">
                 <p className="text-sm font-semibold tabular-nums text-[var(--foreground)]">
-                  <Money
+                  <PrivateMoney
                     amount={Math.max(0, save.saved)}
                     currency={currency}
                     locale={locale}
+                    visible={moneyVisible}
                   />
                   <span className="font-medium text-[var(--muted)]">
                     {" "}
                     /{" "}
-                    <Money
+                    <PrivateMoney
                       amount={save.amount}
                       currency={currency}
                       locale={locale}
+                      visible={moneyVisible}
                     />
                   </span>
                 </p>
@@ -445,10 +453,11 @@ export function MonthSoftLimitCard({
                 <span>
                   {t("monthLimitSaveLeft")}{" "}
                   <span className="tabular-nums text-[var(--foreground)]">
-                    <Money
+                    <PrivateMoney
                       amount={save.remaining}
                       currency={currency}
                       locale={locale}
+                      visible={moneyVisible}
                     />
                   </span>
                 </span>
@@ -459,10 +468,11 @@ export function MonthSoftLimitCard({
                     <>
                       {t("monthLimitOverSpend")}{" "}
                       <span className="tabular-nums text-amber-800 dark:text-amber-300">
-                        <Money
+                        <PrivateMoney
                           amount={Math.max(0, -allowance.remaining)}
                           currency={currency}
                           locale={locale}
+                          visible={moneyVisible}
                         />
                       </span>
                     </>
@@ -470,10 +480,11 @@ export function MonthSoftLimitCard({
                     <>
                       {t("monthLimitSpendRoomShort")}{" "}
                       <span className="tabular-nums text-[var(--foreground)]">
-                        <Money
+                        <PrivateMoney
                           amount={Math.max(0, allowance.remaining)}
                           currency={currency}
                           locale={locale}
+                          visible={moneyVisible}
                         />
                       </span>
                     </>
