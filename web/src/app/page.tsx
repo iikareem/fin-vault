@@ -736,7 +736,7 @@ export default function HomePage() {
         </p>
       </section>
 
-      {!isHouse && active && summary?.softLimit ? (
+      {!isHouse && active && moneyVisible && summary?.softLimit ? (
         <div className="mt-4">
           <MonthSoftLimitCard
             householdId={active.householdId}

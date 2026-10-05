@@ -1,12 +1,13 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { api, parseAmount } from "@/lib/api";
+import { api, parseAmount, todayISO } from "@/lib/api";
 import { useI18n } from "@/components/I18nProvider";
 import { Money } from "@/components/Money";
 import { Hint } from "@/components/Hint";
 import { LimitBar } from "@/components/LimitBar";
 import { householdPath } from "@/lib/space";
+import { fill } from "@/lib/i18n";
 
 export type SaveTrack = {
   amount: number;
@@ -46,6 +47,63 @@ type Props = {
   onUpdated: (next: MonthSoftLimitStatus) => void;
 };
 
+type PlanVerdict =
+  | { kind: "met"; amount: number }
+  | { kind: "ahead"; amount: number }
+  | { kind: "onTrack"; amount: number }
+  | { kind: "behind"; amount: number }
+  | { kind: "negative"; amount: number }
+  | { kind: "overSpend"; amount: number };
+
+function parseDay(iso: string) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function periodFraction(from: string, to: string, today: string) {
+  const start = parseDay(from).getTime();
+  const end = parseDay(to).getTime();
+  const now = parseDay(today).getTime();
+  const dayMs = 86_400_000;
+  const days = Math.max(1, Math.round((end - start) / dayMs) + 1);
+  const elapsed = Math.min(
+    days,
+    Math.max(1, Math.round((now - start) / dayMs) + 1),
+  );
+  return { days, elapsed, fraction: elapsed / days };
+}
+
+function planVerdict(
+  save: SaveTrack,
+  allowance: SpendAllowanceTrack | null,
+  periodFrom: string,
+  periodTo: string,
+): PlanVerdict {
+  if (save.met) {
+    return { kind: "met", amount: Math.max(0, save.saved - save.amount) };
+  }
+
+  if (allowance?.overAllowance) {
+    return {
+      kind: "overSpend",
+      amount: Math.max(0, -allowance.remaining),
+    };
+  }
+
+  if (save.saved < -0.001) {
+    return { kind: "negative", amount: Math.abs(save.saved) };
+  }
+
+  const { fraction } = periodFraction(periodFrom, periodTo, todayISO());
+  const expected = save.amount * fraction;
+  const delta = save.saved - expected;
+  const slack = Math.max(save.amount * 0.03, 1);
+
+  if (delta > slack) return { kind: "ahead", amount: delta };
+  if (delta < -slack) return { kind: "behind", amount: Math.abs(delta) };
+  return { kind: "onTrack", amount: save.remaining };
+}
+
 export function MonthSoftLimitCard({
   householdId,
   currency,
@@ -79,6 +137,16 @@ export function MonthSoftLimitCard({
     const progress = Math.max(0, status.savedThisMonth);
     return Math.round((progress / amt) * 1000) / 10;
   }, [saveDraft, status]);
+
+  const verdict = useMemo(() => {
+    if (!status?.save) return null;
+    return planVerdict(
+      status.save,
+      status.spendAllowance,
+      status.periodFrom,
+      status.periodTo,
+    );
+  }, [status]);
 
   function openEdit() {
     if (!status) return;
@@ -232,93 +300,198 @@ export function MonthSoftLimitCard({
     );
   }
 
+  const tone =
+    verdict?.kind === "met" || verdict?.kind === "ahead"
+      ? "good"
+      : verdict?.kind === "onTrack"
+        ? "ok"
+        : verdict
+          ? "warn"
+          : "ok";
+
+  const toneWrap =
+    tone === "good"
+      ? "bg-[var(--soft-emerald)] text-[var(--accent-a-text)]"
+      : tone === "warn"
+        ? "bg-[var(--soft-amber)] text-amber-950 dark:text-amber-200"
+        : "bg-[var(--panel-soft)] text-[var(--muted)]";
+
+  const toneHero =
+    tone === "good"
+      ? "text-[var(--accent-a-text)]"
+      : tone === "warn"
+        ? "text-amber-900 dark:text-amber-200"
+        : "text-[var(--foreground)]";
+
+  let statusLabel = "";
+  let heroLabel = "";
+  if (verdict?.kind === "met") {
+    statusLabel = t("monthLimitStatusMet");
+    heroLabel =
+      verdict.amount > 0.001
+        ? t("monthLimitWinExtra")
+        : t("monthLimitWinExact");
+  } else if (verdict?.kind === "ahead") {
+    statusLabel = t("monthLimitStatusAhead");
+    heroLabel = t("monthLimitWinAhead");
+  } else if (verdict?.kind === "onTrack") {
+    statusLabel = t("monthLimitStatusOnTrack");
+    heroLabel = t("monthLimitSaveLeft");
+  } else if (verdict?.kind === "behind") {
+    statusLabel = t("monthLimitStatusBehind");
+    heroLabel = t("monthLimitWinBehind");
+  } else if (verdict?.kind === "negative") {
+    statusLabel = t("monthLimitStatusDown");
+    heroLabel = t("monthLimitSaveNegative");
+  } else if (verdict?.kind === "overSpend") {
+    statusLabel = t("monthLimitStatusOver");
+    heroLabel = t("monthLimitOverSpendBy");
+  }
+
   return (
     <section className="surface overflow-hidden rounded-[1.75rem] p-3.5">
       <button
         type="button"
         onClick={openEdit}
-        className="flex w-full items-start justify-between gap-3 text-start"
+        className="flex w-full flex-col gap-3 text-start"
       >
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--accent-a-text)]">
-            {t("monthLimitTitle")}
-          </p>
-          {hasPlan && save ? (
-            <>
-              <p className="mt-1 text-xl font-bold tabular-nums leading-none text-[var(--foreground)]">
-                <Money
-                  amount={save.saved}
-                  currency={currency}
-                  locale={locale}
-                />
-                <span className="text-sm font-semibold text-[var(--muted)]">
-                  {" "}
-                  /{" "}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--accent-a-text)]">
+              {t("monthLimitTitle")}
+            </p>
+            {hasPlan && verdict ? (
+              <span
+                className={`mt-1.5 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${toneWrap}`}
+              >
+                {statusLabel}
+              </span>
+            ) : null}
+          </div>
+          <span className="shrink-0 rounded-2xl bg-[var(--accent-a)] px-3 py-2 text-sm font-semibold text-[var(--accent-a-fg)]">
+            {hasPlan ? t("monthLimitEdit") : t("monthLimitSet")}
+          </span>
+        </div>
+
+        {hasPlan && save && verdict ? (
+          <>
+            <div>
+              <p className="text-xs font-medium text-[var(--muted)]">
+                {heroLabel}
+              </p>
+              <p
+                className={`mt-0.5 text-[1.65rem] font-bold tabular-nums leading-none ${toneHero}`}
+              >
+                {verdict.kind === "ahead" ||
+                (verdict.kind === "met" && verdict.amount > 0.001) ? (
+                  <>
+                    <span aria-hidden>+</span>
+                    <Money
+                      amount={verdict.amount}
+                      currency={currency}
+                      locale={locale}
+                    />
+                  </>
+                ) : verdict.kind === "met" ? (
                   <Money
-                    amount={save.amount}
+                    amount={save.saved}
                     currency={currency}
                     locale={locale}
                   />
-                </span>
-              </p>
-              <div className="mt-2">
-                <LimitBar pct={save.pct} over={false} tone="save" size="sm" />
-              </div>
-              <p
-                className={`mt-1.5 text-xs font-medium ${
-                  save.met
-                    ? "text-[var(--accent-a-text)]"
-                    : save.saved < -0.001
-                      ? "text-amber-800 dark:text-amber-300"
-                      : "text-[var(--muted)]"
-                }`}
-              >
-                {save.met ? (
-                  t("monthLimitSaveMet")
-                ) : allowance && incomeKnown ? (
-                  <>
-                    {t("monthLimitSpendRoomShort")}{" "}
-                    <Money
-                      amount={Math.max(0, allowance.remaining)}
-                      currency={currency}
-                      locale={locale}
-                    />
-                    {allowance.overAllowance ? (
-                      <span className="ms-1 text-amber-800 dark:text-amber-300">
-                        · {t("monthLimitOverSpend")}
-                      </span>
-                    ) : null}
-                  </>
-                ) : save.saved < -0.001 ? (
-                  <>
-                    {t("monthLimitSaveNegative")}{" "}
-                    <Money
-                      amount={Math.abs(save.saved)}
-                      currency={currency}
-                      locale={locale}
-                    />
-                  </>
                 ) : (
-                  <>
-                    {t("monthLimitSaveLeft")}{" "}
+                  <Money
+                    amount={verdict.amount}
+                    currency={currency}
+                    locale={locale}
+                  />
+                )}
+              </p>
+            </div>
+
+            <div>
+              <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                <p className="text-sm font-semibold tabular-nums text-[var(--foreground)]">
+                  <Money
+                    amount={Math.max(0, save.saved)}
+                    currency={currency}
+                    locale={locale}
+                  />
+                  <span className="font-medium text-[var(--muted)]">
+                    {" "}
+                    /{" "}
+                    <Money
+                      amount={save.amount}
+                      currency={currency}
+                      locale={locale}
+                    />
+                  </span>
+                </p>
+                <p className="shrink-0 text-xs font-semibold tabular-nums text-[var(--muted)]">
+                  {fill(t("monthLimitPct"), {
+                    n: String(Math.min(999, Math.round(save.pct))),
+                  })}
+                </p>
+              </div>
+              <LimitBar
+                pct={save.pct}
+                over={verdict.kind === "overSpend"}
+                tone="save"
+                size="sm"
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-medium text-[var(--muted)]">
+              {!save.met ? (
+                <span>
+                  {t("monthLimitSaveLeft")}{" "}
+                  <span className="tabular-nums text-[var(--foreground)]">
                     <Money
                       amount={save.remaining}
                       currency={currency}
                       locale={locale}
                     />
-                  </>
-                )}
-              </p>
-            </>
-          ) : (
+                  </span>
+                </span>
+              ) : null}
+              {allowance && incomeKnown ? (
+                <span>
+                  {allowance.overAllowance ? (
+                    <>
+                      {t("monthLimitOverSpend")}{" "}
+                      <span className="tabular-nums text-amber-800 dark:text-amber-300">
+                        <Money
+                          amount={Math.max(0, -allowance.remaining)}
+                          currency={currency}
+                          locale={locale}
+                        />
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      {t("monthLimitSpendRoomShort")}{" "}
+                      <span className="tabular-nums text-[var(--foreground)]">
+                        <Money
+                          amount={Math.max(0, allowance.remaining)}
+                          currency={currency}
+                          locale={locale}
+                        />
+                      </span>
+                    </>
+                  )}
+                </span>
+              ) : null}
+            </div>
+          </>
+        ) : (
+          <div>
+            <p className="text-base font-semibold text-[var(--foreground)]">
+              {t("monthLimitEmptyTitle")}
+            </p>
             <p className="mt-1 text-sm leading-snug text-[var(--muted)]">
               {t("monthLimitEmptyHint")}
             </p>
-          )}
-        </div>
-        <span className="shrink-0 rounded-2xl bg-[var(--accent-a)] px-3 py-2 text-sm font-semibold text-[var(--accent-a-fg)]">
-          {hasPlan ? t("monthLimitEdit") : t("monthLimitSet")}
-        </span>
+          </div>
+        )}
       </button>
     </section>
   );
