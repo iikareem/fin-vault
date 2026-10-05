@@ -13,14 +13,6 @@ import {
 import { nonSpendCategoryFilter } from '../categories/non-spend-categories';
 import { UpsertMonthSoftLimitDto } from './dto/upsert-month-soft-limit.dto';
 
-export type CeilingTrack = {
-  amount: number;
-  spent: number;
-  remaining: number;
-  pct: number;
-  overLimit: boolean;
-};
-
 export type SaveTrack = {
   amount: number;
   saved: number;
@@ -29,21 +21,41 @@ export type SaveTrack = {
   met: boolean;
 };
 
+export type SpendAllowanceTrack = {
+  /** Income − save target (max outflow to hit save goal). */
+  allowance: number;
+  /** Cash outflow so far (expense + reimbursement). */
+  spent: number;
+  remaining: number;
+  pct: number;
+  overAllowance: boolean;
+};
+
+export type MonthPlanCategory = {
+  categoryId: string;
+  name: string;
+  nameAr: string;
+  emoji: string;
+  color: string;
+  total: number;
+  pctOfSpent: number;
+};
+
 export type MonthSoftLimitStatus = {
   periodKey: string;
   periodFrom: string;
   periodTo: string;
-  personalAmount: number | null;
   saveTargetAmount: number | null;
-  spentPersonal: number;
+  /** Cash income in the period. */
+  periodIncome: number;
+  /** Cash outflow (expense + reimbursement). */
+  periodOutflow: number;
   spentAll: number;
-  /** spentAll − spentPersonal (paid commitment expenses in the period). */
   commitmentsSpend: number;
-  /** Net cash saved this period (same idea as home savedThisMonth). */
   savedThisMonth: number;
-  personal: CeilingTrack | null;
   save: SaveTrack | null;
-  /** True when the personal spend ceiling is exceeded. */
+  spendAllowance: SpendAllowanceTrack | null;
+  categories: MonthPlanCategory[];
   overLimit: boolean;
 };
 
@@ -63,6 +75,35 @@ export class MonthSoftLimitsService {
     return budgetMonthRange(periodKey ?? new Date(), startDay);
   }
 
+  private async cashFlow(householdId: string, from: string, to: string) {
+    const accounts = await this.prisma.account.findMany({
+      where: { householdId, archived: false, type: 'CASH' },
+      select: { id: true },
+    });
+    const ids = accounts.map((a) => a.id);
+    if (ids.length === 0) {
+      return { income: 0, outflow: 0, saved: 0 };
+    }
+
+    const rows = await this.prisma.transaction.groupBy({
+      by: ['type'],
+      where: {
+        householdId,
+        accountId: { in: ids },
+        occurredOn: { gte: dateOnlyUtc(from), lte: dateOnlyUtc(to) },
+        category: { name: { not: 'Wallet transfer' } },
+        type: { in: ['INCOME', 'EXPENSE', 'REIMBURSEMENT'] },
+      },
+      _sum: { amount: true },
+    });
+
+    const amt = (type: string) =>
+      Number(rows.find((r) => r.type === type)?._sum?.amount ?? 0);
+    const income = amt('INCOME');
+    const outflow = amt('EXPENSE') + amt('REIMBURSEMENT');
+    return { income, outflow, saved: income - outflow };
+  }
+
   private async periodSpend(householdId: string, from: string, to: string) {
     const monthStart = dateOnlyUtc(from);
     const monthEnd = dateOnlyUtc(to);
@@ -71,6 +112,7 @@ export class MonthSoftLimitsService {
       type: { in: ['EXPENSE', 'TRACK'] as ('EXPENSE' | 'TRACK')[] },
       occurredOn: { gte: monthStart, lte: monthEnd },
       category: nonSpendCategoryFilter,
+      travelId: null,
     };
 
     const [allAgg, personalAgg] = await Promise.all([
@@ -88,59 +130,66 @@ export class MonthSoftLimitsService {
     const spentPersonal = Number(personalAgg._sum?.amount ?? 0);
     return {
       spentAll,
-      spentPersonal,
       commitmentsSpend: Math.max(0, spentAll - spentPersonal),
     };
   }
 
-  /**
-   * Match home `savedThisMonth`: cash wallets only, income − (expense + reimbursement),
-   * excluding wallet transfers.
-   */
-  private async periodSaved(householdId: string, from: string, to: string) {
-    const accounts = await this.prisma.account.findMany({
-      where: { householdId, archived: false, type: 'CASH' },
-      select: { id: true },
-    });
-    const ids = accounts.map((a) => a.id);
-    if (ids.length === 0) return 0;
-
+  private async spendByCategory(householdId: string, from: string, to: string) {
     const rows = await this.prisma.transaction.groupBy({
-      by: ['type'],
+      by: ['categoryId'],
       where: {
         householdId,
-        accountId: { in: ids },
+        type: { in: ['EXPENSE', 'TRACK'] },
         occurredOn: { gte: dateOnlyUtc(from), lte: dateOnlyUtc(to) },
-        category: { name: { not: 'Wallet transfer' } },
-        type: { in: ['INCOME', 'EXPENSE', 'REIMBURSEMENT'] },
+        category: nonSpendCategoryFilter,
+        travelId: null,
       },
       _sum: { amount: true },
     });
 
-    const amt = (type: string) =>
-      Number(rows.find((r) => r.type === type)?._sum?.amount ?? 0);
-    return amt('INCOME') - amt('EXPENSE') - amt('REIMBURSEMENT');
-  }
+    const cats = await this.prisma.category.findMany({
+      where: { householdId },
+    });
+    const byId = new Map(cats.map((c) => [c.id, c]));
 
-  private spendTrack(
-    amount: number | null,
-    spent: number,
-  ): CeilingTrack | null {
-    if (amount == null || amount <= 0) return null;
-    const pct = Math.round((spent / amount) * 1000) / 10;
-    return {
-      amount,
-      spent,
-      remaining: Math.max(0, amount - spent),
-      pct,
-      overLimit: spent > amount + 0.001,
-    };
+    const groups = new Map<
+      string,
+      { categoryId: string; name: string; nameAr: string; emoji: string; color: string; total: number }
+    >();
+
+    for (const row of rows) {
+      const amount = Number(row._sum?.amount ?? 0);
+      if (amount <= 0) continue;
+      const leaf = byId.get(row.categoryId);
+      const group = leaf?.parentId
+        ? byId.get(leaf.parentId)
+        : leaf;
+      const bucket = group ?? leaf;
+      if (!bucket) continue;
+      const cur = groups.get(bucket.id) ?? {
+        categoryId: bucket.id,
+        name: bucket.name,
+        nameAr: bucket.nameAr ?? '',
+        emoji: bucket.emoji ?? '',
+        color: bucket.color ?? '#64748b',
+        total: 0,
+      };
+      cur.total += amount;
+      groups.set(bucket.id, cur);
+    }
+
+    const list = [...groups.values()].sort((a, b) => b.total - a.total);
+    const spentTotal = list.reduce((s, c) => s + c.total, 0);
+    return list.slice(0, 6).map((c) => ({
+      ...c,
+      pctOfSpent:
+        spentTotal > 0 ? Math.round((c.total / spentTotal) * 1000) / 10 : 0,
+    }));
   }
 
   private saveTrack(amount: number | null, saved: number): SaveTrack | null {
     if (amount == null || amount <= 0) return null;
-    const progress = Math.max(0, saved);
-    const pct = Math.round((progress / amount) * 1000) / 10;
+    const pct = Math.round((Math.max(0, saved) / amount) * 1000) / 10;
     return {
       amount,
       saved,
@@ -150,34 +199,59 @@ export class MonthSoftLimitsService {
     };
   }
 
+  private allowanceTrack(
+    income: number,
+    saveTarget: number,
+    outflow: number,
+  ): SpendAllowanceTrack | null {
+    if (saveTarget <= 0) return null;
+    const allowance = Math.max(0, income - saveTarget);
+    const pct =
+      allowance > 0
+        ? Math.round((outflow / allowance) * 1000) / 10
+        : outflow > 0.001
+          ? 100
+          : 0;
+    return {
+      allowance,
+      spent: outflow,
+      remaining: allowance - outflow,
+      pct,
+      overAllowance: outflow > allowance + 0.001,
+    };
+  }
+
   private shape(
     periodKey: string,
     periodFrom: string,
     periodTo: string,
-    personalAmount: number | null,
     saveTargetAmount: number | null,
-    spends: {
-      spentAll: number;
-      spentPersonal: number;
-      commitmentsSpend: number;
-    },
-    savedThisMonth: number,
+    flow: { income: number; outflow: number; saved: number },
+    spends: { spentAll: number; commitmentsSpend: number },
+    categories: MonthPlanCategory[],
   ): MonthSoftLimitStatus {
-    const personal = this.spendTrack(personalAmount, spends.spentPersonal);
-    const save = this.saveTrack(saveTargetAmount, savedThisMonth);
+    const save = this.saveTrack(saveTargetAmount, flow.saved);
+    const spendAllowance =
+      saveTargetAmount != null && saveTargetAmount > 0 && flow.income > 0.001
+        ? this.allowanceTrack(flow.income, saveTargetAmount, flow.outflow)
+        : saveTargetAmount != null && saveTargetAmount > 0
+          ? this.allowanceTrack(0, saveTargetAmount, flow.outflow)
+          : null;
+
     return {
       periodKey,
       periodFrom,
       periodTo,
-      personalAmount,
       saveTargetAmount,
-      spentPersonal: spends.spentPersonal,
+      periodIncome: flow.income,
+      periodOutflow: flow.outflow,
       spentAll: spends.spentAll,
       commitmentsSpend: spends.commitmentsSpend,
-      savedThisMonth,
-      personal,
+      savedThisMonth: flow.saved,
       save,
-      overLimit: Boolean(personal?.overLimit),
+      spendAllowance,
+      categories,
+      overLimit: Boolean(spendAllowance?.overAllowance),
     };
   }
 
@@ -193,7 +267,7 @@ export class MonthSoftLimitsService {
   ): Promise<MonthSoftLimitStatus> {
     const startDay = await this.resolveStartDay(userId);
     const range = this.resolvePeriod(periodKey, startDay);
-    const [row, spends, savedThisMonth] = await Promise.all([
+    const [row, flow, spends, categories] = await Promise.all([
       this.prisma.monthSoftLimit.findUnique({
         where: {
           householdId_periodKey: {
@@ -202,18 +276,19 @@ export class MonthSoftLimitsService {
           },
         },
       }),
+      this.cashFlow(householdId, range.from, range.to),
       this.periodSpend(householdId, range.from, range.to),
-      this.periodSaved(householdId, range.from, range.to),
+      this.spendByCategory(householdId, range.from, range.to),
     ]);
 
     return this.shape(
       range.key,
       range.from,
       range.to,
-      row?.personalAmount != null ? Number(row.personalAmount) : null,
       row?.saveTargetAmount != null ? Number(row.saveTargetAmount) : null,
+      flow,
       spends,
-      savedThisMonth,
+      categories,
     );
   }
 
@@ -225,15 +300,8 @@ export class MonthSoftLimitsService {
     const startDay = await this.resolveStartDay(userId);
     const range = this.resolvePeriod(dto.periodKey, startDay);
 
-    const personalAmount =
-      dto.personalAmount === undefined ? undefined : dto.personalAmount;
-    const saveTargetAmount =
-      dto.saveTargetAmount === undefined ? undefined : dto.saveTargetAmount;
-
-    if (personalAmount === undefined && saveTargetAmount === undefined) {
-      throw new BadRequestException(
-        'Provide personalAmount and/or saveTargetAmount',
-      );
+    if (dto.saveTargetAmount === undefined) {
+      throw new BadRequestException('Provide saveTargetAmount');
     }
 
     const existing = await this.prisma.monthSoftLimit.findUnique({
@@ -245,20 +313,7 @@ export class MonthSoftLimitsService {
       },
     });
 
-    const nextPersonal =
-      personalAmount !== undefined
-        ? personalAmount
-        : existing?.personalAmount != null
-          ? Number(existing.personalAmount)
-          : null;
-    const nextSave =
-      saveTargetAmount !== undefined
-        ? saveTargetAmount
-        : existing?.saveTargetAmount != null
-          ? Number(existing.saveTargetAmount)
-          : null;
-
-    if (nextPersonal == null && nextSave == null) {
+    if (dto.saveTargetAmount == null) {
       if (existing) {
         await this.prisma.monthSoftLimit.delete({ where: { id: existing.id } });
       }
@@ -275,12 +330,10 @@ export class MonthSoftLimitsService {
       create: {
         householdId,
         periodKey: range.key,
-        personalAmount: this.decOrNull(nextPersonal),
-        saveTargetAmount: this.decOrNull(nextSave),
+        saveTargetAmount: new Prisma.Decimal(dto.saveTargetAmount),
       },
       update: {
-        personalAmount: this.decOrNull(nextPersonal),
-        saveTargetAmount: this.decOrNull(nextSave),
+        saveTargetAmount: new Prisma.Decimal(dto.saveTargetAmount),
       },
     });
 

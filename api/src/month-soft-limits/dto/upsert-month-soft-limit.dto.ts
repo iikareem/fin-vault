@@ -14,13 +14,7 @@ export class UpsertMonthSoftLimitDto {
   @Matches(/^\d{4}-\d{2}$/)
   periodKey?: string;
 
-  /** Day-to-day spend ceiling. Null clears it. */
-  @ValidateIf((_, v) => v !== null && v !== undefined)
-  @IsNumber()
-  @Min(0.01)
-  personalAmount?: number | null;
-
-  /** Net save target for the period. Null clears it. */
+  /** Save target for the period. Null clears the plan. */
   @ValidateIf((_, v) => v !== null && v !== undefined)
   @IsNumber()
   @Min(0.01)
