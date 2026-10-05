@@ -2,7 +2,6 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { api, parseAmount } from "@/lib/api";
-import { categoryLabel, fill } from "@/lib/i18n";
 import { useI18n } from "@/components/I18nProvider";
 import { Money } from "@/components/Money";
 import { Hint } from "@/components/Hint";
@@ -25,16 +24,6 @@ export type SpendAllowanceTrack = {
   overAllowance: boolean;
 };
 
-export type MonthPlanCategory = {
-  categoryId: string;
-  name: string;
-  nameAr: string;
-  emoji: string;
-  color: string;
-  total: number;
-  pctOfSpent: number;
-};
-
 export type MonthSoftLimitStatus = {
   periodKey: string;
   periodFrom: string;
@@ -47,7 +36,6 @@ export type MonthSoftLimitStatus = {
   savedThisMonth: number;
   save: SaveTrack | null;
   spendAllowance: SpendAllowanceTrack | null;
-  categories: MonthPlanCategory[];
   overLimit: boolean;
 };
 
@@ -164,202 +152,10 @@ export function MonthSoftLimitCard({
   const allowance = status.spendAllowance;
   const incomeKnown = status.periodIncome > 0.001;
 
-  return (
-    <section className="surface overflow-hidden rounded-[1.75rem]">
-      {!editing ? (
-        <div className="p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--accent-a-text)]">
-                {t("monthLimitTitle")}
-              </p>
-              <h2 className="mt-0.5 text-lg font-bold text-[var(--foreground)]">
-                {hasPlan ? t("monthLimitHeading") : t("monthLimitEmptyTitle")}
-              </h2>
-            </div>
-            <button
-              type="button"
-              onClick={openEdit}
-              className="shrink-0 rounded-2xl bg-[var(--accent-a)] px-3 py-2 text-sm font-semibold text-[var(--accent-a-fg)]"
-            >
-              {hasPlan ? t("monthLimitEdit") : t("monthLimitSet")}
-            </button>
-          </div>
-
-          {hasPlan && save ? (
-            <div className="mt-3 space-y-2.5">
-              <div className="rounded-2xl bg-[var(--accent-a-soft)] px-3.5 py-3">
-                <p className="text-xs font-bold uppercase tracking-wide text-[var(--accent-a-text)]">
-                  {t("monthLimitModeSave")}
-                </p>
-                <p className="mt-2 text-2xl font-bold tabular-nums leading-none text-[var(--foreground)]">
-                  <Money
-                    amount={save.saved}
-                    currency={currency}
-                    locale={locale}
-                  />
-                  <span className="text-base font-semibold text-[var(--muted)]">
-                    {" "}
-                    /{" "}
-                    <Money
-                      amount={save.amount}
-                      currency={currency}
-                      locale={locale}
-                    />
-                  </span>
-                </p>
-                <div className="mt-2.5">
-                  <LimitBar pct={save.pct} over={false} tone="save" />
-                </div>
-                <p
-                  className={`mt-1.5 text-xs font-medium ${
-                    save.met
-                      ? "text-[var(--accent-a-text)]"
-                      : save.saved < -0.001
-                        ? "text-amber-800 dark:text-amber-300"
-                        : "text-[var(--muted)]"
-                  }`}
-                >
-                  {save.met ? (
-                    t("monthLimitSaveMet")
-                  ) : save.saved < -0.001 ? (
-                    <>
-                      {t("monthLimitSaveNegative")}{" "}
-                      <Money
-                        amount={Math.abs(save.saved)}
-                        currency={currency}
-                        locale={locale}
-                      />
-                    </>
-                  ) : (
-                    <>
-                      {t("monthLimitSaveLeft")}{" "}
-                      <Money
-                        amount={save.remaining}
-                        currency={currency}
-                        locale={locale}
-                      />
-                    </>
-                  )}
-                </p>
-              </div>
-
-              <div className="rounded-2xl bg-[var(--accent-b-soft)] px-3.5 py-3">
-                <p className="text-xs font-bold uppercase tracking-wide text-[var(--accent-b-text)]">
-                  {t("monthLimitSpendRoom")}
-                </p>
-                <p className="mt-0.5 text-[11px] leading-snug text-[var(--muted)]">
-                  {incomeKnown
-                    ? t("monthLimitSpendRoomHint")
-                    : t("monthLimitSpendRoomNoIncome")}
-                </p>
-                {allowance && incomeKnown ? (
-                  <>
-                    <p className="mt-2 text-xl font-bold tabular-nums leading-none text-[var(--foreground)]">
-                      <Money
-                        amount={Math.max(0, allowance.remaining)}
-                        currency={currency}
-                        locale={locale}
-                      />
-                      <span className="text-sm font-semibold text-[var(--muted)]">
-                        {" "}
-                        {t("monthLimitSpendRoomLeft")}{" "}
-                        <Money
-                          amount={allowance.allowance}
-                          currency={currency}
-                          locale={locale}
-                        />
-                      </span>
-                    </p>
-                    <div className="mt-2.5">
-                      <LimitBar
-                        pct={allowance.pct}
-                        over={allowance.overAllowance}
-                        tone="personal"
-                      />
-                    </div>
-                    <p
-                      className={`mt-1.5 text-xs font-medium ${
-                        allowance.overAllowance
-                          ? "text-amber-800 dark:text-amber-300"
-                          : "text-[var(--muted)]"
-                      }`}
-                    >
-                      {t("monthLimitSpentOfAllowance")}{" "}
-                      <Money
-                        amount={allowance.spent}
-                        currency={currency}
-                        locale={locale}
-                      />
-                    </p>
-                  </>
-                ) : (
-                  <p className="mt-2 text-sm tabular-nums text-[var(--foreground)]">
-                    {t("monthLimitSpentSoFar")}{" "}
-                    <Money
-                      amount={status.periodOutflow}
-                      currency={currency}
-                      locale={locale}
-                    />
-                  </p>
-                )}
-              </div>
-
-              {status.categories.length > 0 ? (
-                <div className="rounded-2xl bg-[var(--panel-soft)] px-3.5 py-3">
-                  <p className="text-xs font-bold uppercase tracking-wide text-[var(--muted)]">
-                    {t("monthLimitWhereSpent")}
-                  </p>
-                  <ul className="mt-2.5 space-y-2">
-                    {status.categories.map((cat) => (
-                      <li key={cat.categoryId}>
-                        <div className="flex items-center justify-between gap-2 text-sm">
-                          <span className="min-w-0 truncate font-medium text-[var(--foreground)]">
-                            {cat.emoji ? `${cat.emoji} ` : ""}
-                            {categoryLabel(cat, locale, t)}
-                          </span>
-                          <span className="shrink-0 tabular-nums font-semibold">
-                            <Money
-                              amount={cat.total}
-                              currency={currency}
-                              locale={locale}
-                            />
-                          </span>
-                        </div>
-                        <div className="mt-1 flex items-center gap-2">
-                          <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[var(--surface-bg)] ring-1 ring-[var(--chrome-edge)]">
-                            <div
-                              className="h-full rounded-full transition-[width] duration-500"
-                              style={{
-                                width: `${Math.min(100, cat.pctOfSpent)}%`,
-                                backgroundColor: cat.color || "#64748b",
-                              }}
-                            />
-                          </div>
-                          <span className="w-10 shrink-0 text-end text-[10px] tabular-nums text-[var(--muted)]">
-                            {fill(t("monthLimitPct"), {
-                              pct: String(Math.round(cat.pctOfSpent)),
-                            })}
-                          </span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ) : null}
-
-              <p className="px-0.5 text-xs leading-snug text-[var(--muted)]">
-                {t("monthLimitSoftHint")}
-              </p>
-            </div>
-          ) : (
-            <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">
-              {t("monthLimitEmptyHint")}
-            </p>
-          )}
-        </div>
-      ) : (
-        <form onSubmit={onSave} className="space-y-3 p-4">
+  if (editing) {
+    return (
+      <section className="surface overflow-hidden rounded-[1.75rem] p-4">
+        <form onSubmit={onSave} className="space-y-3">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-bold text-[var(--foreground)]">
@@ -379,12 +175,9 @@ export function MonthSoftLimitCard({
             </button>
           </div>
 
-          <label className="block rounded-2xl bg-[var(--accent-a-soft)] p-3">
-            <span className="mb-0.5 block text-sm font-semibold text-[var(--accent-a-text)]">
+          <label className="block">
+            <span className="mb-1 block text-sm font-semibold text-[var(--accent-a-text)]">
               {t("monthLimitModeSave")}
-            </span>
-            <span className="mb-2 block text-[11px] leading-snug text-[var(--muted)]">
-              {t("monthLimitModeSaveHint")}
             </span>
             <input
               className="field text-lg"
@@ -394,7 +187,7 @@ export function MonthSoftLimitCard({
               placeholder={t("monthLimitAmountPlaceholder")}
               autoFocus
             />
-            <span className="mt-1.5 block text-xs font-semibold tabular-nums text-[var(--accent-a-text)]">
+            <span className="mt-1.5 block text-xs font-medium tabular-nums text-[var(--muted)]">
               {t("monthLimitSavedSoFar")}{" "}
               <Money
                 amount={status.savedThisMonth}
@@ -435,7 +228,98 @@ export function MonthSoftLimitCard({
             ) : null}
           </div>
         </form>
-      )}
+      </section>
+    );
+  }
+
+  return (
+    <section className="surface overflow-hidden rounded-[1.75rem] p-3.5">
+      <button
+        type="button"
+        onClick={openEdit}
+        className="flex w-full items-start justify-between gap-3 text-start"
+      >
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--accent-a-text)]">
+            {t("monthLimitTitle")}
+          </p>
+          {hasPlan && save ? (
+            <>
+              <p className="mt-1 text-xl font-bold tabular-nums leading-none text-[var(--foreground)]">
+                <Money
+                  amount={save.saved}
+                  currency={currency}
+                  locale={locale}
+                />
+                <span className="text-sm font-semibold text-[var(--muted)]">
+                  {" "}
+                  /{" "}
+                  <Money
+                    amount={save.amount}
+                    currency={currency}
+                    locale={locale}
+                  />
+                </span>
+              </p>
+              <div className="mt-2">
+                <LimitBar pct={save.pct} over={false} tone="save" size="sm" />
+              </div>
+              <p
+                className={`mt-1.5 text-xs font-medium ${
+                  save.met
+                    ? "text-[var(--accent-a-text)]"
+                    : save.saved < -0.001
+                      ? "text-amber-800 dark:text-amber-300"
+                      : "text-[var(--muted)]"
+                }`}
+              >
+                {save.met ? (
+                  t("monthLimitSaveMet")
+                ) : allowance && incomeKnown ? (
+                  <>
+                    {t("monthLimitSpendRoomShort")}{" "}
+                    <Money
+                      amount={Math.max(0, allowance.remaining)}
+                      currency={currency}
+                      locale={locale}
+                    />
+                    {allowance.overAllowance ? (
+                      <span className="ms-1 text-amber-800 dark:text-amber-300">
+                        · {t("monthLimitOverSpend")}
+                      </span>
+                    ) : null}
+                  </>
+                ) : save.saved < -0.001 ? (
+                  <>
+                    {t("monthLimitSaveNegative")}{" "}
+                    <Money
+                      amount={Math.abs(save.saved)}
+                      currency={currency}
+                      locale={locale}
+                    />
+                  </>
+                ) : (
+                  <>
+                    {t("monthLimitSaveLeft")}{" "}
+                    <Money
+                      amount={save.remaining}
+                      currency={currency}
+                      locale={locale}
+                    />
+                  </>
+                )}
+              </p>
+            </>
+          ) : (
+            <p className="mt-1 text-sm leading-snug text-[var(--muted)]">
+              {t("monthLimitEmptyHint")}
+            </p>
+          )}
+        </div>
+        <span className="shrink-0 rounded-2xl bg-[var(--accent-a)] px-3 py-2 text-sm font-semibold text-[var(--accent-a-fg)]">
+          {hasPlan ? t("monthLimitEdit") : t("monthLimitSet")}
+        </span>
+      </button>
     </section>
   );
 }

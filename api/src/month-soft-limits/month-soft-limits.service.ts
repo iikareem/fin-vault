@@ -31,16 +31,6 @@ export type SpendAllowanceTrack = {
   overAllowance: boolean;
 };
 
-export type MonthPlanCategory = {
-  categoryId: string;
-  name: string;
-  nameAr: string;
-  emoji: string;
-  color: string;
-  total: number;
-  pctOfSpent: number;
-};
-
 export type MonthSoftLimitStatus = {
   periodKey: string;
   periodFrom: string;
@@ -55,7 +45,6 @@ export type MonthSoftLimitStatus = {
   savedThisMonth: number;
   save: SaveTrack | null;
   spendAllowance: SpendAllowanceTrack | null;
-  categories: MonthPlanCategory[];
   overLimit: boolean;
 };
 
@@ -134,59 +123,6 @@ export class MonthSoftLimitsService {
     };
   }
 
-  private async spendByCategory(householdId: string, from: string, to: string) {
-    const rows = await this.prisma.transaction.groupBy({
-      by: ['categoryId'],
-      where: {
-        householdId,
-        type: { in: ['EXPENSE', 'TRACK'] },
-        occurredOn: { gte: dateOnlyUtc(from), lte: dateOnlyUtc(to) },
-        category: nonSpendCategoryFilter,
-        travelId: null,
-      },
-      _sum: { amount: true },
-    });
-
-    const cats = await this.prisma.category.findMany({
-      where: { householdId },
-    });
-    const byId = new Map(cats.map((c) => [c.id, c]));
-
-    const groups = new Map<
-      string,
-      { categoryId: string; name: string; nameAr: string; emoji: string; color: string; total: number }
-    >();
-
-    for (const row of rows) {
-      const amount = Number(row._sum?.amount ?? 0);
-      if (amount <= 0) continue;
-      const leaf = byId.get(row.categoryId);
-      const group = leaf?.parentId
-        ? byId.get(leaf.parentId)
-        : leaf;
-      const bucket = group ?? leaf;
-      if (!bucket) continue;
-      const cur = groups.get(bucket.id) ?? {
-        categoryId: bucket.id,
-        name: bucket.name,
-        nameAr: bucket.nameAr ?? '',
-        emoji: bucket.emoji ?? '',
-        color: bucket.color ?? '#64748b',
-        total: 0,
-      };
-      cur.total += amount;
-      groups.set(bucket.id, cur);
-    }
-
-    const list = [...groups.values()].sort((a, b) => b.total - a.total);
-    const spentTotal = list.reduce((s, c) => s + c.total, 0);
-    return list.slice(0, 6).map((c) => ({
-      ...c,
-      pctOfSpent:
-        spentTotal > 0 ? Math.round((c.total / spentTotal) * 1000) / 10 : 0,
-    }));
-  }
-
   private saveTrack(amount: number | null, saved: number): SaveTrack | null {
     if (amount == null || amount <= 0) return null;
     const pct = Math.round((Math.max(0, saved) / amount) * 1000) / 10;
@@ -228,7 +164,6 @@ export class MonthSoftLimitsService {
     saveTargetAmount: number | null,
     flow: { income: number; outflow: number; saved: number },
     spends: { spentAll: number; commitmentsSpend: number },
-    categories: MonthPlanCategory[],
   ): MonthSoftLimitStatus {
     const save = this.saveTrack(saveTargetAmount, flow.saved);
     const spendAllowance =
@@ -250,14 +185,8 @@ export class MonthSoftLimitsService {
       savedThisMonth: flow.saved,
       save,
       spendAllowance,
-      categories,
       overLimit: Boolean(spendAllowance?.overAllowance),
     };
-  }
-
-  private decOrNull(v: number | null | undefined): Prisma.Decimal | null {
-    if (v == null) return null;
-    return new Prisma.Decimal(v);
   }
 
   async getStatus(
@@ -267,7 +196,7 @@ export class MonthSoftLimitsService {
   ): Promise<MonthSoftLimitStatus> {
     const startDay = await this.resolveStartDay(userId);
     const range = this.resolvePeriod(periodKey, startDay);
-    const [row, flow, spends, categories] = await Promise.all([
+    const [row, flow, spends] = await Promise.all([
       this.prisma.monthSoftLimit.findUnique({
         where: {
           householdId_periodKey: {
@@ -278,7 +207,6 @@ export class MonthSoftLimitsService {
       }),
       this.cashFlow(householdId, range.from, range.to),
       this.periodSpend(householdId, range.from, range.to),
-      this.spendByCategory(householdId, range.from, range.to),
     ]);
 
     return this.shape(
@@ -288,7 +216,6 @@ export class MonthSoftLimitsService {
       row?.saveTargetAmount != null ? Number(row.saveTargetAmount) : null,
       flow,
       spends,
-      categories,
     );
   }
 

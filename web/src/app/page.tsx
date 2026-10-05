@@ -55,32 +55,6 @@ type CharityTypeRow = {
   monthlyGoal: number;
 };
 type CharityMonth = { familyTotal: number; types: CharityTypeRow[] };
-type GoldHome = {
-  totalValue: number;
-  totalGrams: number;
-  totalGainLoss: number | null;
-  totalGainLossPct: number | null;
-};
-type GoalsHome = {
-  allocated: number;
-  free: number;
-  savingsBalance: number;
-  goals: { id: string }[];
-};
-type TravelHomeCard = {
-  id: string;
-  name: string;
-  currency: string;
-  softLimit: number | null;
-  spent: number;
-  pct: number | null;
-  overLimit: boolean;
-  status: "upcoming" | "active" | "past";
-};
-type TravelsHome = {
-  active: TravelHomeCard | null;
-  travels: TravelHomeCard[];
-};
 type SubsHome = {
   unpaidCount: number;
   dueAmount: number;
@@ -105,10 +79,6 @@ function daysUntilIso(from: string, to: string) {
 
 /** Show home attention only when overdue or due within this many days. */
 const COMMITMENT_ATTENTION_DAYS = 3;
-type OutsideHome = {
-  owedToYou: number;
-  open: { id: string }[];
-};
 type Tx = {
   id: string;
   type: "INCOME" | "EXPENSE" | "REIMBURSEMENT" | "TRACK";
@@ -166,11 +136,7 @@ export default function HomePage() {
   const [personalAccounts, setPersonalAccounts] = useState<Account[]>([]);
   const [txs, setTxs] = useState<Tx[]>([]);
   const [charity, setCharity] = useState<CharityMonth | null>(null);
-  const [gold, setGold] = useState<GoldHome | null>(null);
-  const [goals, setGoals] = useState<GoalsHome | null>(null);
-  const [travels, setTravels] = useState<TravelsHome | null>(null);
   const [subs, setSubs] = useState<SubsHome | null>(null);
-  const [outside, setOutside] = useState<OutsideHome | null>(null);
   const [claims, setClaims] = useState<Claim[]>([]);
   const [covers, setCovers] = useState<Cover[]>([]);
   const [payingId, setPayingId] = useState("");
@@ -241,13 +207,7 @@ export default function HomePage() {
       setClaims([]);
       setCovers([]);
       jobs.push(
-        api<GoldHome>(householdPath(active.householdId, "/gold")),
-        api<GoalsHome>(householdPath(active.householdId, "/savings-goals")),
-        api<TravelsHome>(householdPath(active.householdId, "/travels/home")),
         api<SubsHome>(householdPath(active.householdId, "/subscriptions")),
-        api<OutsideHome>(
-          householdPath(active.householdId, "/outside-loans"),
-        ),
       );
     }
     Promise.all(jobs)
@@ -265,17 +225,9 @@ export default function HomePage() {
           setCharity(result[3] as CharityMonth);
           setClaims(sortByOccurredOnDesc(result[4] as Claim[]));
           setCovers(sortByOccurredOnDesc(result[5] as Cover[]));
-          setGold(null);
-          setGoals(null);
-          setTravels(null);
           setSubs(null);
-          setOutside(null);
         } else {
-          setGold(result[3] as GoldHome);
-          setGoals(result[4] as GoalsHome);
-          setTravels(result[5] as TravelsHome);
-          setSubs(result[6] as SubsHome);
-          setOutside(result[7] as OutsideHome);
+          setSubs(result[3] as SubsHome);
         }
       })
       .catch((e) => setError(e.message));
@@ -1697,215 +1649,22 @@ export default function HomePage() {
           </span>
         </Link>
       ) : (
-        <div className="mt-5 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            {(
-              [
-                {
-                  href: "/goals",
-                  emoji: "🎯",
-                  soft: "var(--soft-emerald)",
-                  accent: "var(--accent-a)",
-                  title: t("navGoals"),
-                  amount: goals?.allocated,
-                  hint:
-                    goals && goals.goals.length > 0
-                      ? goals.goals.length === 1
-                        ? t("goalsCountOne")
-                        : fill(t("goalsCount"), {
-                            n: String(goals.goals.length),
-                          })
-                      : t("goalsHomeHint"),
-                  hintClass: "text-[var(--muted)]",
-                },
-                {
-                  href: "/commitments",
-                  emoji: "📌",
-                  soft: "var(--soft-indigo)",
-                  accent: "var(--accent-b)",
-                  title: t("navSubs"),
-                  amount: subs
-                    ? subs.unpaidCount > 0
-                      ? subs.dueAmount
-                      : subs.monthlyTotal
-                    : undefined,
-                  hint:
-                    subs && subs.subscriptions.length > 0
-                      ? subs.unpaidCount === 0
-                        ? t("subsHomeAllPaid")
-                        : subs.unpaidCount === 1
-                          ? t("subsHomeUnpaidOne")
-                          : fill(t("subsHomeUnpaid"), {
-                              n: String(subs.unpaidCount),
-                            })
-                      : t("subsHomeHint"),
-                  hintClass:
-                    subs && subs.unpaidCount > 0
-                      ? "font-semibold text-amber-800"
-                      : "text-[var(--muted)]",
-                },
-                {
-                  href: "/gold",
-                  emoji: "🥇",
-                  soft: "var(--soft-amber)",
-                  accent: "#d97706",
-                  title: t("navGold"),
-                  amount: gold?.totalValue,
-                  hint:
-                    gold?.totalGainLoss != null ? null : t("goldHomeHint"),
-                  hintNode:
-                    gold?.totalGainLoss != null ? (
-                      <>
-                        <PrivateMoney
-                          amount={gold.totalGainLoss}
-                          currency={currency}
-                          locale={locale}
-                          visible={moneyVisible}
-                          extraSign={gold.totalGainLoss >= 0 ? "+" : "−"}
-                        />
-                        {moneyVisible && gold.totalGainLossPct != null ? (
-                          <span>
-                            {" "}
-                            ({gold.totalGainLossPct >= 0 ? "+" : ""}
-                            {gold.totalGainLossPct}%)
-                          </span>
-                        ) : null}
-                      </>
-                    ) : null,
-                  hintClass:
-                    gold?.totalGainLoss != null && moneyVisible
-                      ? gold.totalGainLoss >= 0
-                        ? "font-semibold text-emerald-800"
-                        : "font-semibold text-red-800"
-                      : "text-[var(--muted)]",
-                },
-                {
-                  href: "/outside-loans",
-                  emoji: "🤝",
-                  soft: "var(--soft-sky)",
-                  accent: "#0284c7",
-                  title: t("navOutsideLoans"),
-                  amount: outside?.owedToYou,
-                  hint:
-                    outside && outside.open.length > 0
-                      ? t("outsideOwedToYou")
-                      : t("outsideLoansHomeHint"),
-                  hintClass: "text-[var(--muted)]",
-                },
-              ] as const
-            ).map((tile) => (
-              <Link
-                key={tile.href}
-                href={tile.href}
-                className="relative flex min-h-[7.5rem] flex-col overflow-hidden rounded-[1.5rem] p-3.5 shadow-sm transition hover:opacity-95 active:scale-[0.99]"
-                style={{ background: tile.soft }}
-              >
-                <span
-                  className="absolute inset-x-0 top-0 h-1"
-                  style={{ background: tile.accent }}
-                  aria-hidden
-                />
-                <span className="flex items-center gap-2">
-                  <span
-                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-base"
-                    style={{
-                      background:
-                        "color-mix(in srgb, var(--surface-bg) 72%, transparent)",
-                    }}
-                    aria-hidden
-                  >
-                    {tile.emoji}
-                  </span>
-                  <span className="min-w-0 text-sm font-semibold leading-snug text-[var(--foreground)]">
-                    {tile.title}
-                  </span>
-                </span>
-                <span className="mt-2 text-lg font-bold leading-tight tabular-nums text-[var(--foreground)]">
-                  {tile.amount != null ? (
-                    <PrivateMoney
-                      amount={tile.amount}
-                      currency={currency}
-                      locale={locale}
-                      visible={moneyVisible}
-                    />
-                  ) : (
-                    "…"
-                  )}
-                </span>
-                <span
-                  className={`mt-auto pt-2 text-xs leading-snug ${tile.hintClass}`}
-                >
-                  {"hintNode" in tile && tile.hintNode
-                    ? tile.hintNode
-                    : tile.hint}
-                </span>
-              </Link>
-            ))}
-          </div>
-
-          <Link
-            href={
-              travels?.active ? `/travels/${travels.active.id}` : "/travels"
-            }
-            className="relative flex items-center gap-3 overflow-hidden rounded-[1.5rem] bg-[var(--soft-sky)] px-3.5 py-3 shadow-sm transition hover:opacity-95 active:scale-[0.99]"
-          >
-            <span
-              className="absolute inset-y-0 start-0 w-1 bg-sky-600"
-              aria-hidden
-            />
-            <span
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg"
-              style={{
-                background:
-                  "color-mix(in srgb, var(--surface-bg) 72%, transparent)",
-              }}
-              aria-hidden
-            >
-              ✈
+        <Link
+          href="/tools"
+          className="surface mt-5 flex min-h-16 items-center justify-between gap-3 rounded-[1.75rem] px-4 py-3.5 transition hover:bg-[var(--panel-soft)] active:scale-[0.99]"
+        >
+          <span className="min-w-0">
+            <span className="block text-base font-semibold text-[var(--foreground)]">
+              {t("toolsHomeTitle")}
             </span>
-            <span className="min-w-0 flex-1">
-              <span className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-[var(--foreground)]">
-                  {travels?.active ? travels.active.name : t("navTravels")}
-                </span>
-                {travels?.active ? (
-                  <span className="rounded-full bg-sky-800 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
-                    {t("travelsActive")}
-                  </span>
-                ) : null}
-              </span>
-              <span className="mt-0.5 block text-xs text-[var(--muted)]">
-                {travels?.active
-                  ? t("travelsHomeActive")
-                  : t("travelsHomeHint")}
-              </span>
-              {travels?.active?.pct != null ? (
-                <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-[var(--panel-soft)]">
-                  <span
-                    className={`block h-full rounded-full ${
-                      travels.active.overLimit ? "bg-amber-600" : "bg-sky-600"
-                    }`}
-                    style={{
-                      width: `${Math.min(100, Math.max(0, travels.active.pct))}%`,
-                    }}
-                  />
-                </span>
-              ) : null}
+            <span className="mt-0.5 block text-xs leading-snug text-[var(--muted)]">
+              {t("toolsHomeHint")}
             </span>
-            <span className="shrink-0 text-sm font-bold tabular-nums text-[var(--foreground)]">
-              {travels?.active ? (
-                <PrivateMoney
-                  amount={travels.active.spent}
-                  currency={travels.active.currency}
-                  locale={locale}
-                  visible={moneyVisible}
-                />
-              ) : (
-                <span className="text-sky-800">＋</span>
-              )}
-            </span>
-          </Link>
-        </div>
+          </span>
+          <span className="shrink-0 text-lg opacity-60" aria-hidden>
+            →
+          </span>
+        </Link>
       )}
 
       {isHouse ? (
