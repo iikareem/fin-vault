@@ -1,7 +1,11 @@
-import { IsIn, IsNumber, IsOptional, IsString, Matches, Min } from 'class-validator';
-
-export const SOFT_LIMIT_MODES = ['PERSONAL', 'ALL'] as const;
-export type SoftLimitModeDto = (typeof SOFT_LIMIT_MODES)[number];
+import {
+  IsNumber,
+  IsOptional,
+  IsString,
+  Matches,
+  Min,
+  ValidateIf,
+} from 'class-validator';
 
 export class UpsertMonthSoftLimitDto {
   /** Budget period YYYY-MM. Defaults to the current personal period. */
@@ -10,10 +14,15 @@ export class UpsertMonthSoftLimitDto {
   @Matches(/^\d{4}-\d{2}$/)
   periodKey?: string;
 
+  /** Day-to-day ceiling. Null clears it. Omit to leave unchanged is not supported — send both. */
+  @ValidateIf((_, v) => v !== null && v !== undefined)
   @IsNumber()
   @Min(0.01)
-  amount: number;
+  personalAmount?: number | null;
 
-  @IsIn([...SOFT_LIMIT_MODES])
-  mode: SoftLimitModeDto;
+  /** All-spend ceiling (incl. commitments). Null clears it. */
+  @ValidateIf((_, v) => v !== null && v !== undefined)
+  @IsNumber()
+  @Min(0.01)
+  totalAmount?: number | null;
 }

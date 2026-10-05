@@ -6,23 +6,28 @@ import { fill } from "@/lib/i18n";
 import { useI18n } from "@/components/I18nProvider";
 import { Money } from "@/components/Money";
 import { Hint } from "@/components/Hint";
-import { LimitBar } from "@/components/LimitBar";
+import { LimitBar, type LimitBarTone } from "@/components/LimitBar";
 import { householdPath } from "@/lib/space";
 
-export type SoftLimitMode = "PERSONAL" | "ALL";
+export type CeilingTrack = {
+  amount: number;
+  spent: number;
+  remaining: number;
+  pct: number;
+  overLimit: boolean;
+};
 
 export type MonthSoftLimitStatus = {
   periodKey: string;
   periodFrom: string;
   periodTo: string;
-  amount: number | null;
-  mode: SoftLimitMode | null;
-  spent: number;
+  personalAmount: number | null;
+  totalAmount: number | null;
   spentPersonal: number;
   spentAll: number;
   commitmentsSpend: number;
-  remaining: number | null;
-  pct: number | null;
+  personal: CeilingTrack | null;
+  total: CeilingTrack | null;
   overLimit: boolean;
 };
 
@@ -33,8 +38,115 @@ type Props = {
   onUpdated: (next: MonthSoftLimitStatus) => void;
 };
 
-function previewSpent(status: MonthSoftLimitStatus, mode: SoftLimitMode) {
-  return mode === "ALL" ? status.spentAll : status.spentPersonal;
+function parseOptionalAmount(raw: string): number | null | "invalid" {
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const value = parseAmount(trimmed);
+  if (!Number.isFinite(value) || value <= 0) return "invalid";
+  return value;
+}
+
+function CeilingLane({
+  label,
+  hint,
+  track,
+  spentFallback,
+  currency,
+  locale,
+  tone,
+}: {
+  label: string;
+  hint?: string;
+  track: CeilingTrack | null;
+  spentFallback: number;
+  currency: string;
+  locale: "ar" | "en";
+  tone: LimitBarTone;
+}) {
+  const { t } = useI18n();
+  const spent = track?.spent ?? spentFallback;
+  const over = track?.overLimit ?? false;
+  const accentText =
+    tone === "personal"
+      ? "text-[var(--accent-a-text)]"
+      : "text-[var(--accent-b-text)]";
+  const softBg =
+    tone === "personal"
+      ? "bg-[var(--accent-a-soft)]"
+      : "bg-[var(--accent-b-soft)]";
+
+  return (
+    <div className={`rounded-2xl ${softBg} px-3.5 py-3`}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className={`text-xs font-bold uppercase tracking-wide ${accentText}`}>
+            {label}
+          </p>
+          {hint ? (
+            <p className="mt-0.5 text-[11px] leading-snug text-[var(--muted)]">
+              {hint}
+            </p>
+          ) : null}
+        </div>
+        {track ? (
+          <span
+            className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums ${
+              over
+                ? "bg-amber-500/20 text-amber-800 dark:text-amber-300"
+                : `${softBg} ${accentText} ring-1 ring-[var(--chrome-edge)]`
+            }`}
+          >
+            {fill(t("monthLimitPct"), { pct: String(Math.round(track.pct)) })}
+          </span>
+        ) : null}
+      </div>
+
+      <p className="mt-2 text-xl font-bold tabular-nums leading-none text-[var(--foreground)]">
+        <Money amount={spent} currency={currency} locale={locale} />
+        {track ? (
+          <span className="text-sm font-semibold text-[var(--muted)]">
+            {" "}
+            / <Money amount={track.amount} currency={currency} locale={locale} />
+          </span>
+        ) : null}
+      </p>
+
+      {track ? (
+        <>
+          <div className="mt-2.5">
+            <LimitBar pct={track.pct} over={over} tone={tone} />
+          </div>
+          <p
+            className={`mt-1.5 text-xs font-medium ${
+              over ? "text-amber-800 dark:text-amber-300" : "text-[var(--muted)]"
+            }`}
+          >
+            {over ? (
+              <>
+                {t("monthLimitOverBy")}{" "}
+                <Money
+                  amount={track.spent - track.amount}
+                  currency={currency}
+                  locale={locale}
+                />
+              </>
+            ) : (
+              <>
+                {t("monthLimitRemaining")}{" "}
+                <Money
+                  amount={track.remaining}
+                  currency={currency}
+                  locale={locale}
+                />
+              </>
+            )}
+          </p>
+        </>
+      ) : (
+        <p className="mt-2 text-xs text-[var(--muted)]">{t("monthLimitUnset")}</p>
+      )}
+    </div>
+  );
 }
 
 export function MonthSoftLimitCard({
@@ -45,40 +157,53 @@ export function MonthSoftLimitCard({
 }: Props) {
   const { t, locale } = useI18n();
   const [editing, setEditing] = useState(false);
-  const [amountDraft, setAmountDraft] = useState("");
-  const [modeDraft, setModeDraft] = useState<SoftLimitMode>("PERSONAL");
+  const [personalDraft, setPersonalDraft] = useState("");
+  const [totalDraft, setTotalDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [removing, setRemoving] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [error, setError] = useState("");
 
-  const hasLimit = status?.amount != null && status.amount > 0;
+  const hasLimit = Boolean(
+    (status?.personalAmount != null && status.personalAmount > 0) ||
+      (status?.totalAmount != null && status.totalAmount > 0),
+  );
 
   useEffect(() => {
     if (!editing || !status) return;
-    setAmountDraft(status.amount != null ? String(status.amount) : "");
-    setModeDraft(status.mode ?? "PERSONAL");
+    setPersonalDraft(
+      status.personalAmount != null ? String(status.personalAmount) : "",
+    );
+    setTotalDraft(status.totalAmount != null ? String(status.totalAmount) : "");
     setError("");
     setConfirmRemove(false);
-  }, [editing, status?.periodKey, status?.amount, status?.mode]);
+  }, [
+    editing,
+    status?.periodKey,
+    status?.personalAmount,
+    status?.totalAmount,
+  ]);
 
-  const liveSpent = useMemo(() => {
-    if (!status) return 0;
-    return previewSpent(status, modeDraft);
-  }, [status, modeDraft]);
+  const livePersonal = useMemo(() => {
+    const amt = parseOptionalAmount(personalDraft);
+    if (amt === "invalid" || amt == null || !status) return null;
+    const pct = Math.round((status.spentPersonal / amt) * 1000) / 10;
+    return { pct, over: pct > 100.001 };
+  }, [personalDraft, status]);
 
-  const livePct = useMemo(() => {
-    const amt = parseAmount(amountDraft);
-    if (!Number.isFinite(amt) || amt <= 0) return null;
-    return Math.round((liveSpent / amt) * 1000) / 10;
-  }, [amountDraft, liveSpent]);
-
-  const liveOver = livePct != null && livePct > 100.001;
+  const liveTotal = useMemo(() => {
+    const amt = parseOptionalAmount(totalDraft);
+    if (amt === "invalid" || amt == null || !status) return null;
+    const pct = Math.round((status.spentAll / amt) * 1000) / 10;
+    return { pct, over: pct > 100.001 };
+  }, [totalDraft, status]);
 
   function openEdit() {
     if (!status) return;
-    setAmountDraft(status.amount != null ? String(status.amount) : "");
-    setModeDraft(status.mode ?? "PERSONAL");
+    setPersonalDraft(
+      status.personalAmount != null ? String(status.personalAmount) : "",
+    );
+    setTotalDraft(status.totalAmount != null ? String(status.totalAmount) : "");
     setError("");
     setConfirmRemove(false);
     setEditing(true);
@@ -93,9 +218,18 @@ export function MonthSoftLimitCard({
   async function onSave(e: FormEvent) {
     e.preventDefault();
     if (!status || busy) return;
-    const value = parseAmount(amountDraft);
-    if (!Number.isFinite(value) || value <= 0) {
+    const personal = parseOptionalAmount(personalDraft);
+    const total = parseOptionalAmount(totalDraft);
+    if (personal === "invalid" || total === "invalid") {
       setError(t("monthLimitAmountHint"));
+      return;
+    }
+    if (personal == null && total == null) {
+      setError(t("monthLimitNeedOne"));
+      return;
+    }
+    if (personal != null && total != null && total + 0.001 < personal) {
+      setError(t("monthLimitTotalTooLow"));
       return;
     }
     setBusy(true);
@@ -107,8 +241,8 @@ export function MonthSoftLimitCard({
           method: "PUT",
           body: JSON.stringify({
             periodKey: status.periodKey,
-            amount: value,
-            mode: modeDraft,
+            personalAmount: personal,
+            totalAmount: total,
           }),
         },
       );
@@ -149,16 +283,13 @@ export function MonthSoftLimitCard({
 
   if (!status) return null;
 
-  const modeLabel =
-    status.mode === "ALL" ? t("monthLimitModeAll") : t("monthLimitModePersonal");
-
   return (
     <section className="surface overflow-hidden rounded-[1.75rem]">
       {!editing ? (
         <div className="p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-xs font-semibold uppercase tracking-wide text-sky-800">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--accent-b-text)]">
                 {t("monthLimitTitle")}
               </p>
               <h2 className="mt-0.5 text-lg font-bold text-[var(--foreground)]">
@@ -168,103 +299,35 @@ export function MonthSoftLimitCard({
             <button
               type="button"
               onClick={openEdit}
-              className="shrink-0 rounded-2xl bg-sky-800 px-3 py-2 text-sm font-semibold text-white"
+              className="shrink-0 rounded-2xl bg-[var(--accent-b)] px-3 py-2 text-sm font-semibold text-[var(--accent-b-fg)]"
             >
               {hasLimit ? t("monthLimitEdit") : t("monthLimitSet")}
             </button>
           </div>
 
-          {hasLimit && status.amount != null ? (
-            <>
-              <div className="mt-3 flex flex-wrap items-end justify-between gap-2">
-                <p className="text-2xl font-bold tabular-nums leading-none">
-                  <Money
-                    amount={status.spent}
-                    currency={currency}
-                    locale={locale}
-                  />
-                  <span className="text-base font-semibold text-[var(--muted)]">
-                    {" "}
-                    /{" "}
-                    <Money
-                      amount={status.amount}
-                      currency={currency}
-                      locale={locale}
-                    />
-                  </span>
-                </p>
-                <span
-                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide ${
-                    status.overLimit
-                      ? "bg-amber-100 text-amber-900"
-                      : "bg-sky-100 text-sky-900"
-                  }`}
-                >
-                  {modeLabel}
-                </span>
-              </div>
-
-              <div className="mt-3">
-                <LimitBar pct={status.pct} over={status.overLimit} />
-              </div>
-
-              <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
-                <p
-                  className={
-                    status.overLimit
-                      ? "font-semibold text-amber-800"
-                      : "font-medium text-[var(--muted)]"
-                  }
-                >
-                  {status.overLimit ? (
-                    <>
-                      {t("monthLimitOverBy")}{" "}
-                      <Money
-                        amount={status.spent - status.amount}
-                        currency={currency}
-                        locale={locale}
-                      />
-                    </>
-                  ) : status.remaining != null ? (
-                    <>
-                      {t("monthLimitRemaining")}{" "}
-                      <Money
-                        amount={status.remaining}
-                        currency={currency}
-                        locale={locale}
-                      />
-                    </>
-                  ) : null}
-                </p>
-                {status.pct != null ? (
-                  <p className="tabular-nums text-[var(--muted)]">
-                    {fill(t("monthLimitPct"), {
-                      pct: String(Math.round(status.pct)),
-                    })}
-                  </p>
-                ) : null}
-              </div>
-
-              {status.mode === "ALL" && status.commitmentsSpend > 0.001 ? (
-                <p className="mt-2 text-xs leading-snug text-[var(--muted)]">
+          {hasLimit ? (
+            <div className="mt-3 space-y-2.5">
+              <CeilingLane
+                label={t("monthLimitModePersonal")}
+                hint={t("monthLimitModePersonalHint")}
+                track={status.personal}
+                spentFallback={status.spentPersonal}
+                currency={currency}
+                locale={locale}
+                tone="personal"
+              />
+              <CeilingLane
+                label={t("monthLimitModeAll")}
+                hint={t("monthLimitModeAllHint")}
+                track={status.total}
+                spentFallback={status.spentAll}
+                currency={currency}
+                locale={locale}
+                tone="total"
+              />
+              {status.commitmentsSpend > 0.001 ? (
+                <p className="px-0.5 text-xs leading-snug text-[var(--muted)]">
                   {t("monthLimitCommitmentsPart")}{" "}
-                  <Money
-                    amount={status.commitmentsSpend}
-                    currency={currency}
-                    locale={locale}
-                  />
-                  {" · "}
-                  {t("monthLimitPersonalSlice")}{" "}
-                  <Money
-                    amount={status.spentPersonal}
-                    currency={currency}
-                    locale={locale}
-                  />
-                </p>
-              ) : status.mode === "PERSONAL" &&
-                status.commitmentsSpend > 0.001 ? (
-                <p className="mt-2 text-xs leading-snug text-[var(--muted)]">
-                  {t("monthLimitCommitmentsExcluded")}{" "}
                   <Money
                     amount={status.commitmentsSpend}
                     currency={currency}
@@ -272,11 +335,11 @@ export function MonthSoftLimitCard({
                   />
                 </p>
               ) : (
-                <p className="mt-2 text-xs leading-snug text-[var(--muted)]">
+                <p className="px-0.5 text-xs leading-snug text-[var(--muted)]">
                   {t("monthLimitSoftHint")}
                 </p>
               )}
-            </>
+            </div>
           ) : (
             <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">
               {t("monthLimitEmptyHint")}
@@ -287,109 +350,94 @@ export function MonthSoftLimitCard({
         <form onSubmit={onSave} className="space-y-3 p-4">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <h2 className="text-lg font-bold">{t("monthLimitEditTitle")}</h2>
+              <h2 className="text-lg font-bold text-[var(--foreground)]">
+                {t("monthLimitEditTitle")}
+              </h2>
               <Hint>{t("monthLimitEditHint")}</Hint>
             </div>
             <button
               type="button"
               onClick={closeEdit}
-              className="shrink-0 rounded-2xl border border-[var(--input-border)] bg-[var(--surface-bg)] px-3 py-2 text-sm font-semibold"
+              className="shrink-0 rounded-2xl border border-[var(--input-border)] bg-[var(--surface-bg)] px-3 py-2 text-sm font-semibold text-[var(--foreground)]"
             >
               {t("monthLimitCancel")}
             </button>
           </div>
 
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
-              {t("monthLimitAmount")}
-            </span>
-            <input
-              className="field text-lg"
-              inputMode="decimal"
-              value={amountDraft}
-              onChange={(e) => setAmountDraft(e.target.value)}
-              placeholder={t("monthLimitAmountPlaceholder")}
-              autoFocus
-            />
-          </label>
+          <div className="space-y-2.5">
+            <label className="block rounded-2xl bg-[var(--accent-a-soft)] p-3">
+              <span className="mb-0.5 block text-sm font-semibold text-[var(--accent-a-text)]">
+                {t("monthLimitModePersonal")}
+              </span>
+              <span className="mb-2 block text-[11px] leading-snug text-[var(--muted)]">
+                {t("monthLimitModePersonalHint")}
+              </span>
+              <input
+                className="field text-lg"
+                inputMode="decimal"
+                value={personalDraft}
+                onChange={(e) => setPersonalDraft(e.target.value)}
+                placeholder={t("monthLimitAmountPlaceholder")}
+                autoFocus
+              />
+              <span className="mt-1.5 block text-xs font-semibold tabular-nums text-[var(--accent-a-text)]">
+                {t("monthLimitSoFar")}{" "}
+                <Money
+                  amount={status.spentPersonal}
+                  currency={currency}
+                  locale={locale}
+                />
+              </span>
+              {livePersonal ? (
+                <div className="mt-2">
+                  <LimitBar
+                    pct={livePersonal.pct}
+                    over={livePersonal.over}
+                    tone="personal"
+                    size="sm"
+                  />
+                </div>
+              ) : null}
+            </label>
 
-          <fieldset>
-            <legend className="mb-1.5 text-xs font-medium text-[var(--muted)]">
-              {t("monthLimitMode")}
-            </legend>
-            <div className="grid grid-cols-2 gap-2">
-              {(
-                [
-                  {
-                    id: "PERSONAL" as const,
-                    title: t("monthLimitModePersonal"),
-                    hint: t("monthLimitModePersonalHint"),
-                    spent: status.spentPersonal,
-                  },
-                  {
-                    id: "ALL" as const,
-                    title: t("monthLimitModeAll"),
-                    hint: t("monthLimitModeAllHint"),
-                    spent: status.spentAll,
-                  },
-                ] as const
-              ).map((opt) => {
-                const active = modeDraft === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    aria-pressed={active}
-                    onClick={() => setModeDraft(opt.id)}
-                    className={`rounded-2xl border px-3 py-2.5 text-start transition ${
-                      active
-                        ? "border-sky-700 bg-sky-50 ring-2 ring-sky-700/30"
-                        : "border-[var(--input-border)] bg-[var(--panel-soft)] hover:bg-[var(--surface-bg)]"
-                    }`}
-                  >
-                    <span className="block text-sm font-semibold leading-snug">
-                      {opt.title}
-                    </span>
-                    <span className="mt-0.5 block text-[11px] leading-snug text-[var(--muted)]">
-                      {opt.hint}
-                    </span>
-                    <span className="mt-1.5 block text-xs font-semibold tabular-nums text-sky-900">
-                      {t("monthLimitSoFar")}{" "}
-                      <Money
-                        amount={opt.spent}
-                        currency={currency}
-                        locale={locale}
-                      />
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </fieldset>
+            <label className="block rounded-2xl bg-[var(--accent-b-soft)] p-3">
+              <span className="mb-0.5 block text-sm font-semibold text-[var(--accent-b-text)]">
+                {t("monthLimitModeAll")}
+              </span>
+              <span className="mb-2 block text-[11px] leading-snug text-[var(--muted)]">
+                {t("monthLimitModeAllHint")}
+              </span>
+              <input
+                className="field text-lg"
+                inputMode="decimal"
+                value={totalDraft}
+                onChange={(e) => setTotalDraft(e.target.value)}
+                placeholder={t("monthLimitAmountPlaceholder")}
+              />
+              <span className="mt-1.5 block text-xs font-semibold tabular-nums text-[var(--accent-b-text)]">
+                {t("monthLimitSoFar")}{" "}
+                <Money
+                  amount={status.spentAll}
+                  currency={currency}
+                  locale={locale}
+                />
+              </span>
+              {liveTotal ? (
+                <div className="mt-2">
+                  <LimitBar
+                    pct={liveTotal.pct}
+                    over={liveTotal.over}
+                    tone="total"
+                    size="sm"
+                  />
+                </div>
+              ) : null}
+            </label>
+          </div>
 
-          {livePct != null ? (
-            <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-2.5">
-              <div className="flex items-center justify-between gap-2 text-sm">
-                <span className="font-medium text-[var(--muted)]">
-                  {t("monthLimitPreview")}
-                </span>
-                <span
-                  className={`font-semibold tabular-nums ${
-                    liveOver ? "text-amber-800" : "text-[var(--foreground)]"
-                  }`}
-                >
-                  {fill(t("monthLimitPct"), {
-                    pct: String(Math.round(livePct)),
-                  })}
-                </span>
-              </div>
-              <div className="mt-2">
-                <LimitBar pct={livePct} over={liveOver} />
-              </div>
-            </div>
+          {error ? (
+            <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
           ) : null}
-
-          {error ? <p className="text-sm text-red-700">{error}</p> : null}
 
           <div className="flex flex-wrap gap-2">
             <button
@@ -404,7 +452,7 @@ export function MonthSoftLimitCard({
                 type="button"
                 disabled={removing || busy}
                 onClick={onRemove}
-                className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-base font-semibold text-amber-950 disabled:opacity-60"
+                className="rounded-2xl border border-amber-500/40 bg-[var(--soft-amber)] px-4 py-2.5 text-base font-semibold text-amber-950 dark:text-amber-200 disabled:opacity-60"
               >
                 {confirmRemove
                   ? t("monthLimitRemoveConfirm")

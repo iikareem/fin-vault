@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -8,22 +12,27 @@ import {
 import { nonSpendCategoryFilter } from '../categories/non-spend-categories';
 import { UpsertMonthSoftLimitDto } from './dto/upsert-month-soft-limit.dto';
 
-export type SoftLimitMode = 'PERSONAL' | 'ALL';
+export type CeilingTrack = {
+  amount: number;
+  spent: number;
+  remaining: number;
+  pct: number;
+  overLimit: boolean;
+};
 
 export type MonthSoftLimitStatus = {
   periodKey: string;
   periodFrom: string;
   periodTo: string;
-  amount: number | null;
-  mode: SoftLimitMode | null;
-  /** Spend counted toward the active mode (or personal when unset). */
-  spent: number;
+  personalAmount: number | null;
+  totalAmount: number | null;
   spentPersonal: number;
   spentAll: number;
   /** spentAll − spentPersonal (paid commitment expenses in the period). */
   commitmentsSpend: number;
-  remaining: number | null;
-  pct: number | null;
+  personal: CeilingTrack | null;
+  total: CeilingTrack | null;
+  /** True when any set ceiling is exceeded. */
   overLimit: boolean;
 };
 
@@ -40,8 +49,7 @@ export class MonthSoftLimitsService {
   }
 
   private resolvePeriod(periodKey: string | undefined, startDay: number) {
-    const range = budgetMonthRange(periodKey ?? new Date(), startDay);
-    return range;
+    return budgetMonthRange(periodKey ?? new Date(), startDay);
   }
 
   private async periodSpend(householdId: string, from: string, to: string) {
@@ -74,39 +82,50 @@ export class MonthSoftLimitsService {
     };
   }
 
+  private track(amount: number | null, spent: number): CeilingTrack | null {
+    if (amount == null || amount <= 0) return null;
+    const pct = Math.round((spent / amount) * 1000) / 10;
+    return {
+      amount,
+      spent,
+      remaining: Math.max(0, amount - spent),
+      pct,
+      overLimit: spent > amount + 0.001,
+    };
+  }
+
   private shape(
     periodKey: string,
     periodFrom: string,
     periodTo: string,
-    amount: number | null,
-    mode: SoftLimitMode | null,
+    personalAmount: number | null,
+    totalAmount: number | null,
     spends: {
       spentAll: number;
       spentPersonal: number;
       commitmentsSpend: number;
     },
   ): MonthSoftLimitStatus {
-    const activeMode = mode ?? 'PERSONAL';
-    const spent =
-      activeMode === 'ALL' ? spends.spentAll : spends.spentPersonal;
-    const pct =
-      amount != null && amount > 0
-        ? Math.round((spent / amount) * 1000) / 10
-        : null;
+    const personal = this.track(personalAmount, spends.spentPersonal);
+    const total = this.track(totalAmount, spends.spentAll);
     return {
       periodKey,
       periodFrom,
       periodTo,
-      amount,
-      mode,
-      spent,
+      personalAmount,
+      totalAmount,
       spentPersonal: spends.spentPersonal,
       spentAll: spends.spentAll,
       commitmentsSpend: spends.commitmentsSpend,
-      remaining: amount != null ? Math.max(0, amount - spent) : null,
-      pct,
-      overLimit: amount != null ? spent > amount + 0.001 : false,
+      personal,
+      total,
+      overLimit: Boolean(personal?.overLimit || total?.overLimit),
     };
+  }
+
+  private decOrNull(v: number | null | undefined): Prisma.Decimal | null {
+    if (v == null) return null;
+    return new Prisma.Decimal(v);
   }
 
   async getStatus(
@@ -132,8 +151,8 @@ export class MonthSoftLimitsService {
       range.key,
       range.from,
       range.to,
-      row ? Number(row.amount) : null,
-      row ? (row.mode as SoftLimitMode) : null,
+      row?.personalAmount != null ? Number(row.personalAmount) : null,
+      row?.totalAmount != null ? Number(row.totalAmount) : null,
       spends,
     );
   }
@@ -146,6 +165,56 @@ export class MonthSoftLimitsService {
     const startDay = await this.resolveStartDay(userId);
     const range = this.resolvePeriod(dto.periodKey, startDay);
 
+    const personalAmount =
+      dto.personalAmount === undefined ? undefined : dto.personalAmount;
+    const totalAmount =
+      dto.totalAmount === undefined ? undefined : dto.totalAmount;
+
+    if (personalAmount === undefined && totalAmount === undefined) {
+      throw new BadRequestException(
+        'Provide personalAmount and/or totalAmount',
+      );
+    }
+
+    const existing = await this.prisma.monthSoftLimit.findUnique({
+      where: {
+        householdId_periodKey: {
+          householdId,
+          periodKey: range.key,
+        },
+      },
+    });
+
+    const nextPersonal =
+      personalAmount !== undefined
+        ? personalAmount
+        : existing?.personalAmount != null
+          ? Number(existing.personalAmount)
+          : null;
+    const nextTotal =
+      totalAmount !== undefined
+        ? totalAmount
+        : existing?.totalAmount != null
+          ? Number(existing.totalAmount)
+          : null;
+
+    if (
+      nextPersonal != null &&
+      nextTotal != null &&
+      nextTotal + 0.001 < nextPersonal
+    ) {
+      throw new BadRequestException(
+        'Total ceiling should be at least the personal ceiling',
+      );
+    }
+
+    if (nextPersonal == null && nextTotal == null) {
+      if (existing) {
+        await this.prisma.monthSoftLimit.delete({ where: { id: existing.id } });
+      }
+      return this.getStatus(householdId, userId, range.key);
+    }
+
     await this.prisma.monthSoftLimit.upsert({
       where: {
         householdId_periodKey: {
@@ -156,12 +225,12 @@ export class MonthSoftLimitsService {
       create: {
         householdId,
         periodKey: range.key,
-        amount: new Prisma.Decimal(dto.amount),
-        mode: dto.mode,
+        personalAmount: this.decOrNull(nextPersonal),
+        totalAmount: this.decOrNull(nextTotal),
       },
       update: {
-        amount: new Prisma.Decimal(dto.amount),
-        mode: dto.mode,
+        personalAmount: this.decOrNull(nextPersonal),
+        totalAmount: this.decOrNull(nextTotal),
       },
     });
 
@@ -190,7 +259,7 @@ export class MonthSoftLimitsService {
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === 'P2025'
       ) {
-        throw new NotFoundException('No soft limit set for this period');
+        throw new NotFoundException('No ceiling set for this period');
       }
       throw err;
     }
