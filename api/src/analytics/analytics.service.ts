@@ -15,10 +15,14 @@ import {
   NON_SPEND_CATEGORY_NAMES,
   nonSpendCategoryFilter,
 } from '../categories/non-spend-categories';
+import { MonthSoftLimitsService } from '../month-soft-limits/month-soft-limits.service';
 
 @Injectable()
 export class AnalyticsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private softLimits: MonthSoftLimitsService,
+  ) {}
 
   private pick(
     rows: { type: string; _sum: { amount: unknown } }[],
@@ -334,6 +338,11 @@ export class AnalyticsService {
     });
     const monthExpense = Number(monthSpendAgg._sum.amount ?? 0);
 
+    const softLimit =
+      membership.kind === 'PERSONAL'
+        ? await this.softLimits.getStatus(householdId, userId, monthKey)
+        : null;
+
     return {
       totalMoney,
       cashNow: cash.cashNow,
@@ -341,6 +350,7 @@ export class AnalyticsService {
       savedThisMonth: cash.current.saved,
       monthIncome: cash.current.income,
       monthExpense,
+      softLimit,
       todayIncome: this.pick(todayAgg, 'INCOME'),
       todayExpense,
       youOwe,

@@ -22,6 +22,10 @@ import {
   sortCashWallets,
 } from "@/lib/wallets";
 import { readUiPrefs } from "@/lib/uiPrefs";
+import {
+  MonthSoftLimitCard,
+  type MonthSoftLimitStatus,
+} from "@/components/MonthSoftLimitCard";
 
 type Summary = {
   totalMoney: number;
@@ -30,6 +34,7 @@ type Summary = {
   savedThisMonth: number;
   monthIncome: number;
   monthExpense: number;
+  softLimit?: MonthSoftLimitStatus | null;
   todayIncome: number;
   todayExpense: number;
   youOwe: number;
@@ -778,6 +783,19 @@ export default function HomePage() {
           {fill(t("monthLength"), { n: String(cal.daysInMonth) })}
         </p>
       </section>
+
+      {!isHouse && active && summary?.softLimit ? (
+        <div className="mt-4">
+          <MonthSoftLimitCard
+            householdId={active.householdId}
+            currency={currency}
+            status={summary.softLimit}
+            onUpdated={(next) =>
+              setSummary((prev) => (prev ? { ...prev, softLimit: next } : prev))
+            }
+          />
+        </div>
+      ) : null}
 
       {!isHouse ? (
         <div className="mt-4 space-y-2">

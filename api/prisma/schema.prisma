@@ -80,6 +80,16 @@ enum SubscriptionKind {
   OTHER
 }
 
+/**
+ * What counts toward a personal month soft spending limit.
+ * PERSONAL = day-to-day only (commitment Mark Paid txs excluded).
+ * ALL = includes paid commitment expenses.
+ */
+enum SoftLimitMode {
+  PERSONAL
+  ALL
+}
+
 model Household {
   id          String         @id @default(cuid())
   name        String
@@ -101,6 +111,7 @@ model Household {
   savingsGoals SavingsGoal[]
   subscriptions Subscription[]
   travels      Travel[]
+  monthSoftLimits MonthSoftLimit[]
 }
 
 model User {
@@ -264,6 +275,25 @@ model Travel {
   txs         Transaction[]
 
   @@index([householdId, startsOn, endsOn])
+}
+
+/**
+ * Optional soft spending cap for one personal budget period (YYYY-MM).
+ * Never blocks spend — progress / warning only.
+ */
+model MonthSoftLimit {
+  id          String        @id @default(cuid())
+  householdId String
+  household   Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  /** Personal budget period key YYYY-MM. */
+  periodKey   String
+  amount      Decimal       @db.Decimal(14, 2)
+  mode        SoftLimitMode @default(PERSONAL)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@unique([householdId, periodKey])
+  @@index([householdId])
 }
 
 model PeerLoan {

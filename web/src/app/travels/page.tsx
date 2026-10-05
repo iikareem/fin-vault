@@ -14,6 +14,7 @@ import { DateField } from "@/components/DateField";
 import { CURRENCY_OPTIONS } from "@/lib/currencies";
 import { fill } from "@/lib/i18n";
 import { formatItemDate } from "@/lib/calendar";
+import { LimitBar } from "@/components/LimitBar";
 
 type TravelCard = {
   id: string;
@@ -36,27 +37,6 @@ type TravelsData = {
   past: TravelCard[];
   travels: TravelCard[];
 };
-
-function LimitBar({
-  pct,
-  over,
-}: {
-  pct: number | null;
-  over: boolean;
-}) {
-  if (pct == null) return null;
-  const width = Math.min(100, Math.max(0, pct));
-  return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--panel-soft)]">
-      <div
-        className={`h-full rounded-full transition-[width] duration-500 ${
-          over ? "bg-amber-600" : "bg-sky-600"
-        }`}
-        style={{ width: `${width}%` }}
-      />
-    </div>
-  );
-}
 
 function tripRangeLabel(
   trip: TravelCard,

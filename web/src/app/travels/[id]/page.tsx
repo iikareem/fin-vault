@@ -17,6 +17,7 @@ import { categoryLabel, fill } from "@/lib/i18n";
 import { ItemDate } from "@/components/ItemDate";
 import { CURRENCY_OPTIONS } from "@/lib/currencies";
 import { formatItemDate } from "@/lib/calendar";
+import { LimitBar } from "@/components/LimitBar";
 
 type Cat = {
   id: string;
@@ -66,21 +67,6 @@ type TravelDetail = {
     };
   }[];
 };
-
-function LimitBar({ pct, over }: { pct: number | null; over: boolean }) {
-  if (pct == null) return null;
-  const width = Math.min(100, Math.max(0, pct));
-  return (
-    <div className="h-2.5 w-full overflow-hidden rounded-full bg-[var(--panel-soft)]">
-      <div
-        className={`h-full rounded-full transition-[width] duration-500 ${
-          over ? "bg-amber-600" : "bg-sky-600"
-        }`}
-        style={{ width: `${width}%` }}
-      />
-    </div>
-  );
-}
 
 export default function TravelDetailPage() {
   const { t, locale } = useI18n();
