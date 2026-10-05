@@ -69,17 +69,6 @@ type SubsHome = {
   }[];
 };
 
-/** Calendar-day gap from `from` to `to` (YYYY-MM-DD). */
-function daysUntilIso(from: string, to: string) {
-  const [fy, fm, fd] = from.split("-").map(Number);
-  const [ty, tm, td] = to.split("-").map(Number);
-  const a = new Date(fy, fm - 1, fd);
-  const b = new Date(ty, tm - 1, td);
-  return Math.round((b.getTime() - a.getTime()) / 86_400_000);
-}
-
-/** Show home attention only when overdue or due within this many days. */
-const COMMITMENT_ATTENTION_DAYS = 3;
 type Tx = {
   id: string;
   type: "INCOME" | "EXPENSE" | "REIMBURSEMENT" | "TRACK";
@@ -463,42 +452,6 @@ export default function HomePage() {
     }
   }
 
-  const urgentCommitments = !isHouse
-    ? (subs?.subscriptions ?? []).filter((s) => {
-        if (s.status === "overdue") return true;
-        if (s.status === "due") {
-          const days = daysUntilIso(cal.today, s.dueOn);
-          return days >= 0 && days <= COMMITMENT_ATTENTION_DAYS;
-        }
-        return false;
-      })
-    : [];
-  const overdueCommitments = urgentCommitments.filter(
-    (s) => s.status === "overdue",
-  );
-  const personalAttention =
-    urgentCommitments.length > 0
-      ? {
-          href: "/commitments",
-          title:
-            overdueCommitments.length > 0
-              ? overdueCommitments.length === 1
-                ? t("subsAttentionOverdueOne")
-                : fill(t("subsAttentionOverdue"), {
-                    n: String(overdueCommitments.length),
-                  })
-              : urgentCommitments.length === 1
-                ? t("subsAttentionDueSoonOne")
-                : fill(t("subsAttentionDueSoon"), {
-                    n: String(urgentCommitments.length),
-                  }),
-          amount:
-            Math.round(
-              urgentCommitments.reduce((sum, s) => sum + s.amount, 0) * 100,
-            ) / 100,
-        }
-      : null;
-
   return (
     <PageShell>
       <p className="text-lg font-semibold text-[var(--foreground)]">
@@ -812,29 +765,6 @@ export default function HomePage() {
               →
             </span>
           </Link>
-          {personalAttention ? (
-            <Link
-              href={personalAttention.href}
-              className="surface flex items-center justify-between gap-3 rounded-[1.5rem] px-4 py-3 transition hover:bg-[var(--panel-soft)]"
-            >
-              <span className="min-w-0">
-                <span className="block text-sm font-semibold">
-                  {t("attentionTitle")}
-                </span>
-                <span className="mt-0.5 block text-sm text-[var(--muted)]">
-                  {personalAttention.title}
-                </span>
-              </span>
-              <span className="shrink-0 text-sm font-bold tabular-nums">
-                <PrivateMoney
-                  amount={personalAttention.amount}
-                  currency={currency}
-                  locale={locale}
-                  visible={moneyVisible}
-                />
-              </span>
-            </Link>
-          ) : null}
         </div>
       ) : null}
 
