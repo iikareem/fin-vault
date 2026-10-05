@@ -146,6 +146,7 @@ export default function HomePage() {
     if (typeof window === "undefined") return false;
     return !readUiPrefs().hideBalances;
   });
+  const [walletDetailsOpen, setWalletDetailsOpen] = useState(false);
 
   useEffect(() => {
     setPersonalMoneyVisible(!readUiPrefs().hideBalances);
@@ -257,11 +258,6 @@ export default function HomePage() {
   const personalTransferHref = suggestTransferToCurrent
     ? "/add?mode=transfer&from=savings&to=current"
     : "/add?mode=transfer&from=current&to=savings";
-  const personalTransferTitle = suggestTransferToCurrent
-    ? t("homeTransferToCurrent")
-    : currentBal > 0.001 || savingsBal > 0.001
-      ? t("homeTransferToSavings")
-      : t("transferWallets");
   const personalTransferHint = suggestTransferToCurrent
     ? t("homeTransferToCurrentHint")
     : currentBal > savingsBal && currentBal > 0.001
@@ -551,125 +547,167 @@ export default function HomePage() {
                 "…"
               )}
             </p>
-            <div className="mt-4 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
-              <div
-                className="rounded-2xl px-3 py-2"
-                style={{ background: "rgba(255,255,255,0.18)" }}
-              >
-                <p className="text-sm opacity-90">
-                  {isHouse ? "💵 " : ""}
-                  {t("currentWallet")}
-                </p>
-                <p className="text-xl font-semibold leading-tight">
-                  {accounts.length ? (
-                    <PrivateMoney
-                      amount={currentWallet?.balance ?? 0}
-                      currency={currency}
-                      locale={locale}
-                      visible={moneyVisible}
-                    />
-                  ) : (
-                    "…"
-                  )}
-                </p>
-                {isHouse ? (
-                  <p className="mt-1 text-xs opacity-80">{t("currentHint")}</p>
-                ) : null}
-              </div>
-              <div
-                className="rounded-2xl px-3 py-2"
-                style={{ background: "rgba(255,255,255,0.18)" }}
-              >
-                <p className="text-sm opacity-90">
-                  {isHouse ? "💰 " : ""}
-                  {t("savingsWallet")}
-                </p>
-                <p className="text-xl font-semibold leading-tight">
-                  {accounts.length ? (
-                    <PrivateMoney
-                      amount={savingsWallet?.balance ?? 0}
-                      currency={currency}
-                      locale={locale}
-                      visible={moneyVisible}
-                    />
-                  ) : (
-                    "…"
-                  )}
-                </p>
-                {isHouse ? (
-                  <p className="mt-1 text-xs opacity-80">{t("savingsHint")}</p>
-                ) : null}
-              </div>
-            </div>
-            <div className="mt-3 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
-              <div
-                className="rounded-2xl px-3 py-2"
-                style={{ background: "rgba(255,255,255,0.18)" }}
-              >
-                <p className="text-sm opacity-90">
-                  {isHouse ? "📈 " : ""}
-                  {t("monthIn")}
-                </p>
-                <p className="text-lg font-semibold leading-tight">
-                  {summary ? (
-                    <PrivateMoney
-                      amount={summary.monthIncome}
-                      currency={currency}
-                      locale={locale}
-                      visible={moneyVisible}
-                    />
-                  ) : (
-                    "…"
-                  )}
-                </p>
-                {isHouse ? (
-                  <p className="mt-1 text-xs opacity-80">{t("monthInHint")}</p>
-                ) : null}
-              </div>
-              <div
-                className="rounded-2xl px-3 py-2"
-                style={{ background: "rgba(255,255,255,0.18)" }}
-              >
-                <p className="text-sm opacity-90">
-                  {isHouse ? "📉 " : ""}
-                  {t("monthOut")}
-                </p>
-                <p className="text-lg font-semibold leading-tight">
-                  {summary ? (
-                    <PrivateMoney
-                      amount={summary.monthExpense}
-                      currency={currency}
-                      locale={locale}
-                      visible={moneyVisible}
-                    />
-                  ) : (
-                    "…"
-                  )}
-                </p>
-                {isHouse ? (
-                  <p className="mt-1 text-xs opacity-80">{t("monthOutHint")}</p>
-                ) : null}
-              </div>
-            </div>
             {!isHouse ? (
-              <Link
-                href="/net"
-                onClick={(e) => e.stopPropagation()}
-                className="mt-3 flex min-h-12 items-center justify-between gap-3 rounded-2xl px-3 py-2.5 transition hover:opacity-95 active:scale-[0.99]"
-                style={{ background: "rgba(255,255,255,0.18)" }}
+              <p className="mt-3 text-sm opacity-90">
+                {cal.remainingDays === 0
+                  ? t("lastDayOfMonth")
+                  : cal.remainingDays === 1
+                    ? t("daysLeftOne")
+                    : fill(t("daysLeft"), { n: String(cal.remainingDays) })}
+                {" · "}
+                {fill(t("monthLength"), { n: String(cal.daysInMonth) })}
+              </p>
+            ) : null}
+            {!isHouse ? (
+              <button
+                type="button"
+                className="mt-3 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-2xl px-3 py-2.5 text-sm font-medium transition hover:opacity-95 active:scale-[0.99]"
+                style={{ background: "rgba(255,255,255,0.16)" }}
+                aria-expanded={walletDetailsOpen}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setWalletDetailsOpen((v) => !v);
+                }}
               >
-                <span className="min-w-0 text-start">
-                  <span className="block text-base font-semibold leading-snug">
-                    {t("homeNet")}
-                  </span>
-                  <span className="mt-0.5 block text-xs font-medium leading-snug opacity-80">
-                    {t("homeNetOpen")}
-                  </span>
+                {walletDetailsOpen
+                  ? t("homeWalletDetailsHide")
+                  : t("homeWalletDetails")}
+                <span aria-hidden className="opacity-80">
+                  {walletDetailsOpen ? "▴" : "▾"}
                 </span>
-                <span className="shrink-0 text-lg opacity-80" aria-hidden>
-                  →
-                </span>
-              </Link>
+              </button>
+            ) : null}
+            {isHouse || walletDetailsOpen ? (
+              <>
+                <div className="mt-4 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
+                  <div
+                    className="rounded-2xl px-3 py-2"
+                    style={{ background: "rgba(255,255,255,0.18)" }}
+                  >
+                    <p className="text-sm opacity-90">
+                      {isHouse ? "💵 " : ""}
+                      {t("currentWallet")}
+                    </p>
+                    <p className="text-xl font-semibold leading-tight">
+                      {accounts.length ? (
+                        <PrivateMoney
+                          amount={currentWallet?.balance ?? 0}
+                          currency={currency}
+                          locale={locale}
+                          visible={moneyVisible}
+                        />
+                      ) : (
+                        "…"
+                      )}
+                    </p>
+                    {isHouse ? (
+                      <p className="mt-1 text-xs opacity-80">
+                        {t("currentHint")}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div
+                    className="rounded-2xl px-3 py-2"
+                    style={{ background: "rgba(255,255,255,0.18)" }}
+                  >
+                    <p className="text-sm opacity-90">
+                      {isHouse ? "💰 " : ""}
+                      {t("savingsWallet")}
+                    </p>
+                    <p className="text-xl font-semibold leading-tight">
+                      {accounts.length ? (
+                        <PrivateMoney
+                          amount={savingsWallet?.balance ?? 0}
+                          currency={currency}
+                          locale={locale}
+                          visible={moneyVisible}
+                        />
+                      ) : (
+                        "…"
+                      )}
+                    </p>
+                    {isHouse ? (
+                      <p className="mt-1 text-xs opacity-80">
+                        {t("savingsHint")}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="mt-3 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
+                  <div
+                    className="rounded-2xl px-3 py-2"
+                    style={{ background: "rgba(255,255,255,0.18)" }}
+                  >
+                    <p className="text-sm opacity-90">
+                      {isHouse ? "📈 " : ""}
+                      {t("monthIn")}
+                    </p>
+                    <p className="text-lg font-semibold leading-tight">
+                      {summary ? (
+                        <PrivateMoney
+                          amount={summary.monthIncome}
+                          currency={currency}
+                          locale={locale}
+                          visible={moneyVisible}
+                        />
+                      ) : (
+                        "…"
+                      )}
+                    </p>
+                    {isHouse ? (
+                      <p className="mt-1 text-xs opacity-80">
+                        {t("monthInHint")}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div
+                    className="rounded-2xl px-3 py-2"
+                    style={{ background: "rgba(255,255,255,0.18)" }}
+                  >
+                    <p className="text-sm opacity-90">
+                      {isHouse ? "📉 " : ""}
+                      {t("monthOut")}
+                    </p>
+                    <p className="text-lg font-semibold leading-tight">
+                      {summary ? (
+                        <PrivateMoney
+                          amount={summary.monthExpense}
+                          currency={currency}
+                          locale={locale}
+                          visible={moneyVisible}
+                        />
+                      ) : (
+                        "…"
+                      )}
+                    </p>
+                    {isHouse ? (
+                      <p className="mt-1 text-xs opacity-80">
+                        {t("monthOutHint")}
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+                {!isHouse ? (
+                  <Link
+                    href="/net"
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-3 flex min-h-12 items-center justify-between gap-3 rounded-2xl px-3 py-2.5 transition hover:opacity-95 active:scale-[0.99]"
+                    style={{ background: "rgba(255,255,255,0.18)" }}
+                  >
+                    <span className="min-w-0 text-start">
+                      <span className="block text-base font-semibold leading-snug">
+                        {t("homeNet")}
+                      </span>
+                      <span className="mt-0.5 block text-xs font-medium leading-snug opacity-80">
+                        {t("homeNetOpen")}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-lg opacity-80" aria-hidden>
+                      →
+                    </span>
+                  </Link>
+                ) : null}
+              </>
             ) : null}
             {canToggleMoney ? (
               <p className="mt-3 text-sm opacity-90">
@@ -678,16 +716,18 @@ export default function HomePage() {
             ) : null}
           </>
         )}
-        <p className="mt-3 text-sm opacity-90">
-          {isHouse ? "📅 " : ""}
-          {cal.remainingDays === 0
-            ? t("lastDayOfMonth")
-            : cal.remainingDays === 1
-              ? t("daysLeftOne")
-              : fill(t("daysLeft"), { n: String(cal.remainingDays) })}
-          {" · "}
-          {fill(t("monthLength"), { n: String(cal.daysInMonth) })}
-        </p>
+        {isHouse ? (
+          <p className="mt-3 text-sm opacity-90">
+            📅{" "}
+            {cal.remainingDays === 0
+              ? t("lastDayOfMonth")
+              : cal.remainingDays === 1
+                ? t("daysLeftOne")
+                : fill(t("daysLeft"), { n: String(cal.remainingDays) })}
+            {" · "}
+            {fill(t("monthLength"), { n: String(cal.daysInMonth) })}
+          </p>
+        ) : null}
       </section>
 
       {!isHouse && active && summary?.softLimit ? (
@@ -747,22 +787,13 @@ export default function HomePage() {
           </div>
           <Link
             href={personalTransferHref}
-            className="flex min-h-14 items-center justify-between gap-3 rounded-[1.5rem] px-4 py-3 shadow-md transition hover:opacity-95 active:scale-[0.99]"
-            style={{
-              background: "var(--accent-b)",
-              color: "var(--accent-b-fg)",
-            }}
+            className="flex min-h-11 w-full flex-col items-center justify-center gap-0.5 rounded-2xl px-3 py-2.5 text-center transition hover:opacity-90 active:scale-[0.99]"
           >
-            <span className="min-w-0 text-start">
-              <span className="block text-base font-semibold leading-snug">
-                {personalTransferTitle}
-              </span>
-              <span className="mt-0.5 block text-xs font-medium leading-snug opacity-70">
-                {personalTransferHint}
-              </span>
+            <span className="text-sm font-semibold text-[var(--accent-b-text)]">
+              {t("homeMoveMoney")}
             </span>
-            <span className="shrink-0 text-lg opacity-80" aria-hidden>
-              →
+            <span className="max-w-[18rem] text-xs font-medium leading-snug text-[var(--muted)]">
+              {personalTransferHint}
             </span>
           </Link>
         </div>
