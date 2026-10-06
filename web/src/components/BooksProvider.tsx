@@ -208,7 +208,15 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       return;
     }
     let cancelled = false;
-    setLoading(true);
+    // Restore last session immediately so offline UI has active space
+    // before /auth/me fails or times out.
+    const cached = loadSessionCache();
+    if (cached) {
+      applyMe(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     loadSpace()
       .then((me) => {
         if (cancelled) return;
@@ -222,9 +230,9 @@ export function BooksProvider({ children }: { children: ReactNode }) {
           return;
         }
         if (isOfflineNetworkError(err) || isLikelyOffline()) {
-          const cached = loadSessionCache();
-          if (cached) {
-            applyMe(cached);
+          const again = loadSessionCache();
+          if (again) {
+            applyMe(again);
             return;
           }
         }

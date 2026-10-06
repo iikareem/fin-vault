@@ -9,6 +9,7 @@ import {
   OFFLINE_QUEUE_CHANGED,
   pendingCount,
 } from "@/lib/offline-queue";
+import { offlineAwareNavigate } from "@/lib/offline-nav";
 
 /**
  * Flushes queued offline expenses when the network returns and shows status
@@ -89,6 +90,7 @@ export function OfflineSync() {
       {offline ? (
         <Link
           href="/add?type=expense"
+          onClick={(e) => offlineAwareNavigate("/add?type=expense", e)}
           className="mt-2 inline-flex min-h-10 items-center justify-center rounded-full bg-emerald-800 px-4 text-sm font-semibold text-white"
         >
           {t("offlineAddExpense")}

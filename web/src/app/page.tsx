@@ -31,8 +31,10 @@ import {
   isLikelyOffline,
   isOfflineNetworkError,
   loadHomeSnapshot,
+  saveAddSnapshot,
   saveHomeSnapshot,
 } from "@/lib/offline-queue";
+import { offlineAwareNavigate } from "@/lib/offline-nav";
 
 type Summary = {
   totalMoney: number;
@@ -189,12 +191,33 @@ export default function HomePage() {
   useEffect(() => {
     if (!active) return;
     setError("");
+    let cancelled = false;
+
+    // Show last-known balances immediately (online refresh still runs below).
+    void loadHomeSnapshot(active.householdId).then((snap) => {
+      if (cancelled || !snap) return;
+      if (isLikelyOffline()) setOfflineMode(true);
+      setAccounts((snap.accounts as Account[]) ?? []);
+      setTxs((snap.txs as Tx[]) ?? []);
+      if (snap.summary) setSummary(snap.summary as Summary);
+    });
+
+    if (isLikelyOffline()) {
+      setOfflineMode(true);
+      return () => {
+        cancelled = true;
+      };
+    }
+
     setOfflineMode(false);
     const month = cal.monthKey;
     const jobs: Promise<unknown>[] = [
       api<Summary>(householdPath(active.householdId, "/analytics/summary")),
       api<Account[]>(householdPath(active.householdId, "/accounts")),
       api<Tx[]>(householdPath(active.householdId, "/transactions")),
+      api<{ id: string; name: string; nameAr?: string | null; kind: string }[]>(
+        householdPath(active.householdId, "/categories"),
+      ),
     ];
     if (active.kind === "HOUSE") {
       jobs.push(
@@ -214,6 +237,7 @@ export default function HomePage() {
     }
     Promise.all(jobs)
       .then((result) => {
+        if (cancelled) return;
         const nextSummary = result[0] as Summary;
         const nextAccounts = result[1] as Account[];
         const nextTxs = sortByOccurredOnDesc(
@@ -221,6 +245,12 @@ export default function HomePage() {
             (tx) => !tx.account || isCashAccount(tx.account),
           ),
         ).slice(0, 8);
+        const categories = result[3] as {
+          id: string;
+          name: string;
+          nameAr?: string | null;
+          kind: string;
+        }[];
         setSummary(nextSummary);
         setAccounts(nextAccounts);
         setTxs(nextTxs);
@@ -232,16 +262,22 @@ export default function HomePage() {
           txs: nextTxs,
           summary: nextSummary,
         });
+        void saveAddSnapshot(
+          active.householdId,
+          sortCashWallets(nextAccounts.filter(isCashAccount)),
+          categories,
+        );
         if (active.kind === "HOUSE") {
-          setCharity(result[3] as CharityMonth);
-          setClaims(sortByOccurredOnDesc(result[4] as Claim[]));
-          setCovers(sortByOccurredOnDesc(result[5] as Cover[]));
+          setCharity(result[4] as CharityMonth);
+          setClaims(sortByOccurredOnDesc(result[5] as Claim[]));
+          setCovers(sortByOccurredOnDesc(result[6] as Cover[]));
           setSubs(null);
         } else {
-          setSubs(result[3] as SubsHome);
+          setSubs(result[4] as SubsHome);
         }
       })
       .catch(async (e) => {
+        if (cancelled) return;
         if (isOfflineNetworkError(e) || isLikelyOffline()) {
           setOfflineMode(true);
           setError("");
@@ -255,11 +291,20 @@ export default function HomePage() {
         }
         setError(e instanceof Error ? e.message : String(e));
       });
+    return () => {
+      cancelled = true;
+    };
   }, [active?.householdId, active?.kind, cal.monthKey]);
 
   useEffect(() => {
     setPersonalMoneyVisible(false);
   }, [active?.householdId, active?.kind]);
+
+  useEffect(() => {
+    if (!offlineMode) return;
+    // Offline: show last-known balances unless the user prefers them hidden.
+    setPersonalMoneyVisible(!readUiPrefs().hideBalances);
+  }, [offlineMode]);
 
   useEffect(() => {
     if (!personal?.householdId || active?.kind !== "HOUSE") {
@@ -510,12 +555,14 @@ export default function HomePage() {
           <div className="mt-3 grid grid-cols-2 gap-2">
             <Link
               href="/add?type=expense"
+              onClick={(e) => offlineAwareNavigate("/add?type=expense", e)}
               className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-emerald-800 px-3 text-sm font-semibold text-white"
             >
               {t("homeSpend")}
             </Link>
             <Link
               href="/add?type=income"
+              onClick={(e) => offlineAwareNavigate("/add?type=income", e)}
               className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--foreground)_10%,transparent)] px-3 text-sm font-semibold text-[var(--foreground)]"
             >
               {t("homeIncome")}

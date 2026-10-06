@@ -6,6 +6,7 @@ import { useI18n } from "./I18nProvider";
 import { useBooks } from "./BooksProvider";
 import { HOUSE_BOOKS_ENABLED } from "@/lib/features";
 import type { MessageKey } from "@/lib/i18n";
+import { offlineAwareNavigate } from "@/lib/offline-nav";
 
 type NavIcon =
   | "home"
@@ -143,6 +144,7 @@ export function BottomNav() {
       <li key={item.href} className="min-w-0">
         <Link
           href={item.href}
+          onClick={(e) => offlineAwareNavigate(item.href, e)}
           aria-current={current ? "page" : undefined}
           aria-label={label}
           className={`nav-tab flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl px-1 text-center transition-colors duration-150 ${
@@ -183,6 +185,7 @@ export function BottomNav() {
           <li className="relative flex min-h-12 items-end justify-center pb-0.5">
             <Link
               href="/add"
+              onClick={(e) => offlineAwareNavigate("/add", e)}
               aria-current={addActive ? "page" : undefined}
               aria-label={t("navAdd")}
               className={`nav-tab -mt-7 mb-0.5 flex h-14 w-14 shrink-0 items-center justify-center rounded-full shadow-md transition-[box-shadow,opacity] duration-150 ${fab} ${

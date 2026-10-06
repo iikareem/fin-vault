@@ -30,6 +30,7 @@ import {
   loadAddSnapshot,
   saveAddSnapshot,
 } from "@/lib/offline-queue";
+import { offlineAwareReplace } from "@/lib/offline-nav";
 
 type Account = { id: string; name: string; type?: string };
 type Category = {
@@ -335,7 +336,7 @@ function AddForm() {
         sessionStorage.setItem("fb_flash", "savedOffline");
       }
       setConfirmOpen(false);
-      router.replace("/");
+      offlineAwareReplace("/");
     };
 
     const postOrQueue = async (path: string, body: unknown) => {

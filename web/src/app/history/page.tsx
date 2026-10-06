@@ -22,6 +22,12 @@ import { isoLocal } from "@/lib/calendar";
 import { householdPath } from "@/lib/space";
 import { DateField } from "@/components/DateField";
 import { HIDDEN_EXPENSE_CATEGORIES, HIDDEN_INCOME_CATEGORIES } from "@/lib/category-visibility";
+import {
+  isLikelyOffline,
+  isOfflineNetworkError,
+  loadAddSnapshot,
+  loadHomeSnapshot,
+} from "@/lib/offline-queue";
 
 type Tx = {
   id: string;
@@ -103,13 +109,17 @@ function HistoryInner() {
   const [confirmId, setConfirmId] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [offlineMode, setOfflineMode] = useState(false);
   const currency = active?.currency ?? "EGP";
   const canEditHouse = active?.kind === "PERSONAL" || active?.role === "ADMIN";
   const hideAggregates = active?.kind === "HOUSE" && house?.role !== "ADMIN";
 
   function loadDay(hid: string, on: string) {
     return api<DayLog>(householdPath(hid, `/analytics/day?on=${on}`)).then(
-      setLog,
+      (dayLog) => {
+        setLog(dayLog);
+        setOfflineMode(false);
+      },
     );
   }
 
@@ -130,12 +140,66 @@ function HistoryInner() {
   // Categories rarely change — fetch once per household, not on every day flip.
   useEffect(() => {
     if (!active) return;
-    loadCategories(active.householdId).catch((e) => setError(e.message));
+    loadCategories(active.householdId).catch(async (e) => {
+      if (isOfflineNetworkError(e) || isLikelyOffline()) {
+        const snap = await loadAddSnapshot(active.householdId);
+        if (snap?.categories?.length) {
+          setCategories(snap.categories as Category[]);
+          return;
+        }
+      }
+      setError(e instanceof Error ? e.message : String(e));
+    });
   }, [active?.householdId]);
 
   useEffect(() => {
     if (!active) return;
-    loadDay(active.householdId, day).catch((e) => setError(e.message));
+    setError("");
+    if (isLikelyOffline()) {
+      setOfflineMode(true);
+      void (async () => {
+        const snap = await loadHomeSnapshot(active.householdId);
+        const txs = ((snap?.txs as Tx[]) ?? []).filter(
+          // Home snapshot only keeps recent rows; show them when day API is down.
+          () => true,
+        );
+        setLog({
+          date: day,
+          income: txs
+            .filter((tx) => tx.type === "INCOME")
+            .reduce((s, tx) => s + tx.amount, 0),
+          expense: txs
+            .filter((tx) => tx.type === "EXPENSE" || tx.type === "TRACK")
+            .reduce((s, tx) => s + Math.abs(tx.amount), 0),
+          txs,
+          claims: [],
+          gifts: [],
+        });
+      })();
+      return;
+    }
+    loadDay(active.householdId, day).catch(async (e) => {
+      if (isOfflineNetworkError(e) || isLikelyOffline()) {
+        setOfflineMode(true);
+        setError("");
+        const snap = await loadHomeSnapshot(active.householdId);
+        const txs = (snap?.txs as Tx[]) ?? [];
+        setLog({
+          date: day,
+          income: txs
+            .filter((tx) => tx.type === "INCOME")
+            .reduce((s, tx) => s + tx.amount, 0),
+          expense: txs
+            .filter((tx) => tx.type === "EXPENSE" || tx.type === "TRACK")
+            .reduce((s, tx) => s + Math.abs(tx.amount), 0),
+          txs,
+          claims: [],
+          gifts: [],
+        });
+        return;
+      }
+      setError(e instanceof Error ? e.message : String(e));
+    });
   }, [active?.householdId, day]);
 
   function goDay(next: string) {
@@ -322,6 +386,11 @@ function HistoryInner() {
         </section>
       )}
 
+      {offlineMode ? (
+        <p className="mt-3 rounded-xl bg-[color-mix(in_srgb,var(--foreground)_6%,transparent)] px-3 py-2 text-sm text-[var(--muted)]">
+          {t("offlineHistoryBody")}
+        </p>
+      ) : null}
       {error ? <p className="mt-3 text-base text-red-700">{error}</p> : null}
 
       {empty ? (

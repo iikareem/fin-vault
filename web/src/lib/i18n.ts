@@ -178,6 +178,8 @@ const ar = {
   offlineHomeBody:
     "تقدر تسجّل صرف أو دخل دلوقتي. لما ترجع أونلاين، هيتزامن لوحده.",
   offlineHomeLastKnown: "الأرقام تحت من آخر مرة كنت أونلاين (ممكن تكون قديمة).",
+  offlineHistoryBody:
+    "بدون نت بنعرض آخر عمليات محفوظة. التعديل والتفاصيل الكاملة تحتاج نت.",
   adminOnlyAdd: "بس المسؤول يضيف مشتريات البيت. من الرئيسية حوّل لفلوسك.",
   eachDay: "كل يوم",
   nothingThisDay: "مفيش حاجة متسجلة اليوم ده.",
@@ -1190,6 +1192,8 @@ const en = {
     "You can log spend or income now. They’ll sync automatically when you’re back online.",
   offlineHomeLastKnown:
     "Numbers below are from your last online visit (may be outdated).",
+  offlineHistoryBody:
+    "Offline: showing your last cached activity. Full day history and edits need the network.",
   adminOnlyAdd:
     "Only the admin can add house purchases. Switch to your own money on Home.",
   eachDay: "Each day",
