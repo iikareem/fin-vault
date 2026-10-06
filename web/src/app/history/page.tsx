@@ -26,7 +26,6 @@ import {
   isLikelyOffline,
   isOfflineNetworkError,
   loadAddSnapshot,
-  loadHomeSnapshot,
 } from "@/lib/offline-queue";
 
 type Tx = {
@@ -157,50 +156,20 @@ function HistoryInner() {
     setError("");
     if (isLikelyOffline()) {
       setOfflineMode(true);
-      void (async () => {
-        const snap = await loadHomeSnapshot(active.householdId);
-        const txs = ((snap?.txs as Tx[]) ?? []).filter(
-          // Home snapshot only keeps recent rows; show them when day API is down.
-          () => true,
-        );
-        setLog({
-          date: day,
-          income: txs
-            .filter((tx) => tx.type === "INCOME")
-            .reduce((s, tx) => s + tx.amount, 0),
-          expense: txs
-            .filter((tx) => tx.type === "EXPENSE" || tx.type === "TRACK")
-            .reduce((s, tx) => s + Math.abs(tx.amount), 0),
-          txs,
-          claims: [],
-          gifts: [],
-        });
-      })();
+      setLog(null);
+      setError(t("offlineNeedsNetwork"));
       return;
     }
-    loadDay(active.householdId, day).catch(async (e) => {
+    loadDay(active.householdId, day).catch((e) => {
       if (isOfflineNetworkError(e) || isLikelyOffline()) {
         setOfflineMode(true);
-        setError("");
-        const snap = await loadHomeSnapshot(active.householdId);
-        const txs = (snap?.txs as Tx[]) ?? [];
-        setLog({
-          date: day,
-          income: txs
-            .filter((tx) => tx.type === "INCOME")
-            .reduce((s, tx) => s + tx.amount, 0),
-          expense: txs
-            .filter((tx) => tx.type === "EXPENSE" || tx.type === "TRACK")
-            .reduce((s, tx) => s + Math.abs(tx.amount), 0),
-          txs,
-          claims: [],
-          gifts: [],
-        });
+        setLog(null);
+        setError(t("offlineNeedsNetwork"));
         return;
       }
       setError(e instanceof Error ? e.message : String(e));
     });
-  }, [active?.householdId, day]);
+  }, [active?.householdId, day, t]);
 
   function goDay(next: string) {
     setDay(next);
@@ -388,10 +357,12 @@ function HistoryInner() {
 
       {offlineMode ? (
         <p className="mt-3 rounded-xl bg-[color-mix(in_srgb,var(--foreground)_6%,transparent)] px-3 py-2 text-sm text-[var(--muted)]">
-          {t("offlineHistoryBody")}
+          {t("offlineNeedsNetwork")}
         </p>
+      ) : error ? (
+        <p className="mt-3 text-base text-red-700">{error}</p>
       ) : null}
-      {error ? <p className="mt-3 text-base text-red-700">{error}</p> : null}
+
 
       {empty ? (
         <div className="mt-10 text-center">

@@ -168,18 +168,19 @@ const ar = {
   offlinePageTitle: "أنت مش متصل",
   offlinePageBody:
     "فين فولت مش قادر يوصل للشبكة دلوقتي. اتصل تاني وجرب. المصاريف المحفوظة بدون نت هتتزامن لما ترجع أونلاين.",
-  offlineModeHint: "أنت مش متصل — تقدر تسجّل مصروف دلوقتي وهيتزامن بعدين",
+  offlineModeHint: "أنت مش متصل — تقدر تشوف الرصيد وتسجّل صرف بس",
   offlineModePendingOne:
-    "أنت مش متصل — عملية واحدةا مستنية تتزامن. تقدر تضيف كمان",
+    "أنت مش متصل — عملية صرف واحدةا مستنية تتزامن",
   offlineModePending:
-    "أنت مش متصل — {count} عمليات مستنية تتزامن. تقدر تضيف كمان",
+    "أنت مش متصل — {count} عمليات صرف مستنية تتزامن",
   offlineAddExpense: "سجّل مصروف",
   offlineHomeTitle: "شغال بدون نت",
   offlineHomeBody:
-    "تقدر تسجّل صرف أو دخل دلوقتي. لما ترجع أونلاين، هيتزامن لوحده.",
-  offlineHomeLastKnown: "الأرقام تحت من آخر مرة كنت أونلاين (ممكن تكون قديمة).",
-  offlineHistoryBody:
-    "بدون نت بنعرض آخر عمليات محفوظة. التعديل والتفاصيل الكاملة تحتاج نت.",
+    "تقدر تشوف آخر رصيد معروف وتسجّل صرف. الباقي (الأيام والرسوم والدخل) محتاج نت.",
+  offlineHomeLastKnown: "الرصيد من آخر مرة كنت أونلاين (ممكن يكون قديم).",
+  offlineNeedsNetwork: "الميزة دي محتاجة نت",
+  offlineSpendOnly: "بدون نت تقدر تسجّل صرف بس",
+  offlineHistoryBody: "الأيام محتاجة نت",
   adminOnlyAdd: "بس المسؤول يضيف مشتريات البيت. من الرئيسية حوّل لفلوسك.",
   eachDay: "كل يوم",
   nothingThisDay: "مفيش حاجة متسجلة اليوم ده.",
@@ -1181,19 +1182,18 @@ const en = {
   offlinePageTitle: "You’re offline",
   offlinePageBody:
     "Fin Vault can’t reach the network right now. Reconnect, then try again. Expenses saved offline will sync when you’re back online.",
-  offlineModeHint: "You’re offline — you can still log an expense; it will sync later",
-  offlineModePendingOne:
-    "You’re offline — 1 entry waiting to sync. You can add more",
-  offlineModePending:
-    "You’re offline — {count} entries waiting to sync. You can add more",
-  offlineAddExpense: "Add expense",
+  offlineModeHint: "You’re offline — balance and add spend only",
+  offlineModePendingOne: "You’re offline — 1 spend waiting to sync",
+  offlineModePending: "You’re offline — {count} spends waiting to sync",
+  offlineAddExpense: "Add spend",
   offlineHomeTitle: "Working offline",
   offlineHomeBody:
-    "You can log spend or income now. They’ll sync automatically when you’re back online.",
+    "You can see your last-known balance and log a spend. Days, charts, and income need the network.",
   offlineHomeLastKnown:
-    "Numbers below are from your last online visit (may be outdated).",
-  offlineHistoryBody:
-    "Offline: showing your last cached activity. Full day history and edits need the network.",
+    "Balance is from your last online visit (may be outdated).",
+  offlineNeedsNetwork: "This needs an internet connection",
+  offlineSpendOnly: "Offline you can only add a spend",
+  offlineHistoryBody: "Days need an internet connection",
   adminOnlyAdd:
     "Only the admin can add house purchases. Switch to your own money on Home.",
   eachDay: "Each day",

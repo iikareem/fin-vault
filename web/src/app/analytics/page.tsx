@@ -20,6 +20,10 @@ import {
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 import { DateField } from "@/components/DateField";
+import {
+  isLikelyOffline,
+  isOfflineNetworkError,
+} from "@/lib/offline-queue";
 
 type Period = "day" | "week" | "month" | "year" | "range";
 type DayRow = { day: string; income: number; expense: number };
@@ -264,6 +268,15 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     if (!active) return;
+    setError("");
+    if (isLikelyOffline()) {
+      setDays([]);
+      setCats([]);
+      setMembers([]);
+      setSavingsMonths([]);
+      setError(t("offlineNeedsNetwork"));
+      return;
+    }
     const id = active.householdId;
     const q = new URLSearchParams({ from, to });
     const catQ = new URLSearchParams({ from, to });
@@ -285,8 +298,18 @@ export default function AnalyticsPage() {
         setSavingsOpening(s.opening);
         setSavingsMonths(s.months);
       })
-      .catch((e) => setError(e.message));
-  }, [active?.householdId, from, to, excludeCommitments]);
+      .catch((e) => {
+        if (isOfflineNetworkError(e) || isLikelyOffline()) {
+          setDays([]);
+          setCats([]);
+          setMembers([]);
+          setSavingsMonths([]);
+          setError(t("offlineNeedsNetwork"));
+          return;
+        }
+        setError(e instanceof Error ? e.message : String(e));
+      });
+  }, [active?.householdId, from, to, excludeCommitments, t]);
 
   useEffect(() => {
     if (!active || period === "range") {

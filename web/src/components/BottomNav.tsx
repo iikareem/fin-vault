@@ -1,12 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useI18n } from "./I18nProvider";
 import { useBooks } from "./BooksProvider";
 import { HOUSE_BOOKS_ENABLED } from "@/lib/features";
 import type { MessageKey } from "@/lib/i18n";
-import { offlineAwareNavigate } from "@/lib/offline-nav";
+import {
+  isOfflineAllowedPath,
+  offlineAwareNavigate,
+} from "@/lib/offline-nav";
+import { isLikelyOffline } from "@/lib/offline-queue";
 
 type NavIcon =
   | "home"
@@ -124,6 +129,8 @@ export function BottomNav() {
   const path = usePathname();
   const { t } = useI18n();
   const { active, personalOnly } = useBooks();
+  const [offline, setOffline] = useState(false);
+  const [blockedFlash, setBlockedFlash] = useState(false);
   const personal =
     !HOUSE_BOOKS_ENABLED || personalOnly || active?.kind === "PERSONAL";
   const side = personal ? mineSide : houseSide;
@@ -137,29 +144,54 @@ export function BottomNav() {
     ? "bg-[var(--accent-b)] text-[var(--accent-b-fg)]"
     : "bg-[var(--accent-a)] text-[var(--accent-a-fg)]";
 
+  useEffect(() => {
+    const sync = () => setOffline(isLikelyOffline());
+    sync();
+    window.addEventListener("online", sync);
+    window.addEventListener("offline", sync);
+    const onBlocked = () => {
+      setBlockedFlash(true);
+      window.setTimeout(() => setBlockedFlash(false), 2200);
+    };
+    window.addEventListener("fb-offline-blocked", onBlocked);
+    return () => {
+      window.removeEventListener("online", sync);
+      window.removeEventListener("offline", sync);
+      window.removeEventListener("fb-offline-blocked", onBlocked);
+    };
+  }, []);
+
   function sideLink(item: SideItem) {
     const current = isCurrent(path, item.href);
     const label = t(item.key);
+    const blockedOffline = offline && !isOfflineAllowedPath(item.href);
     return (
       <li key={item.href} className="min-w-0">
         <Link
           href={item.href}
           onClick={(e) => offlineAwareNavigate(item.href, e)}
           aria-current={current ? "page" : undefined}
-          aria-label={label}
+          aria-disabled={blockedOffline || undefined}
+          aria-label={
+            blockedOffline ? `${label}. ${t("offlineNeedsNetwork")}` : label
+          }
           className={`nav-tab flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl px-1 text-center transition-colors duration-150 ${
-            current ? accentText : "text-[var(--muted)]"
+            blockedOffline
+              ? "cursor-not-allowed text-[var(--muted)] opacity-45"
+              : current
+                ? accentText
+                : "text-[var(--muted)]"
           }`}
         >
           <span className="relative flex h-6 w-6 items-center justify-center">
             <NavGlyph
               name={item.icon}
-              className={current ? "opacity-100" : "opacity-80"}
+              className={current && !blockedOffline ? "opacity-100" : "opacity-80"}
             />
             <span
               aria-hidden
               className={`absolute -bottom-1 h-1 w-1 rounded-full transition-opacity duration-150 ${
-                current
+                current && !blockedOffline
                   ? "bg-current opacity-100"
                   : "opacity-0"
               }`}
@@ -167,7 +199,7 @@ export function BottomNav() {
           </span>
           <span
             className={`max-w-full truncate text-[0.65rem] leading-none tracking-tight ${
-              current ? "font-semibold" : "font-medium opacity-80"
+              current && !blockedOffline ? "font-semibold" : "font-medium opacity-80"
             }`}
           >
             {label}
@@ -180,12 +212,20 @@ export function BottomNav() {
   return (
     <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.5rem,env(safe-area-inset-bottom,0px))] sm:px-4">
       <div className="pointer-events-auto relative mx-auto max-w-lg">
+        {blockedFlash ? (
+          <p
+            role="status"
+            className="mb-2 rounded-xl bg-[color-mix(in_srgb,var(--foreground)_8%,transparent)] px-3 py-2 text-center text-xs text-[var(--muted)]"
+          >
+            {t("offlineNeedsNetwork")}
+          </p>
+        ) : null}
         <ul className="nav-shell grid grid-cols-5 items-end gap-0.5 rounded-2xl px-1.5 pb-1.5 pt-1.5">
           {left.map(sideLink)}
           <li className="relative flex min-h-12 items-end justify-center pb-0.5">
             <Link
-              href="/add"
-              onClick={(e) => offlineAwareNavigate("/add", e)}
+              href="/add?type=expense"
+              onClick={(e) => offlineAwareNavigate("/add?type=expense", e)}
               aria-current={addActive ? "page" : undefined}
               aria-label={t("navAdd")}
               className={`nav-tab -mt-7 mb-0.5 flex h-14 w-14 shrink-0 items-center justify-center rounded-full shadow-md transition-[box-shadow,opacity] duration-150 ${fab} ${

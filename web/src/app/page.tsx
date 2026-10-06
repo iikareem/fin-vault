@@ -198,8 +198,11 @@ export default function HomePage() {
       if (cancelled || !snap) return;
       if (isLikelyOffline()) setOfflineMode(true);
       setAccounts((snap.accounts as Account[]) ?? []);
-      setTxs((snap.txs as Tx[]) ?? []);
-      if (snap.summary) setSummary(snap.summary as Summary);
+      // Do not restore txs offline — avoids wrong "recent" / day-like data.
+      if (!isLikelyOffline()) {
+        setTxs((snap.txs as Tx[]) ?? []);
+        if (snap.summary) setSummary(snap.summary as Summary);
+      }
     });
 
     if (isLikelyOffline()) {
@@ -281,11 +284,12 @@ export default function HomePage() {
         if (isOfflineNetworkError(e) || isLikelyOffline()) {
           setOfflineMode(true);
           setError("");
+          setTxs([]);
+          setSummary(null);
+          setSubs(null);
           const snap = await loadHomeSnapshot(active.householdId);
           if (snap) {
             setAccounts((snap.accounts as Account[]) ?? []);
-            setTxs((snap.txs as Tx[]) ?? []);
-            setSummary((snap.summary as Summary) ?? null);
           }
           return;
         }
@@ -552,22 +556,13 @@ export default function HomePage() {
           <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">
             {t("offlineHomeBody")}
           </p>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <Link
-              href="/add?type=expense"
-              onClick={(e) => offlineAwareNavigate("/add?type=expense", e)}
-              className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-emerald-800 px-3 text-sm font-semibold text-white"
-            >
-              {t("homeSpend")}
-            </Link>
-            <Link
-              href="/add?type=income"
-              onClick={(e) => offlineAwareNavigate("/add?type=income", e)}
-              className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--foreground)_10%,transparent)] px-3 text-sm font-semibold text-[var(--foreground)]"
-            >
-              {t("homeIncome")}
-            </Link>
-          </div>
+          <Link
+            href="/add?type=expense"
+            onClick={(e) => offlineAwareNavigate("/add?type=expense", e)}
+            className="mt-3 inline-flex min-h-12 w-full items-center justify-center rounded-2xl bg-emerald-800 px-3 text-sm font-semibold text-white"
+          >
+            {t("homeSpend")}
+          </Link>
           <p className="mt-2 text-xs text-[var(--muted)]">
             {t("offlineHomeLastKnown")}
           </p>
@@ -842,13 +837,13 @@ export default function HomePage() {
         ) : null}
       </section>
 
-      {!isHouse && active ? (
+      {!offlineMode && !isHouse && active ? (
         <div className="mt-4">
           <MonthSoftLimitCard
             householdId={active.householdId}
             currency={currency}
             moneyVisible={moneyVisible}
-            loading={!summary && !offlineMode}
+            loading={!summary}
             status={summary?.softLimit ?? null}
             onUpdated={(next) =>
               setSummary((prev) => (prev ? { ...prev, softLimit: next } : prev))
@@ -857,7 +852,7 @@ export default function HomePage() {
         </div>
       ) : null}
 
-      {!isHouse ? (
+      {!offlineMode && !isHouse ? (
         <div className="mt-4 space-y-2">
           <div className="grid grid-cols-2 gap-2">
             <Link
@@ -922,6 +917,7 @@ export default function HomePage() {
       ) : null}
 
       {summary &&
+      !offlineMode &&
       !personalOnly &&
       ((summary.claimsWaiting ?? 0) > 0.001 ||
         (summary.coversWaiting ?? 0) > 0.001) &&
@@ -1711,7 +1707,7 @@ export default function HomePage() {
         </section>
       ) : null}
 
-      {isHouse ? (
+      {!offlineMode && isHouse ? (
         <Link
           href="/charity"
           className="surface mt-4 flex items-center justify-between rounded-[1.75rem] px-4 py-3"
@@ -1733,7 +1729,7 @@ export default function HomePage() {
             )}
           </span>
         </Link>
-      ) : active ? (
+      ) : !offlineMode && active ? (
         <MoneyToolsHomeCard
           householdId={active.householdId}
           currency={currency}
@@ -1742,7 +1738,7 @@ export default function HomePage() {
         />
       ) : null}
 
-      {isHouse ? (
+      {!offlineMode && isHouse ? (
         <Link
           href="/with-house"
           className="mt-3 block text-center text-sm font-semibold text-stone-500"
@@ -1751,7 +1747,7 @@ export default function HomePage() {
         </Link>
       ) : null}
 
-      {isHouse && isAdmin ? (
+      {!offlineMode && isHouse && isAdmin ? (
         <div className="mt-5 grid grid-cols-1 gap-2">
           <Link
             href="/add"
@@ -1766,7 +1762,7 @@ export default function HomePage() {
             🏠 {t("housePaidForTitle")}
           </Link>
         </div>
-      ) : isHouse && !isAdmin ? (
+      ) : !offlineMode && isHouse && !isAdmin ? (
         <>
           <Link
             href="/add"
@@ -1778,7 +1774,7 @@ export default function HomePage() {
         </>
       ) : null}
 
-      {txs.length > 0 ? (
+      {!offlineMode && txs.length > 0 ? (
         <>
           <div className="mt-8 flex items-end justify-between gap-3">
             <div className="min-w-0">

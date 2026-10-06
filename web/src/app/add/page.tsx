@@ -128,7 +128,11 @@ function AddForm() {
     const wantTransfer = search.get("mode") === "transfer";
     const wantWithdraw = search.get("mode") === "withdraw";
     const wantType = (search.get("type") || "").toLowerCase();
-    if (isHouseMember || wantClaim) {
+    if (isLikelyOffline()) {
+      // Offline contract: wallet spend only.
+      setMode("wallet");
+      setType("EXPENSE");
+    } else if (isHouseMember || wantClaim) {
       setMode("claim");
       setType("EXPENSE");
     } else if (wantCover && active.role === "ADMIN") {
@@ -142,10 +146,15 @@ function AddForm() {
       setType("EXPENSE");
     } else {
       setMode("wallet");
-      if (search.get("mode") === "give" && !isHouseMember) setType("GIVE");
-      else if (wantType === "income" || wantType === "salary") setType("INCOME");
-      else if (wantType === "expense" || wantType === "spend") setType("EXPENSE");
-      else setType("EXPENSE");
+      if (search.get("mode") === "give" && !isHouseMember) {
+        setType("GIVE");
+      } else if (wantType === "income" || wantType === "salary") {
+        setType("INCOME");
+      } else if (wantType === "expense" || wantType === "spend") {
+        setType("EXPENSE");
+      } else {
+        setType("EXPENSE");
+      }
     }
     setUsingOfflineData(false);
     const applyAccountsAndCategories = (
@@ -339,8 +348,24 @@ function AddForm() {
       offlineAwareReplace("/");
     };
 
+    const canQueueOffline =
+      mode === "wallet" &&
+      (type === "EXPENSE" || (personalPaid && trackOnly));
+
+    if (
+      isLikelyOffline() &&
+      !(mode === "wallet" && type === "EXPENSE")
+    ) {
+      setError(t("offlineSpendOnly"));
+      setBusy(false);
+      return;
+    }
+
     const postOrQueue = async (path: string, body: unknown) => {
       if (isLikelyOffline()) {
+        if (!canQueueOffline) {
+          throw new Error(t("offlineSpendOnly"));
+        }
         await enqueueTransaction(path, body);
         return "queued" as const;
       }
@@ -351,7 +376,7 @@ function AddForm() {
         });
         return "sent" as const;
       } catch (error) {
-        if (isOfflineNetworkError(error)) {
+        if (isOfflineNetworkError(error) && canQueueOffline) {
           await enqueueTransaction(path, body);
           return "queued" as const;
         }
@@ -463,17 +488,14 @@ function AddForm() {
           setBusy(false);
           return;
         }
-        let anyQueued = false;
         for (const body of payloads) {
-          const result = await postOrQueue(txPath, body);
-          if (result === "queued") anyQueued = true;
+          await api(txPath, {
+            method: "POST",
+            body: JSON.stringify(body),
+          });
         }
         if (personalBooks && typeof window !== "undefined") {
           pushRecentCategory(space.householdId, categoryId);
-        }
-        if (anyQueued) {
-          finishOfflineSave();
-          return;
         }
       } else {
         const txPath = householdPath(space.householdId, "/transactions");
@@ -499,8 +521,12 @@ function AddForm() {
       }
       setConfirmOpen(false);
       router.replace("/");
-    } catch {
-      setError(t("couldNotSave"));
+    } catch (e) {
+      setError(
+        e instanceof Error && e.message === t("offlineSpendOnly")
+          ? t("offlineSpendOnly")
+          : t("couldNotSave"),
+      );
     } finally {
       setBusy(false);
     }

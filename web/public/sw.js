@@ -1,7 +1,7 @@
 /* Fin Vault service worker — app shell cache for offline use. */
-const CACHE = "fin-vault-shell-v2";
+const CACHE = "fin-vault-shell-v3";
 const OFFLINE_URL = "/offline.html";
-const APP_SHELL = ["/", "/add", "/history"];
+const APP_SHELL = ["/", "/add"];
 const PRECACHE = [
   OFFLINE_URL,
   "/icon-192.png",

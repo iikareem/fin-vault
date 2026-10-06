@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-const WARM = ["/", "/add", "/history"];
+const WARM = ["/", "/add"];
 
 /** Registers the app-shell service worker (localhost + production). */
 export function ServiceWorkerRegister() {
