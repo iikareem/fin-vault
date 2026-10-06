@@ -161,6 +161,13 @@ const ar = {
   save: "حفظ",
   saving: "جاري الحفظ…",
   couldNotSave: "ما قدرناش نحفظ",
+  savedOffline: "اتسجل بدون نت — هيتزامن لما ترجّع أونلاين",
+  offlinePendingOne: "عملية واحدةا offline مستنية تتزامن",
+  offlinePending: "{count} عمليات offline مستنية تتزامن",
+  usingOfflineData: "شغالين من آخر بيانات محفوظة (بدون نت)",
+  offlinePageTitle: "أنت مش متصل",
+  offlinePageBody:
+    "فين فولت مش قادر يوصل للشبكة دلوقتي. اتصل تاني وجرب. المصاريف المحفوظة بدون نت هتتزامن لما ترجع أونلاين.",
   adminOnlyAdd: "بس المسؤول يضيف مشتريات البيت. من الرئيسية حوّل لفلوسك.",
   eachDay: "كل يوم",
   nothingThisDay: "مفيش حاجة متسجلة اليوم ده.",
@@ -1155,6 +1162,13 @@ const en = {
   save: "Save",
   saving: "Saving…",
   couldNotSave: "Could not save",
+  savedOffline: "Saved offline — will sync when you’re back online",
+  offlinePendingOne: "1 offline entry waiting to sync",
+  offlinePending: "{count} offline entries waiting to sync",
+  usingOfflineData: "Using last saved wallets and categories (offline)",
+  offlinePageTitle: "You’re offline",
+  offlinePageBody:
+    "Fin Vault can’t reach the network right now. Reconnect, then try again. Expenses saved offline will sync when you’re back online.",
   adminOnlyAdd:
     "Only the admin can add house purchases. Switch to your own money on Home.",
   eachDay: "Each day",

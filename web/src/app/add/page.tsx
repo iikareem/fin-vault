@@ -23,6 +23,13 @@ import {
   HIDDEN_INCOME_CATEGORIES,
 } from "@/lib/category-visibility";
 import { categoryLabel, personLabel } from "@/lib/i18n";
+import {
+  enqueueTransaction,
+  isLikelyOffline,
+  isOfflineNetworkError,
+  loadAddSnapshot,
+  saveAddSnapshot,
+} from "@/lib/offline-queue";
 
 type Account = { id: string; name: string; type?: string };
 type Category = {
@@ -99,6 +106,7 @@ function AddForm() {
   const [busy, setBusy] = useState(false);
   const [trackOnly, setTrackOnly] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [usingOfflineData, setUsingOfflineData] = useState(false);
 
   const houseAdmin = space?.kind === "HOUSE" && space.role === "ADMIN";
   const personalBooks = space?.kind === "PERSONAL";
@@ -138,6 +146,48 @@ function AddForm() {
       else if (wantType === "expense" || wantType === "spend") setType("EXPENSE");
       else setType("EXPENSE");
     }
+    setUsingOfflineData(false);
+    const applyAccountsAndCategories = (
+      a: Account[],
+      c: Category[],
+      offline: boolean,
+    ) => {
+      setAccounts(a);
+      setCategories(c);
+      setUsingOfflineData(offline);
+      const current = a.find(isCurrentWallet) ?? a[0];
+      const savings = a.find(isSavingsWallet);
+      const walletByKey = (key: string | null) => {
+        if (key === "savings") return savings ?? null;
+        if (key === "current") return current ?? null;
+        return null;
+      };
+      const fromWanted = walletByKey(search.get("from"));
+      const toWanted = walletByKey(search.get("to"));
+      if (wantTransfer && active.kind === "PERSONAL") {
+        const fromAcc: Account | undefined = fromWanted ?? current ?? a[0];
+        let toAcc: Account | null = toWanted ?? savings ?? a[1] ?? null;
+        if (toAcc && fromAcc && toAcc.id === fromAcc.id) {
+          toAcc = a.find((x) => x.id !== fromAcc.id) ?? null;
+        }
+        if (fromAcc) setAccountId(fromAcc.id);
+        if (toAcc) setToAccountId(toAcc.id);
+      } else {
+        // Personal spend defaults to Current (not last-used wallet).
+        const fromQuery = walletByKey(search.get("from"));
+        if (fromQuery) setAccountId(fromQuery.id);
+        else if (current) setAccountId(current.id);
+        if (savings) setToAccountId(savings.id);
+        else if (a[1]) setToAccountId(a[1].id);
+        setTrackOnly(false);
+      }
+      if (active.kind === "PERSONAL") {
+        setRecentCategoryIds(readRecentCategoryIds(active.householdId));
+      } else {
+        setRecentCategoryIds([]);
+      }
+    };
+
     const jobs: Promise<unknown>[] = [
       api<Account[]>(householdPath(active.householdId, "/accounts")),
       api<Category[]>(householdPath(active.householdId, "/categories")),
@@ -151,48 +201,29 @@ function AddForm() {
           (result[0] as Account[]).filter(isCashWallet),
         );
         const c = result[1] as Category[];
-        setAccounts(a);
-        setCategories(c);
-        const current = a.find(isCurrentWallet) ?? a[0];
-        const savings = a.find(isSavingsWallet);
-        const walletByKey = (key: string | null) => {
-          if (key === "savings") return savings ?? null;
-          if (key === "current") return current ?? null;
-          return null;
-        };
-        const fromWanted = walletByKey(search.get("from"));
-        const toWanted = walletByKey(search.get("to"));
-        if (wantTransfer && active.kind === "PERSONAL") {
-          const fromAcc: Account | undefined =
-            fromWanted ?? current ?? a[0];
-          let toAcc: Account | null =
-            toWanted ?? savings ?? a[1] ?? null;
-          if (toAcc && fromAcc && toAcc.id === fromAcc.id) {
-            toAcc = a.find((x) => x.id !== fromAcc.id) ?? null;
-          }
-          if (fromAcc) setAccountId(fromAcc.id);
-          if (toAcc) setToAccountId(toAcc.id);
-        } else {
-          // Personal spend defaults to Current (not last-used wallet).
-          const fromQuery = walletByKey(search.get("from"));
-          if (fromQuery) setAccountId(fromQuery.id);
-          else if (current) setAccountId(current.id);
-          if (savings) setToAccountId(savings.id);
-          else if (a[1]) setToAccountId(a[1].id);
-          setTrackOnly(false);
-        }
-        if (active.kind === "PERSONAL") {
-          setRecentCategoryIds(readRecentCategoryIds(active.householdId));
-        } else {
-          setRecentCategoryIds([]);
-        }
+        applyAccountsAndCategories(a, c, false);
+        void saveAddSnapshot(active.householdId, a, c);
         if (active.kind === "HOUSE") {
           const users = result[2] as Person[];
           setPeople(users);
           if (users[0]) setToUserId(users[0].id);
         }
       })
-      .catch((e) => setError(e.message));
+      .catch(async (e) => {
+        if (!isOfflineNetworkError(e) && !isLikelyOffline()) {
+          setError(e instanceof Error ? e.message : String(e));
+          return;
+        }
+        const snapshot = await loadAddSnapshot(active.householdId);
+        if (!snapshot) {
+          setError(e instanceof Error ? e.message : String(e));
+          return;
+        }
+        const a = sortCashWallets(
+          (snapshot.accounts as Account[]).filter(isCashWallet),
+        );
+        applyAccountsAndCategories(a, snapshot.categories as Category[], true);
+      });
   }, [active?.householdId, active?.kind, active?.role, search]);
 
   const expenseCats = useMemo(
@@ -298,6 +329,35 @@ function AddForm() {
     if (!space) return;
     setBusy(true);
     setError("");
+
+    const finishOfflineSave = () => {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("fb_flash", "savedOffline");
+      }
+      setConfirmOpen(false);
+      router.replace("/");
+    };
+
+    const postOrQueue = async (path: string, body: unknown) => {
+      if (isLikelyOffline()) {
+        await enqueueTransaction(path, body);
+        return "queued" as const;
+      }
+      try {
+        await api(path, {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+        return "sent" as const;
+      } catch (error) {
+        if (isOfflineNetworkError(error)) {
+          await enqueueTransaction(path, body);
+          return "queued" as const;
+        }
+        throw error;
+      }
+    };
+
     try {
       if (transferMode) {
         const value = parseAmount(amount);
@@ -375,63 +435,65 @@ function AddForm() {
         const savings = accounts.find(isSavingsWallet);
         const intoCurrent = parseAmount(currentAmt);
         const intoSavings = parseAmount(savingsAmt);
-        const jobs: Promise<unknown>[] = [];
+        const txPath = householdPath(space.householdId, "/transactions");
+        const payloads: unknown[] = [];
         if (current && intoCurrent > 0) {
-          jobs.push(
-            api(householdPath(space.householdId, "/transactions"), {
-              method: "POST",
-              body: JSON.stringify({
-                type: "INCOME",
-                amount: intoCurrent,
-                accountId: current.id,
-                categoryId,
-                occurredOn,
-                note,
-              }),
-            }),
-          );
+          payloads.push({
+            type: "INCOME",
+            amount: intoCurrent,
+            accountId: current.id,
+            categoryId,
+            occurredOn,
+            note,
+          });
         }
         if (savings && intoSavings > 0) {
-          jobs.push(
-            api(householdPath(space.householdId, "/transactions"), {
-              method: "POST",
-              body: JSON.stringify({
-                type: "INCOME",
-                amount: intoSavings,
-                accountId: savings.id,
-                categoryId,
-                occurredOn,
-                note,
-              }),
-            }),
-          );
+          payloads.push({
+            type: "INCOME",
+            amount: intoSavings,
+            accountId: savings.id,
+            categoryId,
+            occurredOn,
+            note,
+          });
         }
-        if (jobs.length === 0) {
+        if (payloads.length === 0) {
           setError(t("amountHint"));
           setBusy(false);
           return;
         }
-        await Promise.all(jobs);
+        let anyQueued = false;
+        for (const body of payloads) {
+          const result = await postOrQueue(txPath, body);
+          if (result === "queued") anyQueued = true;
+        }
         if (personalBooks && typeof window !== "undefined") {
           pushRecentCategory(space.householdId, categoryId);
         }
+        if (anyQueued) {
+          finishOfflineSave();
+          return;
+        }
       } else {
-        await api(householdPath(space.householdId, "/transactions"), {
-          method: "POST",
-          body: JSON.stringify({
-            type: personalPaid && trackOnly ? "TRACK" : type,
-            amount: parseAmount(amount),
-            ...(personalPaid && trackOnly ? {} : { accountId }),
-            categoryId,
-            occurredOn,
-            note,
-          }),
-        });
+        const txPath = householdPath(space.householdId, "/transactions");
+        const body = {
+          type: personalPaid && trackOnly ? "TRACK" : type,
+          amount: parseAmount(amount),
+          ...(personalPaid && trackOnly ? {} : { accountId }),
+          categoryId,
+          occurredOn,
+          note,
+        };
+        const result = await postOrQueue(txPath, body);
         if (personalBooks && typeof window !== "undefined") {
           pushRecentCategory(space.householdId, categoryId);
           if (!(personalPaid && trackOnly) && accountId) {
             writeLastWalletId(space.householdId, accountId);
           }
+        }
+        if (result === "queued") {
+          finishOfflineSave();
+          return;
         }
       }
       setConfirmOpen(false);
@@ -943,6 +1005,9 @@ function AddForm() {
           />
         </label>
 
+        {usingOfflineData ? (
+          <p className="text-sm text-[var(--muted)]">{t("usingOfflineData")}</p>
+        ) : null}
         {error ? <p className="text-sm text-red-700">{error}</p> : null}
 
         <button

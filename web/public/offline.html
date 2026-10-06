@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#edf4f0" />
+    <title>Fin Vault — Offline</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #edf4f0;
+        --fg: #0f1c17;
+        --muted: #4a6358;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #06090e;
+          --fg: #e8f0ec;
+          --muted: #9bb0a6;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100dvh;
+        display: grid;
+        place-items: center;
+        padding: 1.5rem;
+        font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--fg);
+      }
+      main {
+        max-width: 22rem;
+        text-align: center;
+      }
+      h1 {
+        font-size: 1.35rem;
+        margin: 0 0 0.75rem;
+        font-weight: 700;
+      }
+      p {
+        margin: 0 0 1rem;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+      button {
+        appearance: none;
+        border: 0;
+        border-radius: 0.75rem;
+        padding: 0.7rem 1.1rem;
+        font: inherit;
+        font-weight: 600;
+        background: #0f766e;
+        color: #fff;
+        cursor: pointer;
+      }
+      .ar {
+        margin-top: 1.5rem;
+        padding-top: 1.25rem;
+        border-top: 1px solid color-mix(in srgb, var(--muted) 35%, transparent);
+        direction: rtl;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>You’re offline</h1>
+      <p>
+        Fin Vault can’t reach the network right now. Reconnect, then try again.
+        Expenses saved offline will sync when you’re back online.
+      </p>
+      <button type="button" onclick="location.reload()">Try again</button>
+      <div class="ar">
+        <h1>أنت مش متصل</h1>
+        <p>
+          فين فولت مش قادر يوصل للشبكة دلوقتي. اتصل تاني وجرب. المصاريف
+          المحفوظة بدون نت هتتزامن لما ترجع أونلاين.
+        </p>
+      </div>
+    </main>
+  </body>
+</html>
