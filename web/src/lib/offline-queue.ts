@@ -1,9 +1,12 @@
 import { api, AUTH_REQUIRED } from "./api";
+import type { Space } from "./space";
 
 const DB_NAME = "fin-vault-offline";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const QUEUE_STORE = "tx-queue";
 const SNAPSHOT_STORE = "add-snapshots";
+const HOME_STORE = "home-snapshots";
+const SESSION_KEY = "fb_me_cache";
 
 export const OFFLINE_QUEUE_CHANGED = "fb-offline-queue-changed";
 
@@ -18,6 +21,28 @@ export type AddSnapshot = {
   householdId: string;
   accounts: unknown[];
   categories: unknown[];
+  savedAt: number;
+};
+
+export type HomeSnapshot = {
+  householdId: string;
+  kind: "PERSONAL" | "HOUSE";
+  accounts: unknown[];
+  txs: unknown[];
+  summary: unknown | null;
+  savedAt: number;
+};
+
+export type SessionCache = {
+  id: string;
+  name: string;
+  nameAr?: string;
+  preferredCurrency?: string;
+  theme?: string;
+  budgetMonthStartDay?: number;
+  spaces: Space[];
+  space: Space | null;
+  personalOnly?: boolean;
   savedAt: number;
 };
 
@@ -36,6 +61,9 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(SNAPSHOT_STORE)) {
         db.createObjectStore(SNAPSHOT_STORE, { keyPath: "householdId" });
+      }
+      if (!db.objectStoreNames.contains(HOME_STORE)) {
+        db.createObjectStore(HOME_STORE, { keyPath: "householdId" });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -78,6 +106,29 @@ export function isOfflineNetworkError(error: unknown): boolean {
 
 export function isLikelyOffline(): boolean {
   return typeof navigator !== "undefined" && navigator.onLine === false;
+}
+
+export function saveSessionCache(me: Omit<SessionCache, "savedAt">): void {
+  if (typeof window === "undefined") return;
+  try {
+    const payload: SessionCache = { ...me, savedAt: Date.now() };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(payload));
+  } catch {
+    /* quota / private mode */
+  }
+}
+
+export function loadSessionCache(): SessionCache | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as SessionCache;
+    if (!parsed?.id || !Array.isArray(parsed.spaces)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
 }
 
 export async function enqueueTransaction(
@@ -176,5 +227,24 @@ export async function loadAddSnapshot(
     "readonly",
     (store) => store.get(householdId),
   )) as AddSnapshot | undefined;
+  return snapshot ?? null;
+}
+
+export async function saveHomeSnapshot(
+  snapshot: Omit<HomeSnapshot, "savedAt">,
+): Promise<void> {
+  await storeTx(HOME_STORE, "readwrite", (store) =>
+    store.put({ ...snapshot, savedAt: Date.now() }),
+  );
+}
+
+export async function loadHomeSnapshot(
+  householdId: string,
+): Promise<HomeSnapshot | null> {
+  const snapshot = (await storeTx<HomeSnapshot>(
+    HOME_STORE,
+    "readonly",
+    (store) => store.get(householdId),
+  )) as HomeSnapshot | undefined;
   return snapshot ?? null;
 }

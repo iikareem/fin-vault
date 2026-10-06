@@ -27,6 +27,12 @@ import {
   type MonthSoftLimitStatus,
 } from "@/components/MonthSoftLimitCard";
 import { MoneyToolsHomeCard } from "@/components/MoneyToolsHomeCard";
+import {
+  isLikelyOffline,
+  isOfflineNetworkError,
+  loadHomeSnapshot,
+  saveHomeSnapshot,
+} from "@/lib/offline-queue";
 
 type Summary = {
   totalMoney: number;
@@ -141,6 +147,7 @@ export default function HomePage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState("");
   const [error, setError] = useState("");
   const [flash, setFlash] = useState("");
+  const [offlineMode, setOfflineMode] = useState(false);
   const [busyEdit, setBusyEdit] = useState(false);
   const [personalMoneyVisible, setPersonalMoneyVisible] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -182,6 +189,7 @@ export default function HomePage() {
   useEffect(() => {
     if (!active) return;
     setError("");
+    setOfflineMode(false);
     const month = cal.monthKey;
     const jobs: Promise<unknown>[] = [
       api<Summary>(householdPath(active.householdId, "/analytics/summary")),
@@ -206,15 +214,24 @@ export default function HomePage() {
     }
     Promise.all(jobs)
       .then((result) => {
-        setSummary(result[0] as Summary);
-        setAccounts(result[1] as Account[]);
-        setTxs(
-          sortByOccurredOnDesc(
-            (result[2] as Tx[]).filter(
-              (tx) => !tx.account || isCashAccount(tx.account),
-            ),
-          ).slice(0, 8),
-        );
+        const nextSummary = result[0] as Summary;
+        const nextAccounts = result[1] as Account[];
+        const nextTxs = sortByOccurredOnDesc(
+          (result[2] as Tx[]).filter(
+            (tx) => !tx.account || isCashAccount(tx.account),
+          ),
+        ).slice(0, 8);
+        setSummary(nextSummary);
+        setAccounts(nextAccounts);
+        setTxs(nextTxs);
+        setOfflineMode(false);
+        void saveHomeSnapshot({
+          householdId: active.householdId,
+          kind: active.kind,
+          accounts: nextAccounts,
+          txs: nextTxs,
+          summary: nextSummary,
+        });
         if (active.kind === "HOUSE") {
           setCharity(result[3] as CharityMonth);
           setClaims(sortByOccurredOnDesc(result[4] as Claim[]));
@@ -224,7 +241,20 @@ export default function HomePage() {
           setSubs(result[3] as SubsHome);
         }
       })
-      .catch((e) => setError(e.message));
+      .catch(async (e) => {
+        if (isOfflineNetworkError(e) || isLikelyOffline()) {
+          setOfflineMode(true);
+          setError("");
+          const snap = await loadHomeSnapshot(active.householdId);
+          if (snap) {
+            setAccounts((snap.accounts as Account[]) ?? []);
+            setTxs((snap.txs as Tx[]) ?? []);
+            setSummary((snap.summary as Summary) ?? null);
+          }
+          return;
+        }
+        setError(e instanceof Error ? e.message : String(e));
+      });
   }, [active?.householdId, active?.kind, cal.monthKey]);
 
   useEffect(() => {
@@ -469,6 +499,33 @@ export default function HomePage() {
       ) : null}
       {flash ? <p className="flash mt-3">{flash}</p> : null}
       {error ? <p className="mt-2 text-red-700">{error}</p> : null}
+      {offlineMode ? (
+        <section className="mt-3 rounded-[1.75rem] border border-[color-mix(in_srgb,var(--foreground)_12%,transparent)] bg-[color-mix(in_srgb,var(--foreground)_5%,transparent)] p-4">
+          <p className="text-base font-semibold text-[var(--foreground)]">
+            {t("offlineHomeTitle")}
+          </p>
+          <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">
+            {t("offlineHomeBody")}
+          </p>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <Link
+              href="/add?type=expense"
+              className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-emerald-800 px-3 text-sm font-semibold text-white"
+            >
+              {t("homeSpend")}
+            </Link>
+            <Link
+              href="/add?type=income"
+              className="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--foreground)_10%,transparent)] px-3 text-sm font-semibold text-[var(--foreground)]"
+            >
+              {t("homeIncome")}
+            </Link>
+          </div>
+          <p className="mt-2 text-xs text-[var(--muted)]">
+            {t("offlineHomeLastKnown")}
+          </p>
+        </section>
+      ) : null}
 
       <section
         className={`mt-3 rounded-[1.75rem] p-5 shadow-lg ${
@@ -744,7 +801,7 @@ export default function HomePage() {
             householdId={active.householdId}
             currency={currency}
             moneyVisible={moneyVisible}
-            loading={!summary}
+            loading={!summary && !offlineMode}
             status={summary?.softLimit ?? null}
             onUpdated={(next) =>
               setSummary((prev) => (prev ? { ...prev, softLimit: next } : prev))

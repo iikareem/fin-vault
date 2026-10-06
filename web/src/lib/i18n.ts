@@ -168,6 +168,16 @@ const ar = {
   offlinePageTitle: "أنت مش متصل",
   offlinePageBody:
     "فين فولت مش قادر يوصل للشبكة دلوقتي. اتصل تاني وجرب. المصاريف المحفوظة بدون نت هتتزامن لما ترجع أونلاين.",
+  offlineModeHint: "أنت مش متصل — تقدر تسجّل مصروف دلوقتي وهيتزامن بعدين",
+  offlineModePendingOne:
+    "أنت مش متصل — عملية واحدةا مستنية تتزامن. تقدر تضيف كمان",
+  offlineModePending:
+    "أنت مش متصل — {count} عمليات مستنية تتزامن. تقدر تضيف كمان",
+  offlineAddExpense: "سجّل مصروف",
+  offlineHomeTitle: "شغال بدون نت",
+  offlineHomeBody:
+    "تقدر تسجّل صرف أو دخل دلوقتي. لما ترجع أونلاين، هيتزامن لوحده.",
+  offlineHomeLastKnown: "الأرقام تحت من آخر مرة كنت أونلاين (ممكن تكون قديمة).",
   adminOnlyAdd: "بس المسؤول يضيف مشتريات البيت. من الرئيسية حوّل لفلوسك.",
   eachDay: "كل يوم",
   nothingThisDay: "مفيش حاجة متسجلة اليوم ده.",
@@ -1169,6 +1179,17 @@ const en = {
   offlinePageTitle: "You’re offline",
   offlinePageBody:
     "Fin Vault can’t reach the network right now. Reconnect, then try again. Expenses saved offline will sync when you’re back online.",
+  offlineModeHint: "You’re offline — you can still log an expense; it will sync later",
+  offlineModePendingOne:
+    "You’re offline — 1 entry waiting to sync. You can add more",
+  offlineModePending:
+    "You’re offline — {count} entries waiting to sync. You can add more",
+  offlineAddExpense: "Add expense",
+  offlineHomeTitle: "Working offline",
+  offlineHomeBody:
+    "You can log spend or income now. They’ll sync automatically when you’re back online.",
+  offlineHomeLastKnown:
+    "Numbers below are from your last online visit (may be outdated).",
   adminOnlyAdd:
     "Only the admin can add house purchases. Switch to your own money on Home.",
   eachDay: "Each day",

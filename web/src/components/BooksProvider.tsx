@@ -14,6 +14,12 @@ import { AUTH_REQUIRED, api } from "@/lib/api";
 import { HOUSE_BOOKS_ENABLED } from "@/lib/features";
 import { personLabel } from "@/lib/i18n";
 import {
+  isOfflineNetworkError,
+  isLikelyOffline,
+  loadSessionCache,
+  saveSessionCache,
+} from "@/lib/offline-queue";
+import {
   isPersonalOnly,
   loadSpace,
   setActiveSpace,
@@ -170,8 +176,20 @@ export function BooksProvider({ children }: { children: ReactNode }) {
   );
 
   const refreshSpaces = useCallback(async () => {
-    const me = await loadSpace();
-    applyMe(me);
+    try {
+      const me = await loadSpace();
+      applyMe(me);
+      saveSessionCache(me);
+    } catch (err) {
+      if (isOfflineNetworkError(err) || isLikelyOffline()) {
+        const cached = loadSessionCache();
+        if (cached) {
+          applyMe(cached);
+          return;
+        }
+      }
+      throw err;
+    }
   }, [applyMe]);
 
   useEffect(() => {
@@ -195,11 +213,20 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       .then((me) => {
         if (cancelled) return;
         applyMe(me);
+        saveSessionCache(me);
       })
       .catch((err) => {
         if (cancelled) return;
         if (err instanceof Error && err.message === AUTH_REQUIRED) {
           router.replace("/login");
+          return;
+        }
+        if (isOfflineNetworkError(err) || isLikelyOffline()) {
+          const cached = loadSessionCache();
+          if (cached) {
+            applyMe(cached);
+            return;
+          }
         }
       })
       .finally(() => {
