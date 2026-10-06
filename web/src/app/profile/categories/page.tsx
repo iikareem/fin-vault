@@ -432,7 +432,7 @@ export default function MyCategoriesPage() {
         <div>
           <p className="mb-2 text-sm font-medium">{t("catsColor")}</p>
           <div className="flex flex-wrap gap-2">
-            {ACCENT_COLORS.map((c) => (
+            {ACCENT_COLORS.map((c, index) => (
               <button
                 key={c}
                 type="button"
@@ -443,7 +443,7 @@ export default function MyCategoriesPage() {
                     : "ring-transparent"
                 }`}
                 style={{ backgroundColor: c }}
-                aria-label={c}
+                aria-label={`${t("catsColor")} ${index + 1}`}
               />
             ))}
           </div>
@@ -642,6 +642,7 @@ export default function MyCategoriesPage() {
                     </button>
                     <button
                       type="button"
+                      aria-label={t("catsAddSub")}
                       onClick={() => {
                         if (creatingUnder === p.id) {
                           closeEditor();

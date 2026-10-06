@@ -197,19 +197,19 @@ export class CategoriesService {
     if (kind === 'PERSONAL') {
       await this.syncPersonal(householdId);
     }
-    await this.fillMissingNameAr(householdId);
+    await this.syncBuiltInNameAr(householdId);
     this.seedSyncedAt.set(householdId, Date.now());
   }
 
-  /** Backfill Arabic labels for known English category names. */
-  private async fillMissingNameAr(householdId: string) {
+  /** Keep untouched built-ins aligned with the current Arabic taxonomy. */
+  private async syncBuiltInNameAr(householdId: string) {
     const cats = await this.prisma.category.findMany({
-      where: { householdId, nameAr: '' },
-      select: { id: true, name: true },
+      where: { householdId, isUserManaged: false },
+      select: { id: true, name: true, nameAr: true },
     });
     for (const cat of cats) {
       const ar = nameArFor(cat.name);
-      if (!ar) continue;
+      if (!ar || ar === cat.nameAr) continue;
       await this.prisma.category.update({
         where: { id: cat.id },
         data: { nameAr: ar },
@@ -522,7 +522,7 @@ export class CategoriesService {
         color: def.color,
         sortOrder: def.sortOrder,
         parentId: def.parentId,
-        nameAr: existing.nameAr || nameArFor(def.name),
+        nameAr: nameArFor(def.name) || existing.nameAr,
       },
     });
   }
@@ -531,7 +531,7 @@ export class CategoriesService {
     // Always fully sync when the user opens category management.
     this.seedSyncedAt.delete(householdId);
     await this.syncPersonal(householdId);
-    await this.fillMissingNameAr(householdId);
+    await this.syncBuiltInNameAr(householdId);
     this.seedSyncedAt.set(householdId, Date.now());
     const cats = await this.prisma.category.findMany({
       where: { householdId, hidden: false },

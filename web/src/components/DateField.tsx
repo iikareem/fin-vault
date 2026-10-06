@@ -85,7 +85,7 @@ export function DateField({
             if (e.target.value) onChange(e.target.value);
           }}
           className="absolute inset-0 z-10 cursor-pointer opacity-0"
-          aria-label={label || (type === "month" ? "Month" : "Date")}
+          aria-label={label || (type === "month" ? t("periodMonth") : t("day"))}
         />
       </span>
     </label>

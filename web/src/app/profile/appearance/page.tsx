@@ -45,7 +45,7 @@ export default function AppearanceSettingsPage() {
       await setPreferences({ theme: next });
       flashSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed");
+      setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
       setThemeBusy(false);
     }

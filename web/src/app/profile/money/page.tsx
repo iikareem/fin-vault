@@ -62,7 +62,7 @@ export default function MoneySettingsPage() {
       await setPreferences({ preferredCurrency: next });
       flashSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed");
+      setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
       setCurrencyBusy(false);
     }
@@ -95,7 +95,7 @@ export default function MoneySettingsPage() {
       flashSaved();
       setPaydayConfirming(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed");
+      setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
       setPaydayBusy(false);
     }

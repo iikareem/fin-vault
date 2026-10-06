@@ -7,6 +7,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOutsideLoanDto } from './dto/create-outside-loan.dto';
 import { CollectOutsideLoanDto } from './dto/collect-outside-loan.dto';
+import { UpdateOutsideLoanDto } from './dto/update-outside-loan.dto';
 import { nameArFor } from '../categories/category-labels';
 
 const CATS = {
@@ -248,6 +249,100 @@ export class OutsideLoansService {
       });
     });
     return this.shape(loan);
+  }
+
+  private lendTxNote(
+    personName: string,
+    direction: 'LEND' | 'BORROW',
+    note: string,
+  ) {
+    const trimmed = note.trim();
+    if (trimmed) return `${personName} · ${trimmed}`;
+    return direction === 'LEND'
+      ? `Lent to ${personName}`
+      : `Borrowed from ${personName}`;
+  }
+
+  async update(
+    householdId: string,
+    userId: string,
+    loanId: string,
+    dto: UpdateOutsideLoanDto,
+  ) {
+    const existing = await this.prisma.outsideLoan.findFirst({
+      where: { id: loanId, householdId, userId },
+      include: { collections: true },
+    });
+    if (!existing) throw new NotFoundException('Loan not found');
+    if (existing.collections.length > 0) {
+      throw new BadRequestException('This loan already has repayments');
+    }
+
+    const personName =
+      dto.personName !== undefined ? dto.personName.trim() : existing.personName;
+    if (!personName) throw new BadRequestException('Enter a name');
+
+    return this.prisma.$transaction(async (tx) => {
+      const data: Prisma.OutsideLoanUpdateInput = {};
+      if (dto.personName !== undefined) data.personName = personName;
+      if (dto.amount !== undefined) {
+        data.originalAmount = new Prisma.Decimal(dto.amount);
+      }
+      if (dto.note !== undefined) data.note = dto.note.trim();
+      if (dto.occurredOn) data.occurredOn = new Date(dto.occurredOn);
+
+      await tx.outsideLoan.update({ where: { id: loanId }, data });
+
+      if (existing.lendTxId) {
+        const amount =
+          dto.amount !== undefined
+            ? dto.amount
+            : Number(existing.originalAmount);
+        const occurredOn = dto.occurredOn ?? existing.occurredOn;
+        const note =
+          dto.note !== undefined ? dto.note : existing.note;
+        await tx.transaction.update({
+          where: { id: existing.lendTxId },
+          data: {
+            amount: new Prisma.Decimal(amount),
+            occurredOn: new Date(occurredOn),
+            note: this.lendTxNote(
+              personName,
+              existing.direction,
+              note,
+            ),
+          },
+        });
+      }
+
+      const updated = await tx.outsideLoan.findUniqueOrThrow({
+        where: { id: loanId },
+        include: {
+          account: { select: { id: true, name: true } },
+          collections: { orderBy: { occurredOn: 'desc' } },
+        },
+      });
+      return this.shape(updated);
+    });
+  }
+
+  async remove(householdId: string, userId: string, loanId: string) {
+    const existing = await this.prisma.outsideLoan.findFirst({
+      where: { id: loanId, householdId, userId },
+      include: { collections: true },
+    });
+    if (!existing) throw new NotFoundException('Loan not found');
+    if (existing.collections.length > 0) {
+      throw new BadRequestException('This loan already has repayments');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.outsideLoan.delete({ where: { id: loanId } });
+      if (existing.lendTxId) {
+        await tx.transaction.delete({ where: { id: existing.lendTxId } });
+      }
+    });
+    return { ok: true };
   }
 
   async collect(

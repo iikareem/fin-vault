@@ -12,7 +12,13 @@ import { householdPath } from "@/lib/space";
 import { Money } from "@/components/Money";
 import { ItemDate } from "@/components/ItemDate";
 import { DateField } from "@/components/DateField";
+import { BottomSheet } from "@/components/BottomSheet";
 import { sortByOccurredOnDesc } from "@/lib/calendar";
+
+function loanDay(value?: string) {
+  if (!value) return todayISO();
+  return value.slice(0, 10);
+}
 
 type Person = { id: string; name: string; nameAr?: string | null };
 type Category = { id: string; name: string; nameAr?: string | null; kind: string };
@@ -50,10 +56,12 @@ export default function BetweenPage() {
   const [occurredOn, setOccurredOn] = useState(todayISO());
   const [note, setNote] = useState("");
   const [payAmount, setPayAmount] = useState<Record<string, string>>({});
-  const [editId, setEditId] = useState("");
+  const [editingLoan, setEditingLoan] = useState<Loan | null>(null);
+  const [editCategoryId, setEditCategoryId] = useState("");
   const [editAmount, setEditAmount] = useState("");
+  const [editOccurredOn, setEditOccurredOn] = useState(todayISO());
   const [editNote, setEditNote] = useState("");
-  const [confirmDeleteId, setConfirmDeleteId] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -140,19 +148,37 @@ export default function BetweenPage() {
     return loan.fromUserId === userId || loan.toUserId === userId;
   }
 
-  async function saveLoanEdit(loanId: string) {
-    if (!houseId) return;
+  function openLoanEdit(loan: Loan) {
+    setEditingLoan(loan);
+    setEditCategoryId(loan.category.id);
+    setEditAmount(String(loan.originalAmount));
+    setEditOccurredOn(loanDay(loan.occurredOn));
+    setEditNote(loan.note);
+    setDeleteConfirm(false);
+    setError("");
+  }
+
+  function closeLoanEdit() {
+    if (busy) return;
+    setEditingLoan(null);
+    setDeleteConfirm(false);
+  }
+
+  async function saveLoanEdit() {
+    if (!houseId || !editingLoan) return;
     setBusy(true);
     setError("");
     try {
-      await api(householdPath(houseId, `/loans/${loanId}`), {
+      await api(householdPath(houseId, `/loans/${editingLoan.id}`), {
         method: "PATCH",
         body: JSON.stringify({
           amount: parseAmount(editAmount),
+          categoryId: editCategoryId,
+          occurredOn: editOccurredOn,
           note: editNote,
         }),
       });
-      setEditId("");
+      setEditingLoan(null);
       await refresh(houseId);
     } catch {
       setError(t("couldNotSave"));
@@ -161,16 +187,16 @@ export default function BetweenPage() {
     }
   }
 
-  async function deleteLoan(loanId: string) {
-    if (!houseId) return;
+  async function deleteLoan() {
+    if (!houseId || !editingLoan) return;
     setBusy(true);
     setError("");
     try {
-      await api(householdPath(houseId, `/loans/${loanId}`), {
+      await api(householdPath(houseId, `/loans/${editingLoan.id}`), {
         method: "DELETE",
       });
-      setConfirmDeleteId("");
-      setEditId("");
+      setEditingLoan(null);
+      setDeleteConfirm(false);
       await refresh(houseId);
     } catch {
       setError(t("couldNotSave"));
@@ -187,82 +213,56 @@ export default function BetweenPage() {
     const other = asDebtor ? loan.fromUser : loan.toUser;
     const manage = canManageLoan(loan);
     return (
-      <li key={loan.id} className="rounded-2xl bg-white px-4 py-3 shadow-sm">
-        <div className="money-row">
-          <span className="font-semibold" dir="auto">
-            {personLabel(other, locale)}
-          </span>
-          <span className="font-semibold">
-            <Money
-              amount={loan.remaining}
-              currency={currency}
+      <li key={loan.id} className="surface rounded-[1.75rem] px-4 py-3.5">
+        <div className="flex items-start gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="money-row">
+              <span className="font-semibold" dir="auto">
+                {personLabel(other, locale)}
+              </span>
+              <span className="font-semibold tabular-nums">
+                <Money
+                  amount={loan.remaining}
+                  currency={currency}
+                  locale={locale}
+                />
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-stone-500">
+              {categoryLabel(loan.category, locale, t)} · {t("remaining")} ·{" "}
+              {t("ofOriginal", {
+                amount: money(loan.originalAmount, currency, locale),
+              })}
+            </p>
+            {loan.note ? (
+              <p className="mt-1 text-sm text-stone-600" dir="auto">
+                {loan.note}
+              </p>
+            ) : null}
+            <ItemDate
+              value={loan.occurredOn}
               locale={locale}
+              className="mt-1"
             />
-          </span>
+          </div>
+          {manage ? (
+            <button
+              type="button"
+              onClick={() => openLoanEdit(loan)}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--panel-soft)] text-lg ring-1 ring-[var(--input-border)] transition active:scale-95"
+              aria-label={t("edit")}
+            >
+              ✏️
+            </button>
+          ) : loan.repaid > 0.001 ? (
+            <span
+              className="shrink-0 rounded-full bg-stone-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-stone-500"
+              title={t("loanEditLocked")}
+            >
+              🔒
+            </span>
+          ) : null}
         </div>
-        <p className="text-sm text-stone-500">
-          {categoryLabel(loan.category, locale, t)} · {t("remaining")} ·{" "}
-          {t("ofOriginal", {
-            amount: money(loan.originalAmount, currency, locale),
-          })}
-          {loan.note ? ` · ${loan.note}` : ""}
-        </p>
-        <ItemDate value={loan.occurredOn} locale={locale} className="mt-1" />
-        {manage ? (
-          <div className="mt-2 flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setEditId(loan.id);
-                setConfirmDeleteId("");
-                setEditAmount(String(loan.originalAmount));
-                setEditNote(loan.note);
-              }}
-              className="rounded-xl bg-stone-100 px-3 py-2 text-sm font-semibold text-stone-800"
-            >
-              {t("edit")}
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() =>
-                confirmDeleteId === loan.id
-                  ? deleteLoan(loan.id)
-                  : setConfirmDeleteId(loan.id)
-              }
-              className="rounded-xl bg-stone-100 px-3 py-2 text-sm font-semibold text-red-800"
-            >
-              {confirmDeleteId === loan.id
-                ? t("confirmDelete")
-                : t("deleteItem")}
-            </button>
-          </div>
-        ) : null}
-        {editId === loan.id ? (
-          <div className="mt-3 space-y-2">
-            <input
-              inputMode="decimal"
-              dir="ltr"
-              className="amount-input w-full rounded-xl border border-stone-300 px-3 py-2 text-xl"
-              value={editAmount}
-              onChange={(e) => setEditAmount(e.target.value)}
-            />
-            <input
-              className="w-full rounded-xl border border-stone-300 px-3 py-2"
-              value={editNote}
-              onChange={(e) => setEditNote(e.target.value)}
-              placeholder={t("noteOptional")}
-            />
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => saveLoanEdit(loan.id)}
-              className="w-full rounded-xl bg-stone-900 px-3 py-2 font-semibold text-white disabled:opacity-60"
-            >
-              {busy ? t("saving") : t("save")}
-            </button>
-          </div>
-        ) : null}
         {asDebtor && loan.remaining > 0.001 ? (
           <div className="mt-3 space-y-1">
             <p className="text-sm text-stone-500">{t("payBackHint")}</p>
@@ -484,6 +484,139 @@ export default function BetweenPage() {
         <span className="text-lg font-semibold">🕒 {t("betweenHistoryLink")}</span>
         <span className="mt-1 text-sm text-stone-500">{t("betweenHistoryHint")}</span>
       </Link>
+
+      <BottomSheet
+        open={editingLoan !== null}
+        onClose={closeLoanEdit}
+        lockDismiss={busy}
+        title={t("loanEditTitle")}
+        hint={
+          editingLoan && editingLoan.repaid > 0.001
+            ? t("loanEditLocked")
+            : t("loanEditHint")
+        }
+        footer={
+          editingLoan && editingLoan.repaid <= 0.001 ? (
+            <div className="space-y-2">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void saveLoanEdit()}
+                className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-stone-900 text-base font-semibold text-white disabled:opacity-60"
+              >
+                {busy ? t("saving") : t("save")}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  deleteConfirm ? void deleteLoan() : setDeleteConfirm(true)
+                }
+                className="flex min-h-11 w-full items-center justify-center rounded-2xl bg-red-50 text-sm font-semibold text-red-800 ring-1 ring-red-200 disabled:opacity-60 dark:bg-red-950/30 dark:ring-red-900"
+              >
+                {deleteConfirm ? t("confirmDelete") : t("deleteItem")}
+              </button>
+              {deleteConfirm ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setDeleteConfirm(false)}
+                  className="w-full py-2 text-sm font-medium text-stone-500"
+                >
+                  {t("goalsCancel")}
+                </button>
+              ) : null}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={closeLoanEdit}
+              className="flex min-h-11 w-full items-center justify-center rounded-2xl bg-stone-200 text-sm font-semibold text-stone-800"
+            >
+              {t("goalsCancel")}
+            </button>
+          )
+        }
+      >
+        {editingLoan ? (
+          <>
+            <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-3 text-center">
+              <p className="text-xs font-medium text-[var(--muted)]">
+                {t("remaining")}
+              </p>
+              <p className="mt-1 text-2xl font-bold tabular-nums">
+                <Money
+                  amount={editingLoan.remaining}
+                  currency={currency}
+                  locale={locale}
+                />
+              </p>
+              <p className="mt-1 text-xs text-stone-500" dir="auto">
+                {personLabel(
+                  editingLoan.fromUserId === userId
+                    ? editingLoan.toUser
+                    : editingLoan.fromUser,
+                  locale,
+                )}
+              </p>
+            </div>
+            {editingLoan.repaid > 0.001 ? (
+              <p className="text-sm text-amber-800">{t("loanEditLocked")}</p>
+            ) : (
+              <>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium">
+                    {t("forWhat")}
+                  </span>
+                  <select
+                    className="field text-base"
+                    value={editCategoryId}
+                    onChange={(e) => setEditCategoryId(e.target.value)}
+                  >
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {categoryLabel(c, locale, t)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium">
+                    {t("amount")}
+                  </span>
+                  <input
+                    inputMode="decimal"
+                    dir="ltr"
+                    className="field amount-input text-2xl"
+                    value={editAmount}
+                    onChange={(e) => setEditAmount(e.target.value)}
+                  />
+                </label>
+                <div>
+                  <span className="mb-1 block text-sm font-medium">
+                    {t("day")}
+                  </span>
+                  <DateField
+                    value={editOccurredOn}
+                    onChange={setEditOccurredOn}
+                  />
+                </div>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium">
+                    {t("noteOptional")}
+                  </span>
+                  <input
+                    className="field text-base"
+                    value={editNote}
+                    onChange={(e) => setEditNote(e.target.value)}
+                  />
+                </label>
+              </>
+            )}
+          </>
+        ) : null}
+      </BottomSheet>
+
       <BottomNav />
     </PageShell>
   );

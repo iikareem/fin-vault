@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { OutsideLoansService } from './outside-loans.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { HouseholdGuard } from '../households/household.guard';
@@ -9,6 +18,7 @@ import { AuthUser } from '../auth/auth-user';
 import { MembershipContext } from '../households/membership-context';
 import { CreateOutsideLoanDto } from './dto/create-outside-loan.dto';
 import { CollectOutsideLoanDto } from './dto/collect-outside-loan.dto';
+import { UpdateOutsideLoanDto } from './dto/update-outside-loan.dto';
 
 @Controller('households/:householdId/outside-loans')
 @UseGuards(JwtAuthGuard, HouseholdGuard, PersonalKindGuard)
@@ -30,6 +40,25 @@ export class OutsideLoansController {
     @Body() dto: CreateOutsideLoanDto,
   ) {
     return this.loans.create(membership.householdId, user.id, dto);
+  }
+
+  @Patch(':id')
+  update(
+    @CurrentMembership() membership: MembershipContext,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateOutsideLoanDto,
+  ) {
+    return this.loans.update(membership.householdId, user.id, id, dto);
+  }
+
+  @Delete(':id')
+  remove(
+    @CurrentMembership() membership: MembershipContext,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+  ) {
+    return this.loans.remove(membership.householdId, user.id, id);
   }
 
   @Post(':id/collect')

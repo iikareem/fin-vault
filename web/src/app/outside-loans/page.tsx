@@ -11,6 +11,12 @@ import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 import { ItemDate } from "@/components/ItemDate";
 import { DateField } from "@/components/DateField";
+import { BottomSheet } from "@/components/BottomSheet";
+
+function loanDay(value?: string) {
+  if (!value) return todayISO();
+  return value.slice(0, 10);
+}
 import {
   isCashWallet,
   isCurrentWallet,
@@ -79,6 +85,12 @@ export default function OutsideLoansPage() {
   const [collectTarget, setCollectTarget] = useState<
     Record<string, WalletTarget>
   >({});
+  const [editingLoan, setEditingLoan] = useState<Loan | null>(null);
+  const [editPersonName, setEditPersonName] = useState("");
+  const [editAmount, setEditAmount] = useState("");
+  const [editOccurredOn, setEditOccurredOn] = useState(todayISO());
+  const [editNote, setEditNote] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -134,7 +146,71 @@ export default function OutsideLoansPage() {
       );
       await load(hid);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed");
+      setError(err instanceof Error ? err.message : t("couldNotSave"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function canEditLoan(loan: Loan) {
+    return loan.collected < 0.001;
+  }
+
+  function openLoanEdit(loan: Loan) {
+    setEditingLoan(loan);
+    setEditPersonName(loan.personName);
+    setEditAmount(String(loan.originalAmount));
+    setEditOccurredOn(loanDay(loan.occurredOn));
+    setEditNote(loan.note);
+    setDeleteConfirm(false);
+    setError("");
+    setMessage("");
+  }
+
+  function closeLoanEdit() {
+    if (busy) return;
+    setEditingLoan(null);
+    setDeleteConfirm(false);
+  }
+
+  async function saveLoanEdit() {
+    if (!hid || !editingLoan) return;
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      await api(householdPath(hid, `/outside-loans/${editingLoan.id}`), {
+        method: "PATCH",
+        body: JSON.stringify({
+          personName: editPersonName.trim(),
+          amount: parseAmount(editAmount),
+          occurredOn: editOccurredOn,
+          note: editNote.trim() || undefined,
+        }),
+      });
+      setEditingLoan(null);
+      setMessage(t("loanEditSaved"));
+      await load(hid);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("couldNotSave"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteLoanEdit() {
+    if (!hid || !editingLoan) return;
+    setBusy(true);
+    setError("");
+    try {
+      await api(householdPath(hid, `/outside-loans/${editingLoan.id}`), {
+        method: "DELETE",
+      });
+      setEditingLoan(null);
+      setDeleteConfirm(false);
+      await load(hid);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
       setBusy(false);
     }
@@ -167,7 +243,7 @@ export default function OutsideLoansPage() {
       );
       await load(hid);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed");
+      setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
       setBusy(false);
     }
@@ -366,10 +442,11 @@ export default function OutsideLoansPage() {
                   ) / 10
                 : 0;
             const target = collectTarget[loan.id] || "CURRENT";
+            const editable = canEditLoan(loan);
             return (
               <article key={loan.id} className="surface rounded-[1.75rem] p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-xl font-bold" dir="auto">
                       {loan.personName}
                     </p>
@@ -388,17 +465,36 @@ export default function OutsideLoansPage() {
                       </p>
                     ) : null}
                   </div>
-                  <div className="shrink-0 text-left">
-                    <p className="font-semibold tabular-nums">
-                      <Money
-                        amount={loan.remaining}
-                        currency={currency}
-                        locale={locale}
-                      />
-                    </p>
-                    <p className="text-sm text-stone-500">
-                      {t("outsideRemaining")}
-                    </p>
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <div className="text-left">
+                      <p className="font-semibold tabular-nums">
+                        <Money
+                          amount={loan.remaining}
+                          currency={currency}
+                          locale={locale}
+                        />
+                      </p>
+                      <p className="text-sm text-stone-500">
+                        {t("outsideRemaining")}
+                      </p>
+                    </div>
+                    {editable ? (
+                      <button
+                        type="button"
+                        onClick={() => openLoanEdit(loan)}
+                        className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--panel-soft)] text-lg ring-1 ring-[var(--input-border)] transition active:scale-95"
+                        aria-label={t("edit")}
+                      >
+                        ✏️
+                      </button>
+                    ) : (
+                      <span
+                        className="rounded-full bg-stone-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-stone-500"
+                        title={t("outsideEditLocked")}
+                      >
+                        🔒
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -528,6 +624,129 @@ export default function OutsideLoansPage() {
           })
         )}
       </section>
+
+      <BottomSheet
+        open={editingLoan !== null}
+        onClose={closeLoanEdit}
+        lockDismiss={busy}
+        title={t("outsideEditTitle")}
+        hint={
+          editingLoan && !canEditLoan(editingLoan)
+            ? t("outsideEditLocked")
+            : t("outsideEditHint")
+        }
+        footer={
+          editingLoan && canEditLoan(editingLoan) ? (
+            <div className="space-y-2">
+              <button
+                type="button"
+                disabled={busy || !editPersonName.trim()}
+                onClick={() => void saveLoanEdit()}
+                className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-stone-900 text-base font-semibold text-white disabled:opacity-60"
+              >
+                {busy ? t("saving") : t("save")}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  deleteConfirm ? void deleteLoanEdit() : setDeleteConfirm(true)
+                }
+                className="flex min-h-11 w-full items-center justify-center rounded-2xl bg-red-50 text-sm font-semibold text-red-800 ring-1 ring-red-200 disabled:opacity-60 dark:bg-red-950/30 dark:ring-red-900"
+              >
+                {deleteConfirm ? t("confirmDelete") : t("deleteItem")}
+              </button>
+              {deleteConfirm ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => setDeleteConfirm(false)}
+                  className="w-full py-2 text-sm font-medium text-stone-500"
+                >
+                  {t("goalsCancel")}
+                </button>
+              ) : null}
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={closeLoanEdit}
+              className="flex min-h-11 w-full items-center justify-center rounded-2xl bg-stone-200 text-sm font-semibold text-stone-800"
+            >
+              {t("goalsCancel")}
+            </button>
+          )
+        }
+      >
+        {editingLoan ? (
+          <>
+            <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-3">
+              <p className="text-center text-xs font-medium text-[var(--muted)]">
+                {editingLoan.direction === "BORROW"
+                  ? t("outsideDirectionBorrow")
+                  : t("outsideDirectionLend")}
+              </p>
+              <p className="mt-2 text-center text-2xl font-bold tabular-nums">
+                <Money
+                  amount={editingLoan.remaining}
+                  currency={currency}
+                  locale={locale}
+                />
+              </p>
+              <p className="mt-1 text-center text-xs text-stone-500">
+                {t("outsideRemaining")}
+              </p>
+            </div>
+            {canEditLoan(editingLoan) ? (
+              <>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium">
+                    {t("outsidePersonName")}
+                  </span>
+                  <input
+                    className="field text-lg"
+                    value={editPersonName}
+                    onChange={(e) => setEditPersonName(e.target.value)}
+                    required
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium">
+                    {t("outsideAmount")}
+                  </span>
+                  <input
+                    inputMode="decimal"
+                    className="field amount-input text-2xl"
+                    value={editAmount}
+                    onChange={(e) => setEditAmount(e.target.value)}
+                  />
+                </label>
+                <div>
+                  <span className="mb-1 block text-sm font-medium">
+                    {t("day")}
+                  </span>
+                  <DateField
+                    value={editOccurredOn}
+                    onChange={setEditOccurredOn}
+                  />
+                </div>
+                <label className="block">
+                  <span className="mb-1 block text-sm font-medium">
+                    {t("noteOptional")}
+                  </span>
+                  <input
+                    className="field text-base"
+                    value={editNote}
+                    onChange={(e) => setEditNote(e.target.value)}
+                  />
+                </label>
+              </>
+            ) : (
+              <p className="text-sm text-amber-800">{t("outsideEditLocked")}</p>
+            )}
+          </>
+        ) : null}
+      </BottomSheet>
 
       {data?.settled.length ? (
         <section className="mt-6 space-y-3">
