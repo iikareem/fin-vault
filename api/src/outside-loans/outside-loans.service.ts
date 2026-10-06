@@ -16,6 +16,8 @@ const CATS = {
   repay: { name: 'Loan repaid', kind: 'EXPENSE' as const, color: '#c2410c' },
 };
 
+type WalletTarget = 'CURRENT' | 'SAVINGS' | 'NONE';
+
 @Injectable()
 export class OutsideLoansService {
   constructor(private prisma: PrismaService) {}
@@ -38,7 +40,7 @@ export class OutsideLoansService {
     note: string;
     occurredOn: Date;
     status: string;
-    accountId: string;
+    accountId: string | null;
     createdAt: Date;
     collections: {
       amount: Prisma.Decimal;
@@ -46,7 +48,7 @@ export class OutsideLoansService {
       note: string;
       id: string;
     }[];
-    account?: { id: string; name: string };
+    account?: { id: string; name: string } | null;
   }) {
     const remaining = this.remaining(loan.originalAmount, loan.collections);
     return {
@@ -59,7 +61,7 @@ export class OutsideLoansService {
       occurredOn: loan.occurredOn,
       status: remaining <= 0.001 ? 'SETTLED' : loan.status,
       accountId: loan.accountId,
-      account: loan.account,
+      account: loan.account ?? null,
       createdAt: loan.createdAt,
       originalAmount: Number(loan.originalAmount),
       remaining: Math.max(0, remaining),
@@ -90,21 +92,71 @@ export class OutsideLoansService {
     });
   }
 
-  private async cashWallet(
+  private resolveTarget(
+    dto: { walletTarget?: WalletTarget; accountId?: string },
+  ): WalletTarget | 'LEGACY' {
+    if (dto.walletTarget === 'NONE') return 'NONE';
+    if (dto.walletTarget === 'CURRENT' || dto.walletTarget === 'SAVINGS') {
+      return dto.walletTarget;
+    }
+    if (dto.accountId) return 'LEGACY';
+    return 'CURRENT';
+  }
+
+  private async resolveWallet(
     tx: Prisma.TransactionClient,
     householdId: string,
-    accountId: string,
+    target: WalletTarget | 'LEGACY',
+    accountId?: string,
   ) {
-    const cash = await tx.account.findFirst({
+    if (target === 'NONE') return null;
+
+    if (target === 'LEGACY') {
+      if (!accountId) throw new BadRequestException('Pick a cash wallet');
+      const cash = await tx.account.findFirst({
+        where: {
+          id: accountId,
+          householdId,
+          type: 'CASH',
+          archived: false,
+        },
+      });
+      if (!cash) throw new BadRequestException('Pick a cash wallet');
+      return cash;
+    }
+
+    if (target === 'CURRENT') {
+      const current = await tx.account.findFirst({
+        where: {
+          householdId,
+          type: 'CASH',
+          archived: false,
+          name: 'Current',
+        },
+      });
+      if (current) return current;
+      const cash = await tx.account.findFirst({
+        where: {
+          householdId,
+          type: 'CASH',
+          archived: false,
+          name: 'Cash',
+        },
+      });
+      if (cash) return cash;
+      throw new BadRequestException('Current wallet missing');
+    }
+
+    const savings = await tx.account.findFirst({
       where: {
-        id: accountId,
         householdId,
         type: 'CASH',
         archived: false,
+        name: 'Savings',
       },
     });
-    if (!cash) throw new BadRequestException('Pick a cash wallet');
-    return cash;
+    if (!savings) throw new BadRequestException('Savings wallet missing');
+    return savings;
   }
 
   async list(householdId: string, userId: string) {
@@ -136,32 +188,47 @@ export class OutsideLoansService {
     if (!personName) throw new BadRequestException('Enter a name');
     const direction = dto.direction === 'BORROW' ? 'BORROW' : 'LEND';
     const openCat = direction === 'LEND' ? CATS.lend : CATS.borrow;
+    const target = this.resolveTarget(dto);
 
     const loan = await this.prisma.$transaction(async (tx) => {
-      const wallet = await this.cashWallet(tx, householdId, dto.accountId);
-      const category = await this.ensureCategory(
+      const wallet = await this.resolveWallet(
         tx,
         householdId,
-        openCat.name,
-        openCat.kind,
-        openCat.color,
+        target,
+        dto.accountId,
       );
-      const openTx = await tx.transaction.create({
-        data: {
+
+      let openTxId: string | null = null;
+      let walletId: string | null = null;
+
+      if (wallet) {
+        walletId = wallet.id;
+        const category = await this.ensureCategory(
+          tx,
           householdId,
-          accountId: wallet.id,
-          categoryId: category.id,
-          userId,
-          type: openCat.kind,
-          amount: new Prisma.Decimal(dto.amount),
-          occurredOn: new Date(dto.occurredOn),
-          note: dto.note?.trim()
-            ? `${personName} · ${dto.note.trim()}`
-            : direction === 'LEND'
-              ? `Lent to ${personName}`
-              : `Borrowed from ${personName}`,
-        },
-      });
+          openCat.name,
+          openCat.kind,
+          openCat.color,
+        );
+        const openTx = await tx.transaction.create({
+          data: {
+            householdId,
+            accountId: wallet.id,
+            categoryId: category.id,
+            userId,
+            type: openCat.kind,
+            amount: new Prisma.Decimal(dto.amount),
+            occurredOn: new Date(dto.occurredOn),
+            note: dto.note?.trim()
+              ? `${personName} · ${dto.note.trim()}`
+              : direction === 'LEND'
+                ? `Lent to ${personName}`
+                : `Borrowed from ${personName}`,
+          },
+        });
+        openTxId = openTx.id;
+      }
+
       return tx.outsideLoan.create({
         data: {
           householdId,
@@ -171,8 +238,8 @@ export class OutsideLoansService {
           originalAmount: new Prisma.Decimal(dto.amount),
           note: dto.note?.trim() ?? '',
           occurredOn: new Date(dto.occurredOn),
-          accountId: wallet.id,
-          lendTxId: openTx.id,
+          accountId: walletId,
+          lendTxId: openTxId,
         },
         include: {
           account: { select: { id: true, name: true } },
@@ -208,40 +275,55 @@ export class OutsideLoansService {
 
     const settleCat =
       existing.direction === 'BORROW' ? CATS.repay : CATS.collect;
+    const target = this.resolveTarget(dto);
 
     const loan = await this.prisma.$transaction(async (tx) => {
-      const wallet = await this.cashWallet(tx, householdId, dto.accountId);
-      const category = await this.ensureCategory(
+      const wallet = await this.resolveWallet(
         tx,
         householdId,
-        settleCat.name,
-        settleCat.kind,
-        settleCat.color,
+        target,
+        dto.accountId,
       );
-      const settleTx = await tx.transaction.create({
-        data: {
+
+      let collectTxId: string | null = null;
+      let walletId: string | null = null;
+
+      if (wallet) {
+        walletId = wallet.id;
+        const category = await this.ensureCategory(
+          tx,
           householdId,
-          accountId: wallet.id,
-          categoryId: category.id,
-          userId,
-          type: settleCat.kind,
-          amount: new Prisma.Decimal(dto.amount),
-          occurredOn: new Date(dto.occurredOn),
-          note: dto.note?.trim()
-            ? `${existing.personName} · ${dto.note.trim()}`
-            : existing.direction === 'BORROW'
-              ? `Repaid ${existing.personName}`
-              : `Collected from ${existing.personName}`,
-        },
-      });
+          settleCat.name,
+          settleCat.kind,
+          settleCat.color,
+        );
+        const settleTx = await tx.transaction.create({
+          data: {
+            householdId,
+            accountId: wallet.id,
+            categoryId: category.id,
+            userId,
+            type: settleCat.kind,
+            amount: new Prisma.Decimal(dto.amount),
+            occurredOn: new Date(dto.occurredOn),
+            note: dto.note?.trim()
+              ? `${existing.personName} · ${dto.note.trim()}`
+              : existing.direction === 'BORROW'
+                ? `Repaid ${existing.personName}`
+                : `Collected from ${existing.personName}`,
+          },
+        });
+        collectTxId = settleTx.id;
+      }
+
       await tx.outsideLoanCollection.create({
         data: {
           loanId: existing.id,
           amount: new Prisma.Decimal(dto.amount),
           occurredOn: new Date(dto.occurredOn),
           note: dto.note?.trim() ?? '',
-          accountId: wallet.id,
-          collectTxId: settleTx.id,
+          accountId: walletId,
+          collectTxId,
         },
       });
       const nextRemaining = remaining - dto.amount;

@@ -187,17 +187,20 @@ export function MoneyToolsHomeCard({
     }
 
     if (outside && outside.open.length > 0) {
-      const owed = outside.owedToYou > 0.001;
-      const borrow = (outside.youOwe ?? 0) > 0.001;
+      const owedAmt = outside.owedToYou;
+      const borrowAmt = outside.youOwe ?? 0;
+      const owed = owedAmt > 0.001;
+      const borrow = borrowAmt > 0.001;
       if (owed || borrow) {
+        const preferBorrow = borrow && (!owed || borrowAmt >= owedAmt);
         next.push({
           key: "outside",
           href: "/outside-loans",
           emoji: "🤝",
           title: t("navOutsideLoans"),
-          detail: owed ? t("outsideOwedToYou") : t("outsideYouOwe"),
+          detail: preferBorrow ? t("outsideYouOwe") : t("outsideOwedToYou"),
           detailTone: "warn",
-          amount: owed ? outside.owedToYou : outside.youOwe,
+          amount: preferBorrow ? borrowAmt : owedAmt,
           score: 70,
         });
       }

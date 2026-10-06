@@ -487,10 +487,11 @@ model OutsideLoan {
   note           String                  @default("")
   occurredOn     DateTime                @db.Date
   status         LoanStatus              @default(OPEN)
-  accountId      String
-  account        Account                 @relation(fields: [accountId], references: [id])
-  lendTxId       String                  @unique
-  lendTx         Transaction             @relation("OutsideLendTx", fields: [lendTxId], references: [id])
+  /** Null when tracked without moving a wallet (walletTarget NONE). */
+  accountId      String?
+  account        Account?                @relation(fields: [accountId], references: [id])
+  lendTxId       String?                 @unique
+  lendTx         Transaction?            @relation("OutsideLendTx", fields: [lendTxId], references: [id])
   createdAt      DateTime                @default(now())
   collections    OutsideLoanCollection[]
 
@@ -506,10 +507,11 @@ model OutsideLoanCollection {
   amount      Decimal     @db.Decimal(14, 2)
   occurredOn  DateTime    @db.Date
   note        String      @default("")
-  accountId   String
-  account     Account     @relation(fields: [accountId], references: [id])
-  collectTxId String      @unique
-  collectTx   Transaction @relation("OutsideCollectTx", fields: [collectTxId], references: [id])
+  /** Null when repayment/collection does not move a wallet. */
+  accountId   String?
+  account     Account?    @relation(fields: [accountId], references: [id])
+  collectTxId String?     @unique
+  collectTx   Transaction? @relation("OutsideCollectTx", fields: [collectTxId], references: [id])
   createdAt   DateTime    @default(now())
 
   @@index([loanId])

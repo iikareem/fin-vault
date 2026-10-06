@@ -16,25 +16,29 @@ import {
   isCurrentWallet,
   sortCashWallets,
 } from "@/lib/wallets";
-import { labelFor } from "@/lib/i18n";
 
 type Account = { id: string; name: string };
+type WalletTarget = "CURRENT" | "SAVINGS" | "NONE";
+type Direction = "LEND" | "BORROW";
+
 type Loan = {
   id: string;
   personName: string;
+  direction: Direction;
   originalAmount: number;
   remaining: number;
   collected: number;
   status: string;
   note: string;
   occurredOn: string;
-  account?: { id: string; name: string };
+  account?: { id: string; name: string } | null;
 };
 
 type LoansData = {
   open: Loan[];
   settled: Loan[];
   owedToYou: number;
+  youOwe: number;
 };
 
 function ProgressBar({ pct }: { pct: number }) {
@@ -49,6 +53,12 @@ function ProgressBar({ pct }: { pct: number }) {
   );
 }
 
+function chipClass(active: boolean) {
+  return `seg-item px-3 py-2 text-sm ${
+    active ? "seg-active" : "ring-1 ring-[var(--input-border)]"
+  }`;
+}
+
 export default function OutsideLoansPage() {
   const { t, locale } = useI18n();
   const { personal, setKind } = useBooks();
@@ -56,18 +66,19 @@ export default function OutsideLoansPage() {
   const hid = personal?.householdId ?? "";
   const [data, setData] = useState<LoansData | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
-  const [showLend, setShowLend] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [direction, setDirection] = useState<Direction>("BORROW");
+  const [walletTarget, setWalletTarget] = useState<WalletTarget>("CURRENT");
   const [personName, setPersonName] = useState("");
   const [amount, setAmount] = useState("");
-  const [accountId, setAccountId] = useState("");
   const [occurredOn, setOccurredOn] = useState(todayISO());
   const [note, setNote] = useState("");
   const [collectAmount, setCollectAmount] = useState<Record<string, string>>(
     {},
   );
-  const [collectWallet, setCollectWallet] = useState<Record<string, string>>(
-    {},
-  );
+  const [collectTarget, setCollectTarget] = useState<
+    Record<string, WalletTarget>
+  >({});
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -80,17 +91,13 @@ export default function OutsideLoansPage() {
       setData(loans);
       const cash = sortCashWallets(list.filter(isCashWallet));
       setAccounts(cash);
-      const current = cash.find(isCurrentWallet) ?? cash[0];
-      if (current) {
-        setAccountId((prev) => prev || current.id);
-        setCollectWallet((prev) => {
-          const next = { ...prev };
-          for (const loan of loans.open) {
-            if (!next[loan.id]) next[loan.id] = current.id;
-          }
-          return next;
-        });
-      }
+      setCollectTarget((prev) => {
+        const next = { ...prev };
+        for (const loan of loans.open) {
+          if (!next[loan.id]) next[loan.id] = "CURRENT";
+        }
+        return next;
+      });
     });
   }
 
@@ -100,7 +107,7 @@ export default function OutsideLoansPage() {
     load(personal.householdId).catch((e) => setError(e.message));
   }, [personal?.householdId]);
 
-  async function lend(e: FormEvent) {
+  async function saveLoan(e: FormEvent) {
     e.preventDefault();
     if (!hid) return;
     setBusy(true);
@@ -111,8 +118,9 @@ export default function OutsideLoansPage() {
         method: "POST",
         body: JSON.stringify({
           personName,
+          direction,
           amount: parseAmount(amount),
-          accountId,
+          walletTarget,
           occurredOn,
           note: note.trim() || undefined,
         }),
@@ -120,8 +128,10 @@ export default function OutsideLoansPage() {
       setPersonName("");
       setAmount("");
       setNote("");
-      setShowLend(false);
-      setMessage(t("outsideSaved"));
+      setShowForm(false);
+      setMessage(
+        direction === "BORROW" ? t("outsideBorrowedSaved") : t("outsideSaved"),
+      );
       await load(hid);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -130,13 +140,13 @@ export default function OutsideLoansPage() {
     }
   }
 
-  async function collect(loan: Loan, fullRemaining = false) {
+  async function settle(loan: Loan, fullRemaining = false) {
     if (!hid) return;
     const raw = collectAmount[loan.id] ?? "";
     const value = fullRemaining
       ? loan.remaining
       : parseAmount(raw || String(loan.remaining));
-    const wallet = collectWallet[loan.id] || accountId;
+    const target = collectTarget[loan.id] || "CURRENT";
     setBusy(true);
     setError("");
     setMessage("");
@@ -145,12 +155,16 @@ export default function OutsideLoansPage() {
         method: "POST",
         body: JSON.stringify({
           amount: value,
-          accountId: wallet,
+          walletTarget: target,
           occurredOn: todayISO(),
         }),
       });
       setCollectAmount((prev) => ({ ...prev, [loan.id]: "" }));
-      setMessage(t("outsideCollected"));
+      setMessage(
+        loan.direction === "BORROW"
+          ? t("outsideRepaid")
+          : t("outsideCollected"),
+      );
       await load(hid);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed");
@@ -158,6 +172,9 @@ export default function OutsideLoansPage() {
       setBusy(false);
     }
   }
+
+  const hasCurrent = accounts.some(isCurrentWallet);
+  const hasSavings = accounts.some((a) => a.name === "Savings");
 
   return (
     <PageShell>
@@ -169,39 +186,81 @@ export default function OutsideLoansPage() {
         <button
           type="button"
           onClick={() => {
-            setShowLend((v) => !v);
+            setShowForm((v) => !v);
             setError("");
             setMessage("");
           }}
           className={`shrink-0 rounded-2xl px-4 py-3 text-sm font-bold shadow-sm ${
-            showLend
+            showForm
               ? "bg-stone-200 text-stone-800"
               : "bg-stone-900 text-white"
           }`}
         >
-          {showLend ? t("goalsCancel") : `＋ ${t("outsideLendTitle")}`}
+          {showForm
+            ? t("goalsCancel")
+            : `＋ ${direction === "BORROW" ? t("outsideBorrowTitle") : t("outsideLendTitle")}`}
         </button>
       </div>
 
       {data ? (
-        <section className="surface mt-4 rounded-[1.75rem] p-4">
-          <p className="text-sm text-stone-500">{t("outsideOwedToYou")}</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums">
-            <Money
-              amount={data.owedToYou}
-              currency={currency}
-              locale={locale}
-            />
-          </p>
-        </section>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <section className="surface rounded-[1.75rem] p-4">
+            <p className="text-sm text-stone-500">{t("outsideOwedToYou")}</p>
+            <p className="mt-1 text-xl font-bold tabular-nums">
+              <Money
+                amount={data.owedToYou}
+                currency={currency}
+                locale={locale}
+              />
+            </p>
+          </section>
+          <section className="surface rounded-[1.75rem] p-4">
+            <p className="text-sm text-stone-500">{t("outsideYouOwe")}</p>
+            <p className="mt-1 text-xl font-bold tabular-nums">
+              <Money
+                amount={data.youOwe ?? 0}
+                currency={currency}
+                locale={locale}
+              />
+            </p>
+          </section>
+        </div>
       ) : null}
 
-      {showLend ? (
+      {showForm ? (
         <form
-          onSubmit={lend}
+          onSubmit={saveLoan}
           className="surface mt-4 space-y-3 rounded-[1.75rem] p-4"
         >
-          <h2 className="text-xl font-bold">{t("outsideLendTitle")}</h2>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={chipClass(direction === "BORROW")}
+              onClick={() => {
+                setDirection("BORROW");
+                setWalletTarget("CURRENT");
+              }}
+            >
+              {t("outsideDirectionBorrow")}
+            </button>
+            <button
+              type="button"
+              className={chipClass(direction === "LEND")}
+              onClick={() => {
+                setDirection("LEND");
+                setWalletTarget("CURRENT");
+              }}
+            >
+              {t("outsideDirectionLend")}
+            </button>
+          </div>
+
+          <h2 className="text-xl font-bold">
+            {direction === "BORROW"
+              ? t("outsideBorrowTitle")
+              : t("outsideLendTitle")}
+          </h2>
+
           <label className="block">
             <span className="mb-1 block font-medium">
               {t("outsidePersonName")}
@@ -215,6 +274,7 @@ export default function OutsideLoansPage() {
             />
             <Hint>{t("outsidePersonNameHint")}</Hint>
           </label>
+
           <label className="block">
             <span className="mb-1 block font-medium">{t("outsideAmount")}</span>
             <input
@@ -225,27 +285,49 @@ export default function OutsideLoansPage() {
               required
             />
           </label>
-          <label className="block">
+
+          <div>
             <span className="mb-1 block font-medium">
-              {t("outsidePickWallet")}
+              {direction === "BORROW"
+                ? t("outsideAddTo")
+                : t("outsideFromWallet")}
             </span>
-            <select
-              className="field text-lg"
-              value={accountId}
-              onChange={(e) => setAccountId(e.target.value)}
-              required
-            >
-              {accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {labelFor(a.name, t)}
-                </option>
-              ))}
-            </select>
-          </label>
+            <div className="flex flex-wrap gap-2">
+              {hasCurrent ? (
+                <button
+                  type="button"
+                  className={chipClass(walletTarget === "CURRENT")}
+                  onClick={() => setWalletTarget("CURRENT")}
+                >
+                  {t("outsideWalletCurrent")}
+                </button>
+              ) : null}
+              {hasSavings ? (
+                <button
+                  type="button"
+                  className={chipClass(walletTarget === "SAVINGS")}
+                  onClick={() => setWalletTarget("SAVINGS")}
+                >
+                  {t("outsideWalletSavings")}
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className={chipClass(walletTarget === "NONE")}
+                onClick={() => setWalletTarget("NONE")}
+              >
+                {direction === "BORROW"
+                  ? t("outsideAlreadyTaken")
+                  : t("outsideNoDeduction")}
+              </button>
+            </div>
+          </div>
+
           <div>
             <span className="mb-1 block font-medium">{t("day")}</span>
             <DateField value={occurredOn} onChange={setOccurredOn} />
           </div>
+
           <label className="block">
             <span className="mb-1 block font-medium">{t("noteOptional")}</span>
             <input
@@ -254,12 +336,15 @@ export default function OutsideLoansPage() {
               onChange={(e) => setNote(e.target.value)}
             />
           </label>
+
           <button
             type="submit"
             disabled={busy}
             className="flex min-h-14 w-full items-center justify-center rounded-3xl bg-stone-900 text-lg font-semibold text-white disabled:opacity-60"
           >
-            {t("outsideLendSave")}
+            {direction === "BORROW"
+              ? t("outsideBorrowSave")
+              : t("outsideLendSave")}
           </button>
         </form>
       ) : null}
@@ -273,12 +358,14 @@ export default function OutsideLoansPage() {
           <p className="text-stone-500">{t("outsideNoOpen")}</p>
         ) : (
           data.open.map((loan) => {
+            const borrow = loan.direction === "BORROW";
             const pct =
               loan.originalAmount > 0
                 ? Math.round(
                     (loan.collected / loan.originalAmount) * 1000,
                   ) / 10
                 : 0;
+            const target = collectTarget[loan.id] || "CURRENT";
             return (
               <article key={loan.id} className="surface rounded-[1.75rem] p-4">
                 <div className="flex items-start justify-between gap-3">
@@ -286,8 +373,13 @@ export default function OutsideLoansPage() {
                     <p className="text-xl font-bold" dir="auto">
                       {loan.personName}
                     </p>
+                    <p className="text-sm font-semibold text-stone-600">
+                      {borrow
+                        ? t("outsideDirectionBorrow")
+                        : t("outsideDirectionLend")}
+                    </p>
                     <p className="text-sm text-stone-500">
-                      {t("outsideLentOn")}{" "}
+                      {borrow ? t("outsideBorrowedOn") : t("outsideLentOn")}{" "}
                       <ItemDate value={loan.occurredOn} locale={locale} />
                     </p>
                     {loan.note ? (
@@ -331,34 +423,65 @@ export default function OutsideLoansPage() {
                 </div>
 
                 <div className="mt-3 space-y-2">
-                  <label className="block">
-                    <span className="mb-1 block text-sm font-medium">
-                      {t("outsidePickWalletBack")}
-                    </span>
-                    <select
-                      className="field"
-                      value={collectWallet[loan.id] || accountId}
-                      onChange={(e) =>
-                        setCollectWallet((prev) => ({
+                  <span className="mb-1 block text-sm font-medium">
+                    {borrow ? t("outsideFromWallet") : t("outsideAddTo")}
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {hasCurrent ? (
+                      <button
+                        type="button"
+                        className={chipClass(target === "CURRENT")}
+                        onClick={() =>
+                          setCollectTarget((prev) => ({
+                            ...prev,
+                            [loan.id]: "CURRENT",
+                          }))
+                        }
+                      >
+                        {t("outsideWalletCurrent")}
+                      </button>
+                    ) : null}
+                    {hasSavings ? (
+                      <button
+                        type="button"
+                        className={chipClass(target === "SAVINGS")}
+                        onClick={() =>
+                          setCollectTarget((prev) => ({
+                            ...prev,
+                            [loan.id]: "SAVINGS",
+                          }))
+                        }
+                      >
+                        {t("outsideWalletSavings")}
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className={chipClass(target === "NONE")}
+                      onClick={() =>
+                        setCollectTarget((prev) => ({
                           ...prev,
-                          [loan.id]: e.target.value,
+                          [loan.id]: "NONE",
                         }))
                       }
                     >
-                      {accounts.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {labelFor(a.name, t)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      {t("outsideNoDeduction")}
+                    </button>
+                  </div>
+                  <Hint>
+                    {borrow ? t("outsideRepayHint") : t("outsideCollectHint")}
+                  </Hint>
+
                   <button
                     type="button"
                     disabled={busy}
-                    onClick={() => collect(loan, true)}
+                    onClick={() => settle(loan, true)}
                     className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-emerald-800 font-semibold text-white disabled:opacity-60"
                   >
-                    {t("outsideCollectRemaining")} ·{" "}
+                    {borrow
+                      ? t("outsideRepayRemaining")
+                      : t("outsideCollectRemaining")}{" "}
+                    ·{" "}
                     <span className="ms-1 tabular-nums">
                       <Money
                         amount={loan.remaining}
@@ -367,9 +490,12 @@ export default function OutsideLoansPage() {
                       />
                     </span>
                   </button>
+
                   <details className="rounded-2xl bg-[var(--panel-soft)] px-3 py-2">
                     <summary className="cursor-pointer text-sm font-semibold text-stone-600">
-                      {t("outsideCollectPartial")}
+                      {borrow
+                        ? t("outsideRepayPartial")
+                        : t("outsideCollectPartial")}
                     </summary>
                     <div className="mt-2 space-y-2">
                       <input
@@ -384,14 +510,15 @@ export default function OutsideLoansPage() {
                           }))
                         }
                       />
-                      <Hint>{t("outsideCollectHint")}</Hint>
                       <button
                         type="button"
                         disabled={busy}
-                        onClick={() => collect(loan, false)}
+                        onClick={() => settle(loan, false)}
                         className="flex min-h-11 w-full items-center justify-center rounded-2xl bg-stone-800 text-sm font-semibold text-white disabled:opacity-60"
                       >
-                        {t("outsideCollectSave")}
+                        {borrow
+                          ? t("outsideRepaySave")
+                          : t("outsideCollectSave")}
                       </button>
                     </div>
                   </details>
@@ -411,8 +538,15 @@ export default function OutsideLoansPage() {
               className="rounded-[1.75rem] border border-stone-200 bg-white/70 px-4 py-3"
             >
               <div className="flex justify-between gap-3">
-                <span className="font-semibold" dir="auto">
-                  {loan.personName}
+                <span className="min-w-0">
+                  <span className="block font-semibold" dir="auto">
+                    {loan.personName}
+                  </span>
+                  <span className="text-xs text-stone-500">
+                    {loan.direction === "BORROW"
+                      ? t("outsideDirectionBorrow")
+                      : t("outsideDirectionLend")}
+                  </span>
                 </span>
                 <Money
                   amount={loan.originalAmount}

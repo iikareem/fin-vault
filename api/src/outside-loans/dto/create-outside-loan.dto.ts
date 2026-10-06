@@ -22,8 +22,16 @@ export class CreateOutsideLoanDto {
   @Min(0.01)
   amount: number;
 
+  /** CURRENT / SAVINGS move cash; NONE tracks only. Defaults to CURRENT. */
+  @IsOptional()
   @IsString()
-  accountId: string;
+  @IsIn(['CURRENT', 'SAVINGS', 'NONE'])
+  walletTarget?: 'CURRENT' | 'SAVINGS' | 'NONE';
+
+  /** Legacy: explicit cash wallet when walletTarget is omitted. */
+  @IsOptional()
+  @IsString()
+  accountId?: string;
 
   @IsDateString()
   occurredOn: string;

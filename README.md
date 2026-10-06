@@ -8,7 +8,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169e1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 
-Fin Vault brings wallets, spending, income, savings goals, commitments, loans, and analytics into one private workspace. It is English-first, includes full Arabic and RTL support, and is designed to run locally or as a production deployment.
+Fin Vault brings wallets, spending, income, savings goals, commitments, loans, monthly limits, analytics, and offline spend logging into one private workspace. It is English-first, includes full Arabic and RTL support, and is designed to run locally or as a production deployment.
 
 [Open the live app](https://personal-budget-calc.up.railway.app) ·
 [Create an account](https://personal-budget-calc.up.railway.app/register) ·
@@ -34,13 +34,18 @@ Fin Vault brings wallets, spending, income, savings goals, commitments, loans, a
 - **Daily history** — review and edit activity by date.
 - **Analytics** — understand cash flow and spending by period and category.
 - **Flexible categories** — organize transactions with editable categories and subcategories.
+- **Monthly spend and save limits** — set a soft save target or spend allowance for the current budget period, with progress on Home.
+- **Custom budget month** — choose which calendar day your personal month starts on.
 - **Savings goals** — allocate savings toward named targets.
 - **Commitments** — manage subscriptions, installments, and recurring obligations.
+- **Travel envelopes** — track trip spend against an optional limit.
+- **Gold holdings** — record gold pieces and follow live EGP-per-gram quotes.
 - **Outside loans** — track money lent to people who do not use the app.
 - **Private balances** — hide sensitive totals without leaving the page.
+- **Offline PWA** — install on supported phones; when offline, view the last-known balance and queue new spends that sync when you are back online.
 - **Bilingual interface** — English by default, with Arabic and RTL support.
 - **Self-service accounts** — registration creates a ready-to-use personal workspace.
-- **Installable web app** — standalone PWA behavior on supported mobile devices.
+- **Themes and appearance** — pick a visual theme and compact or privacy-minded UI prefs.
 
 ## Architecture
 
@@ -87,6 +92,7 @@ fin-vault/
 | API | NestJS 11, Passport JWT, class-validator |
 | Data | PostgreSQL 16, Prisma 6 |
 | Authentication | HTTP-only JWT session cookie |
+| Offline | Service worker, IndexedDB spend queue, cached session/balance |
 | Testing | Jest, Supertest |
 | Deployment | Railway, Nixpacks |
 
