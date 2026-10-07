@@ -163,46 +163,86 @@ async function removeQueued(id: string): Promise<void> {
   notifyQueueChanged();
 }
 
+export type FlushProgress = {
+  /** 1-based index of the item currently being posted */
+  current: number;
+  total: number;
+  /** Items successfully posted so far (before this attempt finishes) */
+  done: number;
+};
+
 export type FlushResult = {
   synced: number;
   remaining: number;
   stoppedForAuth: boolean;
 };
 
-/** Posts queued wallet transactions in order. Safe to call often. */
-export async function flushOfflineQueue(): Promise<FlushResult> {
-  if (isLikelyOffline()) {
-    const remaining = await pendingCount();
-    return { synced: 0, remaining, stoppedForAuth: false };
-  }
+export type FlushOptions = {
+  onProgress?: (progress: FlushProgress) => void;
+};
 
-  const items = await listQueuedTransactions();
-  let synced = 0;
-  let stoppedForAuth = false;
+let flushInFlight: Promise<FlushResult> | null = null;
 
-  for (const item of items) {
-    try {
-      await api(item.path, {
-        method: "POST",
-        body: item.body,
-      });
-      await removeQueued(item.id);
-      synced += 1;
-    } catch (error) {
-      if (error instanceof Error && error.message === AUTH_REQUIRED) {
-        stoppedForAuth = true;
-        break;
-      }
-      if (isOfflineNetworkError(error)) {
-        break;
-      }
-      // Drop permanent client/server validation failures so the queue cannot stall.
-      await removeQueued(item.id);
+/** Posts queued wallet transactions in order. Safe to call often; concurrent calls share one run. */
+export async function flushOfflineQueue(
+  options?: FlushOptions,
+): Promise<FlushResult> {
+  if (flushInFlight) return flushInFlight;
+
+  flushInFlight = (async () => {
+    if (isLikelyOffline()) {
+      const remaining = await pendingCount();
+      return { synced: 0, remaining, stoppedForAuth: false };
     }
-  }
 
-  const remaining = await pendingCount();
-  return { synced, remaining, stoppedForAuth };
+    const items = await listQueuedTransactions();
+    const total = items.length;
+    let synced = 0;
+    let stoppedForAuth = false;
+
+    if (total === 0) {
+      return { synced: 0, remaining: 0, stoppedForAuth: false };
+    }
+
+    for (let i = 0; i < items.length; i += 1) {
+      const item = items[i]!;
+      options?.onProgress?.({
+        current: i + 1,
+        total,
+        done: synced,
+      });
+      try {
+        await api(item.path, {
+          method: "POST",
+          body: item.body,
+        });
+        await removeQueued(item.id);
+        synced += 1;
+        options?.onProgress?.({
+          current: i + 1,
+          total,
+          done: synced,
+        });
+      } catch (error) {
+        if (error instanceof Error && error.message === AUTH_REQUIRED) {
+          stoppedForAuth = true;
+          break;
+        }
+        if (isOfflineNetworkError(error)) {
+          break;
+        }
+        // Drop permanent client/server validation failures so the queue cannot stall.
+        await removeQueued(item.id);
+      }
+    }
+
+    const remaining = await pendingCount();
+    return { synced, remaining, stoppedForAuth };
+  })().finally(() => {
+    flushInFlight = null;
+  });
+
+  return flushInFlight;
 }
 
 export async function saveAddSnapshot(

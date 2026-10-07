@@ -164,6 +164,9 @@ const ar = {
   savedOffline: "تم الحفظ دون اتصال — ستتم المزامنة عند عودة الاتصال",
   offlinePendingOne: "معاملة واحدة بانتظار المزامنة",
   offlinePending: "{count} معاملات بانتظار المزامنة",
+  offlineSyncProgress: "جارٍ المزامنة {current} من {total}…",
+  offlineSyncDoneOne: "تمت مزامنة مصروف واحد",
+  offlineSyncDone: "تمت مزامنة {count} مصروفات",
   usingOfflineData: "تُعرض آخر بيانات محفوظة (دون اتصال)",
   offlinePageTitle: "لا يوجد اتصال",
   offlinePageBody:
@@ -1203,6 +1206,9 @@ const en = {
   savedOffline: "Saved offline — will sync when you’re back online",
   offlinePendingOne: "1 offline entry waiting to sync",
   offlinePending: "{count} offline entries waiting to sync",
+  offlineSyncProgress: "Syncing {current} of {total}…",
+  offlineSyncDoneOne: "1 spend synced",
+  offlineSyncDone: "{count} spends synced",
   usingOfflineData: "Using last saved wallets and categories (offline)",
   offlinePageTitle: "You’re offline",
   offlinePageBody:
