@@ -1,8 +1,12 @@
 /**
- * Idempotent demo seeder for a rich mock_user account.
+ * Idempotent demo seeder for a rich mock_user account with sample data
+ * across personal + house features (txs, goals, gold, outside/peer loans,
+ * travels, soft limits, subscriptions, claims/covers + repayments,
+ * charity, payouts).
  *
  * Usage:
- *   DATABASE_URL='postgresql://…' npx ts-node --compiler-options '{"module":"CommonJS"}' prisma/seed-mock-user.ts
+ *   npm run prisma:seed-mock
+ *   # or: DATABASE_URL='postgresql://…' npx ts-node --compiler-options '{"module":"CommonJS"}' prisma/seed-mock-user.ts
  *
  * Login: mock_user@demo.local / Mock-Vault-26
  */
@@ -27,6 +31,17 @@ function d(daysAgo: number) {
 
 function iso(daysAgo: number) {
   return d(daysAgo).toISOString().slice(0, 10);
+}
+
+/** Personal budget period key YYYY-MM, relative to today. */
+function periodKey(monthsAgo: number) {
+  const x = new Date();
+  x.setUTCDate(1);
+  x.setUTCHours(12, 0, 0, 0);
+  x.setUTCMonth(x.getUTCMonth() - monthsAgo);
+  const y = x.getUTCFullYear();
+  const m = String(x.getUTCMonth() + 1).padStart(2, '0');
+  return `${y}-${m}`;
 }
 
 async function cat(
@@ -65,6 +80,47 @@ async function wallet(householdId: string, name: 'Current' | 'Savings') {
 }
 
 async function wipeDemo(userId: string, personalId: string, houseId: string) {
+  // Travels (+ linked spend) on personal — txs first (Restrict on travelId)
+  const travels = await prisma.travel.findMany({
+    where: { householdId: personalId, note: { startsWith: DEMO } },
+  });
+  for (const t of travels) {
+    await prisma.transaction.deleteMany({ where: { travelId: t.id } });
+    await prisma.travel.delete({ where: { id: t.id } });
+  }
+
+  // Soft monthly save targets
+  await prisma.monthSoftLimit.deleteMany({ where: { householdId: personalId } });
+
+  // Subscriptions (+ payment txs)
+  const subs = await prisma.subscription.findMany({
+    where: { userId },
+    include: { payments: true },
+  });
+  for (const s of subs) {
+    for (const p of s.payments) {
+      await prisma.subscriptionPayment.delete({ where: { id: p.id } });
+      await prisma.transaction
+        .delete({ where: { id: p.transactionId } })
+        .catch(() => undefined);
+    }
+    await prisma.subscription.delete({ where: { id: s.id } });
+  }
+
+  // House payouts received by mock
+  const payouts = await prisma.housePayout.findMany({
+    where: { toUserId: userId, note: { startsWith: DEMO } },
+  });
+  for (const p of payouts) {
+    await prisma.housePayout.delete({ where: { id: p.id } });
+    await prisma.transaction
+      .delete({ where: { id: p.houseTxId } })
+      .catch(() => undefined);
+    await prisma.transaction
+      .delete({ where: { id: p.personalTxId } })
+      .catch(() => undefined);
+  }
+
   // Goals / gold owned by user
   await prisma.savingsGoal.deleteMany({ where: { userId } });
   await prisma.goldHolding.deleteMany({ where: { userId } });
@@ -77,10 +133,18 @@ async function wipeDemo(userId: string, personalId: string, houseId: string) {
   for (const loan of outside) {
     for (const c of loan.collections) {
       await prisma.outsideLoanCollection.delete({ where: { id: c.id } });
-      await prisma.transaction.delete({ where: { id: c.collectTxId } }).catch(() => undefined);
+      if (c.collectTxId) {
+        await prisma.transaction
+          .delete({ where: { id: c.collectTxId } })
+          .catch(() => undefined);
+      }
     }
     await prisma.outsideLoan.delete({ where: { id: loan.id } });
-    await prisma.transaction.delete({ where: { id: loan.lendTxId } }).catch(() => undefined);
+    if (loan.lendTxId) {
+      await prisma.transaction
+        .delete({ where: { id: loan.lendTxId } })
+        .catch(() => undefined);
+    }
   }
 
   // Peer loans involving mock user on house
@@ -206,6 +270,7 @@ async function main() {
   }
   if (!user) throw new Error('Failed to load mock user');
   const userId = user.id;
+  const houseId = house.id;
 
   let personalMembership = await prisma.membership.findFirst({
     where: { userId, household: { kind: 'PERSONAL' } },
@@ -671,7 +736,293 @@ async function main() {
     data: tx(pCurrent.id, loanRepay.id, 'EXPENSE', 500, 36, 'رد سلفة قديمة'),
   });
 
-  // Peer loan with another house member (CASH)
+  const toHouseCat = await ensureCat(
+    personalId,
+    'To the house',
+    'EXPENSE',
+    '#44403c',
+  );
+  const houseGrocery = await ensureCat(
+    house.id,
+    'Groceries',
+    'EXPENSE',
+    '#16a34a',
+  );
+  const houseBills = await ensureCat(house.id, 'Bills', 'EXPENSE', '#ea580c');
+  const houseTransport = await ensureCat(
+    house.id,
+    'Transport',
+    'EXPENSE',
+    '#0284c7',
+  );
+  const houseAllowance = await ensureCat(
+    house.id,
+    'Allowance',
+    'EXPENSE',
+    '#0284c7',
+  );
+  const houseFamilyGift = await ensureCat(
+    house.id,
+    'Family gift',
+    'EXPENSE',
+    '#db2777',
+  );
+  const paybackCat = await ensureCat(
+    house.id,
+    'Member payback',
+    'EXPENSE',
+    '#44403c',
+  );
+  const memberRepayInc = await ensureCat(
+    house.id,
+    'Member repayment',
+    'INCOME',
+    '#0f766e',
+  );
+
+  const adminMem = await prisma.membership.findFirst({
+    where: { householdId: house.id, role: 'ADMIN' },
+  });
+  const recorderId = adminMem?.userId ?? userId;
+
+  // —— Travels: past / active / upcoming + spend ——
+  const pastTrip = await prisma.travel.create({
+    data: {
+      householdId: personalId,
+      name: 'أسوان',
+      currency: 'EGP',
+      softLimit: 8000,
+      startsOn: d(55),
+      endsOn: d(48),
+      endedAt: d(48),
+      note: `${DEMO} رحلة خلصت`,
+    },
+  });
+  const activeTrip = await prisma.travel.create({
+    data: {
+      householdId: personalId,
+      name: 'إسكندرية',
+      currency: 'EGP',
+      softLimit: 5000,
+      startsOn: d(3),
+      endsOn: d(-10),
+      note: `${DEMO} رحلة شغّالة`,
+    },
+  });
+  await prisma.travel.create({
+    data: {
+      householdId: personalId,
+      name: 'دبي',
+      currency: 'AED',
+      softLimit: 4000,
+      startsOn: d(-25),
+      endsOn: d(-32),
+      note: `${DEMO} رحلة جاية`,
+    },
+  });
+  await prisma.transaction.createMany({
+    data: [
+      {
+        householdId: personalId,
+        userId,
+        accountId: pCurrent.id,
+        categoryId: dining.id,
+        travelId: pastTrip.id,
+        type: 'EXPENSE',
+        amount: 1200,
+        occurredOn: d(53),
+        note: `${DEMO} عشاء في أسوان`,
+      },
+      {
+        householdId: personalId,
+        userId,
+        accountId: pCurrent.id,
+        categoryId: localTrips.id,
+        travelId: pastTrip.id,
+        type: 'EXPENSE',
+        amount: 3500,
+        occurredOn: d(52),
+        note: `${DEMO} مواصلات أسوان`,
+      },
+      {
+        householdId: personalId,
+        userId,
+        accountId: pCurrent.id,
+        categoryId: entertainment.id,
+        travelId: pastTrip.id,
+        type: 'TRACK',
+        amount: 400,
+        occurredOn: d(50),
+        note: `${DEMO} ضيافة أسوان كاش`,
+      },
+      {
+        householdId: personalId,
+        userId,
+        accountId: pCurrent.id,
+        categoryId: dining.id,
+        travelId: activeTrip.id,
+        type: 'EXPENSE',
+        amount: 680,
+        occurredOn: d(2),
+        note: `${DEMO} فطار إسكندرية`,
+      },
+      {
+        householdId: personalId,
+        userId,
+        accountId: pCurrent.id,
+        categoryId: fuel.id,
+        travelId: activeTrip.id,
+        type: 'EXPENSE',
+        amount: 900,
+        occurredOn: d(1),
+        note: `${DEMO} بنزين رحلة`,
+      },
+      {
+        householdId: personalId,
+        userId,
+        accountId: pCurrent.id,
+        categoryId: entertainment.id,
+        travelId: activeTrip.id,
+        type: 'TRACK',
+        amount: 250,
+        occurredOn: d(0),
+        note: `${DEMO} تذكرة كاش`,
+      },
+    ],
+  });
+
+  // —— Month soft limits (save targets) ——
+  await prisma.monthSoftLimit.createMany({
+    data: [
+      {
+        householdId: personalId,
+        periodKey: periodKey(2),
+        saveTargetAmount: 4000,
+      },
+      {
+        householdId: personalId,
+        periodKey: periodKey(1),
+        saveTargetAmount: 5000,
+      },
+      {
+        householdId: personalId,
+        periodKey: periodKey(0),
+        saveTargetAmount: 6000,
+      },
+    ],
+  });
+
+  // —— Subscriptions: sub / installment / charity / other ——
+  async function paySub(
+    subscriptionId: string,
+    categoryId: string,
+    amount: number,
+    monthsAgo: number,
+    note: string,
+  ) {
+    const key = periodKey(monthsAgo);
+    const payTx = await prisma.transaction.create({
+      data: {
+        householdId: personalId,
+        userId,
+        accountId: pCurrent.id,
+        categoryId,
+        type: 'EXPENSE',
+        amount,
+        occurredOn: d(monthsAgo * 30 + 5),
+        note: `${DEMO} ${note}`,
+      },
+    });
+    await prisma.subscriptionPayment.create({
+      data: {
+        subscriptionId,
+        periodKey: key,
+        amount,
+        paidOn: d(monthsAgo * 30 + 5),
+        transactionId: payTx.id,
+      },
+    });
+  }
+
+  const netflix = await prisma.subscription.create({
+    data: {
+      householdId: personalId,
+      userId,
+      name: 'نتفلكس',
+      amount: 299,
+      billingDay: 5,
+      kind: 'SUBSCRIPTION',
+      startPeriodKey: periodKey(4),
+      categoryId: subs.id,
+      accountId: pCurrent.id,
+      note: `${DEMO} اشتراك شهري`,
+      color: '#4f46e5',
+      active: true,
+    },
+  });
+  await paySub(netflix.id, subs.id, 299, 2, 'دفع نتفلكس');
+  await paySub(netflix.id, subs.id, 299, 1, 'دفع نتفلكس');
+  // current month left unpaid → due/overdue for testing Mark Paid
+
+  const carPlan = await prisma.subscription.create({
+    data: {
+      householdId: personalId,
+      userId,
+      name: 'قسط عربية',
+      amount: 6500,
+      billingDay: 1,
+      kind: 'INSTALLMENT',
+      totalInstallments: 12,
+      installmentsPaid: 3,
+      startPeriodKey: periodKey(3),
+      categoryId: carInstall.id,
+      accountId: pCurrent.id,
+      note: `${DEMO} أقساط`,
+      color: '#b45309',
+      active: true,
+    },
+  });
+  await paySub(carPlan.id, carInstall.id, 6500, 3, 'قسط عربية ١');
+  await paySub(carPlan.id, carInstall.id, 6500, 2, 'قسط عربية ٢');
+  await paySub(carPlan.id, carInstall.id, 6500, 1, 'قسط عربية ٣');
+
+  await prisma.subscription.create({
+    data: {
+      householdId: personalId,
+      userId,
+      name: 'صدقة شهرية',
+      amount: 200,
+      billingDay: 10,
+      kind: 'CHARITY',
+      startPeriodKey: periodKey(1),
+      categoryId: sadaqah.id,
+      accountId: pCurrent.id,
+      note: `${DEMO} تعهد صدقة`,
+      color: '#0f766e',
+      active: true,
+    },
+  });
+  // unpaid this period
+
+  const gymSub = await prisma.subscription.create({
+    data: {
+      householdId: personalId,
+      userId,
+      name: 'جيم قديم',
+      amount: 800,
+      billingDay: 15,
+      kind: 'OTHER',
+      startPeriodKey: periodKey(6),
+      categoryId: sports.id,
+      accountId: pCurrent.id,
+      note: `${DEMO} اتوقف`,
+      color: '#7c3aed',
+      active: false,
+    },
+  });
+  await paySub(gymSub.id, sports.id, 800, 5, 'دفع جيم قديم');
+
+  // Peer loans with another house member
   const other = await prisma.membership.findFirst({
     where: { householdId: house.id, userId: { not: user.id } },
     include: { user: true },
@@ -681,138 +1032,493 @@ async function main() {
     const otherPersonal = await prisma.membership.findFirst({
       where: { userId: other.userId, household: { kind: 'PERSONAL' } },
     });
-    let fromTxId: string | undefined;
-    let toTxId: string | undefined;
+    const mockPeerExp = await ensureCat(
+      personalId,
+      'Family support',
+      'EXPENSE',
+      '#be185d',
+    );
+    const mockPeerInc = await ensureCat(
+      personalId,
+      'Family gift',
+      'INCOME',
+      '#db2777',
+    );
+
+    let otherCurrentId: string | undefined;
+    let otherPeerExpId: string | undefined;
+    let otherPeerIncId: string | undefined;
     if (otherPersonal) {
       const otherCurrent = await wallet(otherPersonal.householdId, 'Current');
-      const otherExpense = await ensureCat(
-        otherPersonal.householdId,
-        'Loan repayment',
-        'EXPENSE',
-        '#dc2626',
-      );
-      // Mock lends to other: mock current ↓, other current ↑
-      // Use "Family support" or create peer-linked expense on personal — loans service uses specific cats.
-      // Simpler: create EXPENSE on mock personal + INCOME on other personal for CASH loan.
-      const mockPeerExp = await ensureCat(
-        personalId,
-        'Family support',
-        'EXPENSE',
-        '#be185d',
-      );
-      const otherPeerInc = await ensureCat(
-        otherPersonal.householdId,
-        'Family gift',
-        'INCOME',
-        '#db2777',
-      );
-      const fromTx = await prisma.transaction.create({
-        data: {
-          householdId: personalId,
-          userId: userId,
-          accountId: pCurrent.id,
-          categoryId: mockPeerExp.id,
-          type: 'EXPENSE',
-          amount: 2500,
-          occurredOn: d(16),
-          note: `${DEMO} سلفة لـ ${other.user.name}`,
-        },
-      });
-      const toTx = await prisma.transaction.create({
-        data: {
-          householdId: otherPersonal.householdId,
-          userId: other.userId,
-          accountId: otherCurrent.id,
-          categoryId: otherPeerInc.id,
-          type: 'INCOME',
-          amount: 2500,
-          occurredOn: d(16),
-          note: `${DEMO} سلفة من Mock User`,
-        },
-      });
-      fromTxId = fromTx.id;
-      toTxId = toTx.id;
-      void otherExpense;
+      otherCurrentId = otherCurrent.id;
+      otherPeerExpId = (
+        await ensureCat(
+          otherPersonal.householdId,
+          'Family support',
+          'EXPENSE',
+          '#be185d',
+        )
+      ).id;
+      otherPeerIncId = (
+        await ensureCat(
+          otherPersonal.householdId,
+          'Family gift',
+          'INCOME',
+          '#db2777',
+        )
+      ).id;
     }
+
+    // 1) Mock lent cash — still OPEN (no repayments)
+    {
+      let fromTxId: string | undefined;
+      let toTxId: string | undefined;
+      if (otherPersonal && otherCurrentId && otherPeerIncId) {
+        const fromTx = await prisma.transaction.create({
+          data: {
+            householdId: personalId,
+            userId,
+            accountId: pCurrent.id,
+            categoryId: mockPeerExp.id,
+            type: 'EXPENSE',
+            amount: 2500,
+            occurredOn: d(16),
+            note: `${DEMO} سلفة لـ ${other.user.name}`,
+          },
+        });
+        const toTx = await prisma.transaction.create({
+          data: {
+            householdId: otherPersonal.householdId,
+            userId: other.userId,
+            accountId: otherCurrentId,
+            categoryId: otherPeerIncId,
+            type: 'INCOME',
+            amount: 2500,
+            occurredOn: d(16),
+            note: `${DEMO} سلفة من Mock User`,
+          },
+        });
+        fromTxId = fromTx.id;
+        toTxId = toTx.id;
+      }
+      await prisma.peerLoan.create({
+        data: {
+          householdId: house.id,
+          fromUserId: user.id,
+          toUserId: other.userId,
+          recordedByUserId: user.id,
+          categoryId: peerCat.id,
+          originalAmount: 2500,
+          note: `${DEMO} سلفة مفتوحة للعيلة`,
+          occurredOn: d(16),
+          status: 'OPEN',
+          kind: 'CASH',
+          fromPersonalTxId: fromTxId,
+          toPersonalTxId: toTxId,
+        },
+      });
+    }
+
+    // 2) Mock lent cash — partial repayment from other
+    {
+      let fromTxId: string | undefined;
+      let toTxId: string | undefined;
+      if (otherPersonal && otherCurrentId && otherPeerIncId) {
+        const fromTx = await prisma.transaction.create({
+          data: {
+            householdId: personalId,
+            userId,
+            accountId: pCurrent.id,
+            categoryId: mockPeerExp.id,
+            type: 'EXPENSE',
+            amount: 4000,
+            occurredOn: d(40),
+            note: `${DEMO} سلفة كبيرة لـ ${other.user.name}`,
+          },
+        });
+        const toTx = await prisma.transaction.create({
+          data: {
+            householdId: otherPersonal.householdId,
+            userId: other.userId,
+            accountId: otherCurrentId,
+            categoryId: otherPeerIncId,
+            type: 'INCOME',
+            amount: 4000,
+            occurredOn: d(40),
+            note: `${DEMO} سلفة كبيرة من Mock`,
+          },
+        });
+        fromTxId = fromTx.id;
+        toTxId = toTx.id;
+      }
+      const loan = await prisma.peerLoan.create({
+        data: {
+          householdId: house.id,
+          fromUserId: user.id,
+          toUserId: other.userId,
+          recordedByUserId: user.id,
+          categoryId: peerCat.id,
+          originalAmount: 4000,
+          note: `${DEMO} سلفة جزئي السداد`,
+          occurredOn: d(40),
+          status: 'OPEN',
+          kind: 'CASH',
+          fromPersonalTxId: fromTxId,
+          toPersonalTxId: toTxId,
+        },
+      });
+      if (otherPersonal && otherCurrentId && otherPeerExpId) {
+        const repayFrom = await prisma.transaction.create({
+          data: {
+            householdId: otherPersonal.householdId,
+            userId: other.userId,
+            accountId: otherCurrentId,
+            categoryId: otherPeerExpId,
+            type: 'EXPENSE',
+            amount: 1500,
+            occurredOn: d(12),
+            note: `${DEMO} سداد جزئي لـ Mock`,
+          },
+        });
+        const repayTo = await prisma.transaction.create({
+          data: {
+            householdId: personalId,
+            userId,
+            accountId: pCurrent.id,
+            categoryId: mockPeerInc.id,
+            type: 'INCOME',
+            amount: 1500,
+            occurredOn: d(12),
+            note: `${DEMO} تحصيل من ${other.user.name}`,
+          },
+        });
+        await prisma.loanRepayment.create({
+          data: {
+            loanId: loan.id,
+            amount: 1500,
+            occurredOn: d(12),
+            note: `${DEMO} قسط أول`,
+            recordedByUserId: other.userId,
+            fromPersonalTxId: repayFrom.id,
+            toPersonalTxId: repayTo.id,
+          },
+        });
+      }
+    }
+
+    // 3) Mock borrowed TRACK_ONLY — open (no cash move)
     await prisma.peerLoan.create({
       data: {
         householdId: house.id,
-        fromUserId: user.id,
-        toUserId: other.userId,
+        fromUserId: other.userId,
+        toUserId: user.id,
         recordedByUserId: user.id,
         categoryId: peerCat.id,
-        originalAmount: 2500,
-        note: `${DEMO} سلفة بين العيلة`,
-        occurredOn: d(16),
+        originalAmount: 1200,
+        note: `${DEMO} دين تتبع فقط`,
+        occurredOn: d(9),
         status: 'OPEN',
-        kind: 'CASH',
-        fromPersonalTxId: fromTxId,
-        toPersonalTxId: toTxId,
+        kind: 'TRACK_ONLY',
       },
     });
-    console.log('Peer loan with', other.user.name);
+
+    // 4) Mock borrowed CASH — settled after full repay
+    {
+      let fromTxId: string | undefined;
+      let toTxId: string | undefined;
+      if (otherPersonal && otherCurrentId && otherPeerExpId) {
+        const fromTx = await prisma.transaction.create({
+          data: {
+            householdId: otherPersonal.householdId,
+            userId: other.userId,
+            accountId: otherCurrentId,
+            categoryId: otherPeerExpId,
+            type: 'EXPENSE',
+            amount: 1800,
+            occurredOn: d(70),
+            note: `${DEMO} سلفة لـ Mock`,
+          },
+        });
+        const toTx = await prisma.transaction.create({
+          data: {
+            householdId: personalId,
+            userId,
+            accountId: pCurrent.id,
+            categoryId: mockPeerInc.id,
+            type: 'INCOME',
+            amount: 1800,
+            occurredOn: d(70),
+            note: `${DEMO} سلفة من ${other.user.name}`,
+          },
+        });
+        fromTxId = fromTx.id;
+        toTxId = toTx.id;
+      }
+      const loan = await prisma.peerLoan.create({
+        data: {
+          householdId: house.id,
+          fromUserId: other.userId,
+          toUserId: user.id,
+          recordedByUserId: user.id,
+          categoryId: peerCat.id,
+          originalAmount: 1800,
+          note: `${DEMO} دين اتقفل`,
+          occurredOn: d(70),
+          status: 'SETTLED',
+          kind: 'CASH',
+          fromPersonalTxId: fromTxId,
+          toPersonalTxId: toTxId,
+        },
+      });
+      const repayFrom = await prisma.transaction.create({
+        data: {
+          householdId: personalId,
+          userId,
+          accountId: pCurrent.id,
+          categoryId: mockPeerExp.id,
+          type: 'EXPENSE',
+          amount: 1800,
+          occurredOn: d(50),
+          note: `${DEMO} سداد كامل لـ ${other.user.name}`,
+        },
+      });
+      let repayToId: string | undefined;
+      if (otherPersonal && otherCurrentId && otherPeerIncId) {
+        const repayTo = await prisma.transaction.create({
+          data: {
+            householdId: otherPersonal.householdId,
+            userId: other.userId,
+            accountId: otherCurrentId,
+            categoryId: otherPeerIncId,
+            type: 'INCOME',
+            amount: 1800,
+            occurredOn: d(50),
+            note: `${DEMO} تحصيل من Mock`,
+          },
+        });
+        repayToId = repayTo.id;
+      }
+      await prisma.loanRepayment.create({
+        data: {
+          loanId: loan.id,
+          amount: 1800,
+          occurredOn: d(50),
+          note: `${DEMO} سداد كامل`,
+          recordedByUserId: user.id,
+          fromPersonalTxId: repayFrom.id,
+          toPersonalTxId: repayToId,
+        },
+      });
+    }
+
+    console.log('Peer loans with', other.user.name);
   }
 
-  // House claim: mock paid for house from pocket
-  const houseGrocery = await ensureCat(
-    house.id,
-    'Groceries',
-    'EXPENSE',
-    '#16a34a',
-  );
-  const houseBills = await ensureCat(house.id, 'Bills', 'EXPENSE', '#ea580c');
-  const claimPersonalTx = await prisma.transaction.create({
-    data: {
-      householdId: personalId,
-      userId: user.id,
-      accountId: pCurrent.id,
-      categoryId: supermarket.id,
-      type: 'EXPENSE',
-      amount: 780,
-      occurredOn: d(4),
-      note: `${DEMO} دفعت من جيبي للبيت`,
-    },
+  // —— House claims: OPEN / PARTIAL / REIMBURSED ——
+  async function makeClaim(opts: {
+    amount: number;
+    daysAgo: number;
+    note: string;
+    categoryId: string;
+    personalCatId: string;
+    status: 'OPEN' | 'PARTIAL' | 'REIMBURSED';
+    reimbursements?: { amount: number; daysAgo: number; note: string }[];
+  }) {
+    const personalTx = await prisma.transaction.create({
+      data: {
+        householdId: personalId,
+        userId,
+        accountId: pCurrent.id,
+        categoryId: opts.personalCatId,
+        type: 'EXPENSE',
+        amount: opts.amount,
+        occurredOn: d(opts.daysAgo),
+        note: `${DEMO} ${opts.note}`,
+      },
+    });
+    const claim = await prisma.houseClaim.create({
+      data: {
+        householdId: houseId,
+        memberId: userId,
+        categoryId: opts.categoryId,
+        amount: opts.amount,
+        occurredOn: d(opts.daysAgo),
+        note: `${DEMO} ${opts.note}`,
+        status: opts.status,
+        personalTxId: personalTx.id,
+      },
+    });
+    for (const r of opts.reimbursements ?? []) {
+      const houseTx = await prisma.transaction.create({
+        data: {
+          householdId: houseId,
+          userId: recorderId,
+          accountId: hCurrent.id,
+          categoryId: paybackCat.id,
+          type: 'REIMBURSEMENT',
+          amount: r.amount,
+          occurredOn: d(r.daysAgo),
+          note: `${DEMO} ${r.note}`,
+        },
+      });
+      const personalInc = await prisma.transaction.create({
+        data: {
+          householdId: personalId,
+          userId,
+          accountId: pCurrent.id,
+          categoryId: fromHouse.id,
+          type: 'INCOME',
+          amount: r.amount,
+          occurredOn: d(r.daysAgo),
+          note: `${DEMO} ${r.note}`,
+        },
+      });
+      await prisma.reimbursement.create({
+        data: {
+          claimId: claim.id,
+          amount: r.amount,
+          occurredOn: d(r.daysAgo),
+          accountId: hCurrent.id,
+          transactionId: houseTx.id,
+          personalTxId: personalInc.id,
+          recordedByUserId: recorderId,
+        },
+      });
+    }
+  }
+
+  await makeClaim({
+    amount: 780,
+    daysAgo: 4,
+    note: 'مشتريات البيت — لسه مفتوحة',
+    categoryId: houseGrocery.id,
+    personalCatId: supermarket.id,
+    status: 'OPEN',
   });
-  await prisma.houseClaim.create({
-    data: {
-      householdId: house.id,
-      memberId: user.id,
-      categoryId: houseGrocery.id,
-      amount: 780,
-      occurredOn: d(4),
-      note: `${DEMO} مشتريات البيت`,
-      status: 'OPEN',
-      personalTxId: claimPersonalTx.id,
-    },
+  await makeClaim({
+    amount: 1200,
+    daysAgo: 25,
+    note: 'فاتورة جزئي الاسترداد',
+    categoryId: houseBills.id,
+    personalCatId: electricity.id,
+    status: 'PARTIAL',
+    reimbursements: [
+      { amount: 500, daysAgo: 10, note: 'جزء من استرداد الفاتورة' },
+    ],
+  });
+  await makeClaim({
+    amount: 350,
+    daysAgo: 45,
+    note: 'مواصلات اتردت كاملة',
+    categoryId: houseTransport.id,
+    personalCatId: rides.id,
+    status: 'REIMBURSED',
+    reimbursements: [
+      { amount: 350, daysAgo: 38, note: 'استرداد كامل للمواصلات' },
+    ],
   });
 
-  // House cover: house paid for mock
-  const coverHouseTx = await prisma.transaction.create({
-    data: {
-      householdId: house.id,
-      userId: user.id,
-      accountId: hCurrent.id,
-      categoryId: houseBills.id,
-      type: 'EXPENSE',
-      amount: 450,
-      occurredOn: d(11),
-      note: `${DEMO} البيت دفع فاتورة عن Mock`,
-    },
+  // —— House covers: OPEN / PARTIAL / SETTLED ——
+  async function makeCover(opts: {
+    amount: number;
+    daysAgo: number;
+    note: string;
+    categoryId: string;
+    status: 'OPEN' | 'PARTIAL' | 'SETTLED';
+    repayments?: { amount: number; daysAgo: number; note: string }[];
+  }) {
+    const houseTx = await prisma.transaction.create({
+      data: {
+        householdId: houseId,
+        userId: recorderId,
+        accountId: hCurrent.id,
+        categoryId: opts.categoryId,
+        type: 'EXPENSE',
+        amount: opts.amount,
+        occurredOn: d(opts.daysAgo),
+        note: `${DEMO} ${opts.note}`,
+      },
+    });
+    const cover = await prisma.houseCover.create({
+      data: {
+        householdId: houseId,
+        memberId: userId,
+        categoryId: opts.categoryId,
+        amount: opts.amount,
+        occurredOn: d(opts.daysAgo),
+        note: `${DEMO} ${opts.note}`,
+        status: opts.status,
+        houseTxId: houseTx.id,
+      },
+    });
+    for (const r of opts.repayments ?? []) {
+      const repayHouse = await prisma.transaction.create({
+        data: {
+          householdId: houseId,
+          userId: recorderId,
+          accountId: hCurrent.id,
+          categoryId: memberRepayInc.id,
+          type: 'INCOME',
+          amount: r.amount,
+          occurredOn: d(r.daysAgo),
+          note: `${DEMO} ${r.note}`,
+        },
+      });
+      const repayPersonal = await prisma.transaction.create({
+        data: {
+          householdId: personalId,
+          userId,
+          accountId: pCurrent.id,
+          categoryId: toHouseCat.id,
+          type: 'EXPENSE',
+          amount: r.amount,
+          occurredOn: d(r.daysAgo),
+          note: `${DEMO} ${r.note}`,
+        },
+      });
+      await prisma.coverRepayment.create({
+        data: {
+          coverId: cover.id,
+          amount: r.amount,
+          occurredOn: d(r.daysAgo),
+          accountId: hCurrent.id,
+          houseTxId: repayHouse.id,
+          personalTxId: repayPersonal.id,
+          recordedByUserId: userId,
+        },
+      });
+    }
+  }
+
+  await makeCover({
+    amount: 450,
+    daysAgo: 11,
+    note: 'تغطية فاتورة — مفتوحة',
+    categoryId: houseBills.id,
+    status: 'OPEN',
   });
-  await prisma.houseCover.create({
-    data: {
-      householdId: house.id,
-      memberId: user.id,
-      categoryId: houseBills.id,
-      amount: 450,
-      occurredOn: d(11),
-      note: `${DEMO} تغطية فاتورة`,
-      status: 'OPEN',
-      houseTxId: coverHouseTx.id,
-    },
+  await makeCover({
+    amount: 900,
+    daysAgo: 35,
+    note: 'تغطية سوبرماركت — جزئي',
+    categoryId: houseGrocery.id,
+    status: 'PARTIAL',
+    repayments: [
+      { amount: 300, daysAgo: 18, note: 'سداد جزئي للتغطية' },
+    ],
+  });
+  await makeCover({
+    amount: 200,
+    daysAgo: 60,
+    note: 'تغطية مواصلات — اتقفلت',
+    categoryId: houseTransport.id,
+    status: 'SETTLED',
+    repayments: [
+      { amount: 200, daysAgo: 52, note: 'سداد كامل للتغطية' },
+    ],
   });
 
-  // Charity gifts (personal debit + house record)
+  // —— Charity: from personal + from house wallet ——
   const charityType = await prisma.charityType.findFirst({
     where: { householdId: house.id, archived: false },
   });
@@ -820,7 +1526,7 @@ async function main() {
     const personalGiftTx = await prisma.transaction.create({
       data: {
         householdId: personalId,
-        userId: userId,
+        userId,
         accountId: pCurrent.id,
         categoryId: sadaqah.id,
         type: 'EXPENSE',
@@ -836,24 +1542,109 @@ async function main() {
         memberId: user.id,
         amount: 500,
         occurredOn: d(3),
-        note: `${DEMO} صدقة`,
+        note: `${DEMO} صدقة من الشخصي`,
         personalTxId: personalGiftTx.id,
+      },
+    });
+
+    const houseCharityCat = await ensureCat(
+      house.id,
+      charityType.name,
+      'EXPENSE',
+      charityType.color,
+    );
+    const houseGiftTx = await prisma.transaction.create({
+      data: {
+        householdId: house.id,
+        userId: recorderId,
+        accountId: hCurrent.id,
+        categoryId: houseCharityCat.id,
+        type: 'EXPENSE',
+        amount: 300,
+        occurredOn: d(8),
+        note: `${DEMO} صدقة من فلوس البيت (سجلها Mock)`,
+      },
+    });
+    await prisma.charityGift.create({
+      data: {
+        householdId: house.id,
+        typeId: charityType.id,
+        memberId: user.id,
+        amount: 300,
+        occurredOn: d(8),
+        note: `${DEMO} صدقة من البيت`,
+        houseTxId: houseGiftTx.id,
       },
     });
   }
 
+  // —— House payouts (allowance + family gift) to mock ——
+  async function makePayout(opts: {
+    amount: number;
+    daysAgo: number;
+    note: string;
+    houseCatId: string;
+    personalCatId: string;
+  }) {
+    const houseTx = await prisma.transaction.create({
+      data: {
+        householdId: houseId,
+        userId: recorderId,
+        accountId: hCurrent.id,
+        categoryId: opts.houseCatId,
+        type: 'EXPENSE',
+        amount: opts.amount,
+        occurredOn: d(opts.daysAgo),
+        note: `${NAME} · ${DEMO} ${opts.note}`,
+      },
+    });
+    const personalTx = await prisma.transaction.create({
+      data: {
+        householdId: personalId,
+        userId,
+        accountId: pCurrent.id,
+        categoryId: opts.personalCatId,
+        type: 'INCOME',
+        amount: opts.amount,
+        occurredOn: d(opts.daysAgo),
+        note: `${DEMO} ${opts.note}`,
+      },
+    });
+    await prisma.housePayout.create({
+      data: {
+        householdId: houseId,
+        toUserId: userId,
+        recordedByUserId: recorderId,
+        amount: opts.amount,
+        occurredOn: d(opts.daysAgo),
+        note: `${DEMO} ${opts.note}`,
+        houseTxId: houseTx.id,
+        personalTxId: personalTx.id,
+      },
+    });
+  }
+
+  await makePayout({
+    amount: 2000,
+    daysAgo: 20,
+    note: 'مصروف من البيت',
+    houseCatId: houseAllowance.id,
+    personalCatId: allowance.id,
+  });
+  await makePayout({
+    amount: 1000,
+    daysAgo: 55,
+    note: 'هدية عيلة من البيت',
+    houseCatId: houseFamilyGift.id,
+    personalCatId: familyGiftIn.id,
+  });
+
   // A few house expenses attributed to mock for history/analytics flavor
-  const houseTransport = await ensureCat(
-    house.id,
-    'Transport',
-    'EXPENSE',
-    '#0284c7',
-  );
   await prisma.transaction.createMany({
     data: [
       {
         householdId: house.id,
-        userId: userId,
+        userId,
         accountId: hCurrent.id,
         categoryId: houseGrocery.id,
         type: 'EXPENSE',
@@ -863,7 +1654,7 @@ async function main() {
       },
       {
         householdId: house.id,
-        userId: userId,
+        userId,
         accountId: hCurrent.id,
         categoryId: houseTransport.id,
         type: 'EXPENSE',
@@ -879,8 +1670,15 @@ async function main() {
   console.log(`Email:    ${EMAIL}`);
   console.log(`Password: ${PASSWORD}`);
   console.log(`Name:     ${NAME}`);
-  console.log('Personal: ~6mo history, gold×5, goals×5, outside loans, transfers, track');
-  console.log('House:    claim, cover, charity gift, sample house spend, peer loan');
+  console.log(
+    'Personal: ~6mo txs, gold×5, goals×5, outside loans, transfers, track,',
+  );
+  console.log(
+    '          travels×3, soft limits×3, subscriptions×4 (+payments)',
+  );
+  console.log(
+    'House:    claims×3, covers×3, charity×2, payouts×2, peer loans×4, house spend',
+  );
   console.log('———————');
 }
 
