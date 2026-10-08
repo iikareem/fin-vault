@@ -203,6 +203,26 @@ export function formatItemDate(
   });
 }
 
+/** Clock time for ordering moves within a day (from createdAt). */
+export function formatItemTime(
+  value: string | number | Date | null | undefined,
+  locale: string,
+) {
+  if (value == null || value === "") return "";
+  const date =
+    typeof value === "number"
+      ? new Date(value)
+      : value instanceof Date
+        ? value
+        : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const loc = locale === "ar" ? "ar" : "en";
+  return date.toLocaleTimeString(loc, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 /** Newest date first. */
 export function compareOccurredOnDesc(
   a: string | Date | null | undefined,

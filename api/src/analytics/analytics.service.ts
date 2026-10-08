@@ -869,17 +869,21 @@ export class AnalyticsService {
 
     const dayMap = new Map<
       string,
-      { date: string; total: number; items: Omit<LogItem, 'occurredOn' | 'createdAt'>[] }
+      {
+        date: string;
+        total: number;
+        items: Array<Omit<LogItem, 'occurredOn' | 'createdAt'> & { createdAt: string }>;
+      }
     >();
     for (const item of capped) {
-      const { occurredOn, createdAt: _c, ...rest } = item;
+      const { occurredOn, createdAt, ...rest } = item;
       const cur = dayMap.get(occurredOn) ?? {
         date: occurredOn,
         total: 0,
         items: [],
       };
       cur.total += item.amount;
-      cur.items.push(rest);
+      cur.items.push({ ...rest, createdAt: new Date(createdAt).toISOString() });
       dayMap.set(occurredOn, cur);
     }
 
@@ -958,6 +962,7 @@ export class AnalyticsService {
         ...actorForSpace(membership.kind, t),
         amount: Number(t.amount),
         travelId: t.travelId,
+        createdAt: t.createdAt.toISOString(),
       })),
       claims: claims.map((c) => {
         const reimbursed = c.reimbursements.reduce(
@@ -974,6 +979,7 @@ export class AnalyticsService {
           category: c.category,
           categoryId: c.categoryId,
           memberId: c.memberId,
+          createdAt: c.createdAt.toISOString(),
         };
       }),
       gifts: gifts.map((g) => ({
@@ -983,6 +989,7 @@ export class AnalyticsService {
         member: g.houseTxId ? { id: 'house', name: 'House' } : g.member,
         memberId: g.houseTxId ? 'house' : g.memberId,
         type: g.type,
+        createdAt: g.createdAt.toISOString(),
       })),
     };
   }

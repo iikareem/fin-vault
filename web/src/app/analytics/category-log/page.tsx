@@ -14,6 +14,7 @@ import { budgetMonthKey, budgetMonthRange, formatItemDate } from "@/lib/calendar
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 import { DateField } from "@/components/DateField";
+import { ItemTime } from "@/components/ItemTime";
 
 type RangeMode = "month" | "custom";
 
@@ -31,6 +32,7 @@ type LogItem = {
   amount: number;
   note: string;
   type?: string;
+  createdAt?: string;
   category: {
     id: string;
     name: string;
@@ -493,6 +495,11 @@ function CategoryLogInner() {
                                   {meta.join(" · ")}
                                 </p>
                               ) : null}
+                              <ItemTime
+                                value={item.createdAt}
+                                locale={locale}
+                                className="mt-1"
+                              />
                             </div>
                             <p className="shrink-0 self-center text-sm font-bold tabular-nums text-red-800">
                               {hideAggregates ? (

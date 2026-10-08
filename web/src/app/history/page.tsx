@@ -21,6 +21,7 @@ import { useCalendarClock } from "@/hooks/useCalendarClock";
 import { isoLocal } from "@/lib/calendar";
 import { householdPath } from "@/lib/space";
 import { DateField } from "@/components/DateField";
+import { ItemTime } from "@/components/ItemTime";
 import { HIDDEN_EXPENSE_CATEGORIES, HIDDEN_INCOME_CATEGORIES } from "@/lib/category-visibility";
 import {
   isLikelyOffline,
@@ -33,6 +34,7 @@ type Tx = {
   type: "INCOME" | "EXPENSE" | "REIMBURSEMENT" | "TRACK";
   amount: number;
   note: string;
+  createdAt?: string;
   category: { id?: string; name: string; nameAr?: string | null };
   categoryId?: string;
   user: { name: string; nameAr?: string | null };
@@ -47,6 +49,7 @@ type Claim = {
   member: { name: string; nameAr?: string | null };
   category: { name: string; nameAr?: string | null };
   categoryId: string;
+  createdAt?: string;
 };
 type Gift = {
   id: string;
@@ -55,6 +58,7 @@ type Gift = {
   memberId: string;
   member: { name: string; nameAr?: string | null };
   type: { name: string };
+  createdAt?: string;
 };
 type DayLog = {
   date: string;
@@ -422,6 +426,11 @@ function HistoryInner() {
                           </p>
                         );
                       })()}
+                      <ItemTime
+                        value={tx.createdAt}
+                        locale={locale}
+                        className="mt-1.5"
+                      />
                     </div>
                     <span
                       className={`shrink-0 text-base font-bold tabular-nums ${
@@ -515,6 +524,11 @@ function HistoryInner() {
                           {c.note}
                         </p>
                       ) : null}
+                      <ItemTime
+                        value={c.createdAt}
+                        locale={locale}
+                        className="mt-1.5"
+                      />
                     </div>
                     <span className="shrink-0 text-base font-bold tabular-nums text-amber-950">
                       <Money
@@ -571,10 +585,17 @@ function HistoryInner() {
                     {t("charityThatDay")}
                   </span>
                   <div className="mt-1.5 flex items-start justify-between gap-3">
-                    <p className="min-w-0 truncate text-base font-bold" dir="auto">
-                      {personLabel(g.member, locale)} ·{" "}
-                      {labelFor(g.type.name, t)}
-                    </p>
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-bold" dir="auto">
+                        {personLabel(g.member, locale)} ·{" "}
+                        {labelFor(g.type.name, t)}
+                      </p>
+                      <ItemTime
+                        value={g.createdAt}
+                        locale={locale}
+                        className="mt-1.5"
+                      />
+                    </div>
                     <span className="shrink-0 text-base font-bold tabular-nums text-teal-950">
                       <Money
                         amount={g.amount}
