@@ -232,39 +232,44 @@ function ShareRing({
   const c = 2 * Math.PI * r;
   const dash = (clamped / 100) * c;
   return (
-    <div className="relative flex h-[4.25rem] w-[4.25rem] shrink-0 items-center justify-center">
-      <svg
-        viewBox="0 0 44 44"
-        className="absolute inset-0 h-full w-full -rotate-90"
-        aria-hidden
+    <div className="flex shrink-0 flex-col items-center gap-1">
+      <div
+        className="relative flex h-[3.75rem] w-[3.75rem] items-center justify-center"
+        aria-label={`${clamped}% ${label}`}
       >
-        <circle
-          cx="22"
-          cy="22"
-          r={r}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="4"
-          className="text-[color-mix(in_srgb,var(--foreground)_10%,transparent)]"
-        />
-        <circle
-          cx="22"
-          cy="22"
-          r={r}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="4"
-          strokeLinecap="round"
-          strokeDasharray={`${dash} ${c - dash}`}
-          className="text-red-600 transition-[stroke-dasharray] duration-300"
-        />
-      </svg>
-      <div className="relative z-[1] px-1 text-center leading-none">
-        <p className="text-sm font-bold tabular-nums text-red-700">{clamped}%</p>
-        <p className="mt-0.5 text-[9px] font-medium text-[var(--muted)]">
-          {label}
+        <svg
+          viewBox="0 0 44 44"
+          className="absolute inset-0 h-full w-full -rotate-90"
+          aria-hidden
+        >
+          <circle
+            cx="22"
+            cy="22"
+            r={r}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="4"
+            className="text-[color-mix(in_srgb,var(--foreground)_10%,transparent)]"
+          />
+          <circle
+            cx="22"
+            cy="22"
+            r={r}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeDasharray={`${dash} ${c - dash}`}
+            className="text-red-600 transition-[stroke-dasharray] duration-300"
+          />
+        </svg>
+        <p className="relative z-[1] text-sm font-bold tabular-nums leading-none text-red-700">
+          {clamped}%
         </p>
       </div>
+      <p className="max-w-[4.5rem] text-center text-[10px] font-medium leading-tight text-[var(--muted)]">
+        {label}
+      </p>
     </div>
   );
 }

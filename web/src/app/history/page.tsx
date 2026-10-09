@@ -579,6 +579,9 @@ function HistoryInner() {
                           >
                             {categoryLabel(tx.category, locale, t)}
                           </p>
+                          <div className="mt-1">
+                            <ItemTime value={tx.createdAt} locale={locale} />
+                          </div>
                           {(() => {
                             const showUser =
                               active?.kind === "HOUSE" &&
@@ -598,25 +601,22 @@ function HistoryInner() {
                             );
                           })()}
                         </div>
-                        <div className="flex shrink-0 flex-col items-end gap-1">
-                          <span
-                            className={`text-base font-bold tabular-nums ${amountClass(kind)}`}
-                          >
-                            <Money
-                              amount={tx.amount}
-                              currency={currency}
-                              locale={locale}
-                              extraSign={
-                                tx.type === "INCOME"
-                                  ? "+"
-                                  : tx.type === "TRACK"
-                                    ? undefined
-                                    : "−"
-                              }
-                            />
-                          </span>
-                          <ItemTime value={tx.createdAt} locale={locale} />
-                        </div>
+                        <span
+                          className={`shrink-0 text-base font-bold tabular-nums ${amountClass(kind)}`}
+                        >
+                          <Money
+                            amount={tx.amount}
+                            currency={currency}
+                            locale={locale}
+                            extraSign={
+                              tx.type === "INCOME"
+                                ? "+"
+                                : tx.type === "TRACK"
+                                  ? undefined
+                                  : "−"
+                            }
+                          />
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -688,6 +688,9 @@ function HistoryInner() {
                           >
                             {categoryLabel(c.category, locale, t)}
                           </p>
+                          <div className="mt-1">
+                            <ItemTime value={c.createdAt} locale={locale} />
+                          </div>
                           <p
                             className="mt-0.5 truncate text-sm text-[var(--muted)]"
                             dir="auto"
@@ -701,18 +704,15 @@ function HistoryInner() {
                               .join(" · ")}
                           </p>
                         </div>
-                        <div className="flex shrink-0 flex-col items-end gap-1">
-                          <span
-                            className={`text-base font-bold tabular-nums ${amountClass("claim")}`}
-                          >
-                            <Money
-                              amount={c.amount}
-                              currency={currency}
-                              locale={locale}
-                            />
-                          </span>
-                          <ItemTime value={c.createdAt} locale={locale} />
-                        </div>
+                        <span
+                          className={`shrink-0 text-base font-bold tabular-nums ${amountClass("claim")}`}
+                        >
+                          <Money
+                            amount={c.amount}
+                            currency={currency}
+                            locale={locale}
+                          />
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -774,6 +774,9 @@ function HistoryInner() {
                           >
                             {labelFor(g.type.name, t)}
                           </p>
+                          <div className="mt-1">
+                            <ItemTime value={g.createdAt} locale={locale} />
+                          </div>
                           <p
                             className="mt-0.5 truncate text-sm text-[var(--muted)]"
                             dir="auto"
@@ -786,18 +789,15 @@ function HistoryInner() {
                               .join(" · ")}
                           </p>
                         </div>
-                        <div className="flex shrink-0 flex-col items-end gap-1">
-                          <span
-                            className={`text-base font-bold tabular-nums ${amountClass("gift")}`}
-                          >
-                            <Money
-                              amount={g.amount}
-                              currency={currency}
-                              locale={locale}
-                            />
-                          </span>
-                          <ItemTime value={g.createdAt} locale={locale} />
-                        </div>
+                        <span
+                          className={`shrink-0 text-base font-bold tabular-nums ${amountClass("gift")}`}
+                        >
+                          <Money
+                            amount={g.amount}
+                            currency={currency}
+                            locale={locale}
+                          />
+                        </span>
                       </div>
                     </div>
                   </div>

@@ -470,6 +470,13 @@ export function MonthSoftLimitCard({
                       currency={currency}
                       locale={locale}
                       visible={moneyVisible}
+                      extraSign={
+                        overSpend != null
+                          ? "−"
+                          : leftToSpend != null
+                            ? "+"
+                            : undefined
+                      }
                     />
                   </p>
                 </div>
@@ -646,13 +653,14 @@ export function MonthSoftLimitCard({
                     </>
                   ) : (
                     <>
-                      {t("monthLimitSpendRoomShort")}{" "}
+                      {t("monthLimitLeftThisMonth")}{" "}
                       <span className="tabular-nums text-[var(--foreground)]">
                         <PrivateMoney
                           amount={Math.max(0, allowance.remaining)}
                           currency={currency}
                           locale={locale}
                           visible={moneyVisible}
+                          extraSign="+"
                         />
                       </span>
                     </>
