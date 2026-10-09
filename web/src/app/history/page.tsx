@@ -18,9 +18,10 @@ import {
 } from "@/lib/i18n";
 import { CategoryPicker } from "@/components/CategoryPicker";
 import { useCalendarClock } from "@/hooks/useCalendarClock";
-import { formatItemDate, formatItemTime, isoLocal } from "@/lib/calendar";
+import { formatItemDate, isoLocal } from "@/lib/calendar";
 import { householdPath } from "@/lib/space";
 import { DateField } from "@/components/DateField";
+import { ItemTime } from "@/components/ItemTime";
 import {
   HIDDEN_EXPENSE_CATEGORIES,
   HIDDEN_INCOME_CATEGORIES,
@@ -543,7 +544,6 @@ function HistoryInner() {
               tx.note || null,
               tx.type === "TRACK" ? t("trackOnlyBadge") : wallet,
             ].filter(Boolean);
-            const timeLabel = formatItemTime(tx.createdAt, locale);
             return (
               <li
                 key={tx.id}
@@ -587,33 +587,36 @@ function HistoryInner() {
                               showUser ? personLabel(tx.user, locale) : null,
                               ...subParts,
                             ].filter(Boolean);
-                            if (parts.length === 0 && !timeLabel) return null;
+                            if (parts.length === 0) return null;
                             return (
                               <p
                                 className="mt-0.5 truncate text-sm text-[var(--muted)]"
                                 dir="auto"
                               >
-                                {[...parts, timeLabel].filter(Boolean).join(" · ")}
+                                {parts.join(" · ")}
                               </p>
                             );
                           })()}
                         </div>
-                        <span
-                          className={`shrink-0 text-base font-bold tabular-nums ${amountClass(kind)}`}
-                        >
-                          <Money
-                            amount={tx.amount}
-                            currency={currency}
-                            locale={locale}
-                            extraSign={
-                              tx.type === "INCOME"
-                                ? "+"
-                                : tx.type === "TRACK"
-                                  ? undefined
-                                  : "−"
-                            }
-                          />
-                        </span>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <span
+                            className={`text-base font-bold tabular-nums ${amountClass(kind)}`}
+                          >
+                            <Money
+                              amount={tx.amount}
+                              currency={currency}
+                              locale={locale}
+                              extraSign={
+                                tx.type === "INCOME"
+                                  ? "+"
+                                  : tx.type === "TRACK"
+                                    ? undefined
+                                    : "−"
+                              }
+                            />
+                          </span>
+                          <ItemTime value={tx.createdAt} locale={locale} />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -655,7 +658,6 @@ function HistoryInner() {
           {log?.claims.map((c) => {
             const editing = openId === c.id;
             const mine = c.memberId === userId || canEditHouse;
-            const timeLabel = formatItemTime(c.createdAt, locale);
             return (
               <li
                 key={c.id}
@@ -694,21 +696,23 @@ function HistoryInner() {
                               t("pocketThatDay"),
                               personLabel(c.member, locale),
                               c.note || null,
-                              timeLabel,
                             ]
                               .filter(Boolean)
                               .join(" · ")}
                           </p>
                         </div>
-                        <span
-                          className={`shrink-0 text-base font-bold tabular-nums ${amountClass("claim")}`}
-                        >
-                          <Money
-                            amount={c.amount}
-                            currency={currency}
-                            locale={locale}
-                          />
-                        </span>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <span
+                            className={`text-base font-bold tabular-nums ${amountClass("claim")}`}
+                          >
+                            <Money
+                              amount={c.amount}
+                              currency={currency}
+                              locale={locale}
+                            />
+                          </span>
+                          <ItemTime value={c.createdAt} locale={locale} />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -742,7 +746,6 @@ function HistoryInner() {
           {log?.gifts.map((g) => {
             const editing = openId === g.id;
             const mine = g.memberId === userId || canEditHouse;
-            const timeLabel = formatItemTime(g.createdAt, locale);
             return (
               <li
                 key={g.id}
@@ -778,21 +781,23 @@ function HistoryInner() {
                             {[
                               t("charityThatDay"),
                               personLabel(g.member, locale),
-                              timeLabel,
                             ]
                               .filter(Boolean)
                               .join(" · ")}
                           </p>
                         </div>
-                        <span
-                          className={`shrink-0 text-base font-bold tabular-nums ${amountClass("gift")}`}
-                        >
-                          <Money
-                            amount={g.amount}
-                            currency={currency}
-                            locale={locale}
-                          />
-                        </span>
+                        <div className="flex shrink-0 flex-col items-end gap-1">
+                          <span
+                            className={`text-base font-bold tabular-nums ${amountClass("gift")}`}
+                          >
+                            <Money
+                              amount={g.amount}
+                              currency={currency}
+                              locale={locale}
+                            />
+                          </span>
+                          <ItemTime value={g.createdAt} locale={locale} />
+                        </div>
                       </div>
                     </div>
                   </div>

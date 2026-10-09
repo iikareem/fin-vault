@@ -34,7 +34,10 @@ export type MonthSoftLimitStatus = {
   periodOutflow: number;
   spentAll: number;
   commitmentsSpend: number;
+  /** Organic month surplus (income − outflow). Unchanged by wallet transfers. */
   savedThisMonth: number;
+  /** Surplus auto-moved Current → Savings for this plan. */
+  autoMovedToSavings?: number;
   save: SaveTrack | null;
   spendAllowance: SpendAllowanceTrack | null;
   overLimit: boolean;
@@ -415,6 +418,16 @@ export function MonthSoftLimitCard({
         : tone === "warn"
           ? "text-amber-800 dark:text-amber-300"
           : "text-[var(--accent-b-text)]";
+    const overSpend =
+      allowance && incomeKnown && allowance.overAllowance
+        ? Math.max(0, -allowance.remaining)
+        : null;
+    const leftToSpend =
+      allowance && incomeKnown && !allowance.overAllowance
+        ? Math.max(0, allowance.remaining)
+        : null;
+    const leftToSave =
+      save && !save.met ? Math.max(0, save.remaining) : null;
 
     return (
       <section className="surface overflow-hidden rounded-[1.25rem] px-4 py-3.5">
@@ -439,6 +452,31 @@ export function MonthSoftLimitCard({
           </div>
           {hasPlan && save && verdict ? (
             <>
+              {(leftToSpend != null || overSpend != null || leftToSave != null) && (
+                <div>
+                  <p className="text-[11px] font-medium text-[var(--muted)]">
+                    {overSpend != null
+                      ? t("monthLimitOverSpend")
+                      : leftToSpend != null
+                        ? t("monthLimitLeftThisMonth")
+                        : t("monthLimitSaveLeft")}
+                  </p>
+                  <p
+                    className={`mt-0.5 text-xl font-bold tabular-nums leading-none ${
+                      overSpend != null
+                        ? "text-amber-800 dark:text-amber-300"
+                        : "text-[var(--foreground)]"
+                    }`}
+                  >
+                    <PrivateMoney
+                      amount={overSpend ?? leftToSpend ?? leftToSave ?? 0}
+                      currency={currency}
+                      locale={locale}
+                      visible={moneyVisible}
+                    />
+                  </p>
+                </div>
+              )}
               <LimitBar
                 pct={save.pct}
                 over={verdict.kind === "overSpend"}
@@ -473,6 +511,19 @@ export function MonthSoftLimitCard({
                   })}
                 </p>
               </div>
+              {(status.autoMovedToSavings ?? 0) > 0.001 ? (
+                <p className="text-[11px] font-medium text-[var(--muted)]">
+                  {t("monthLimitAutoSaveHint")}{" "}
+                  <span className="tabular-nums text-[var(--foreground)]">
+                    <PrivateMoney
+                      amount={status.autoMovedToSavings ?? 0}
+                      currency={currency}
+                      locale={locale}
+                      visible={moneyVisible}
+                    />
+                  </span>
+                </p>
+              ) : null}
             </>
           ) : (
             <p className="text-xs leading-snug text-[var(--muted)]">
@@ -622,6 +673,19 @@ export function MonthSoftLimitCard({
                       </span>
                     </>
                   )}
+                </span>
+              ) : null}
+              {(status.autoMovedToSavings ?? 0) > 0.001 ? (
+                <span>
+                  {t("monthLimitAutoSaveHint")}{" "}
+                  <span className="tabular-nums text-[var(--foreground)]">
+                    <PrivateMoney
+                      amount={status.autoMovedToSavings ?? 0}
+                      currency={currency}
+                      locale={locale}
+                      visible={moneyVisible}
+                    />
+                  </span>
                 </span>
               ) : null}
             </div>
