@@ -9,14 +9,8 @@ import {
   budgetMonthRange,
   clampBudgetStartDay,
   dateOnlyUtc,
-  isoLocal,
-  shiftBudgetMonthKey,
 } from '../common/calendar';
 import { nonSpendCategoryFilter } from '../categories/non-spend-categories';
-import {
-  AccountsService,
-  WALLET_TRANSFER_CATEGORY,
-} from '../accounts/accounts.service';
 import { UpsertMonthSoftLimitDto } from './dto/upsert-month-soft-limit.dto';
 
 export type SaveTrack = {
@@ -48,10 +42,7 @@ export type MonthSoftLimitStatus = {
   periodOutflow: number;
   spentAll: number;
   commitmentsSpend: number;
-  /** Organic month surplus (income − outflow). Unchanged by wallet transfers. */
   savedThisMonth: number;
-  /** Surplus auto-moved Current → Savings for this plan. */
-  autoMovedToSavings: number;
   save: SaveTrack | null;
   spendAllowance: SpendAllowanceTrack | null;
   overLimit: boolean;
@@ -59,14 +50,7 @@ export type MonthSoftLimitStatus = {
 
 @Injectable()
 export class MonthSoftLimitsService {
-  constructor(
-    private prisma: PrismaService,
-    private accounts: AccountsService,
-  ) {}
-
-  private planTransferNote(periodKey: string) {
-    return `Month plan · ${periodKey}`;
-  }
+  constructor(private prisma: PrismaService) {}
 
   private async resolveStartDay(userId: string) {
     const user = await this.prisma.user.findUnique({
@@ -96,7 +80,7 @@ export class MonthSoftLimitsService {
         householdId,
         accountId: { in: ids },
         occurredOn: { gte: dateOnlyUtc(from), lte: dateOnlyUtc(to) },
-        category: { name: { not: WALLET_TRANSFER_CATEGORY } },
+        category: { name: { not: 'Wallet transfer' } },
         type: { in: ['INCOME', 'EXPENSE', 'REIMBURSEMENT'] },
       },
       _sum: { amount: true },
@@ -173,130 +157,6 @@ export class MonthSoftLimitsService {
     };
   }
 
-  private roundMoney(n: number) {
-    return Math.round(n * 100) / 100;
-  }
-
-  /** Sum of Current→Savings wallet transfers tagged for this month plan. */
-  private async sweptByTransferNotes(
-    householdId: string,
-    periodKey: string,
-  ): Promise<number> {
-    const current = await this.prisma.account.findFirst({
-      where: {
-        householdId,
-        name: 'Current',
-        archived: false,
-        type: 'CASH',
-      },
-      select: { id: true },
-    });
-    if (!current) return 0;
-
-    const agg = await this.prisma.transaction.aggregate({
-      where: {
-        householdId,
-        accountId: current.id,
-        type: 'EXPENSE',
-        note: this.planTransferNote(periodKey),
-        category: { name: WALLET_TRANSFER_CATEGORY },
-      },
-      _sum: { amount: true },
-    });
-    return this.roundMoney(Number(agg._sum?.amount ?? 0));
-  }
-
-  /**
-   * Once the plan month starts: move the *previous* month's organic surplus
-   * Current → Savings (one shot). No mid-month top-ups — wallets stay separate.
-   * Wallet transfers do not change savedThisMonth / analytics.
-   */
-  private async syncAutoSaveToSavings(
-    householdId: string,
-    userId: string,
-    rowId: string,
-    periodKey: string,
-    periodFrom: string,
-    startDay: number,
-    recordedSwept: number,
-    alreadyDone: boolean,
-  ): Promise<number> {
-    const today = isoLocal(new Date());
-    // Only on/after the first day of the picked month — never before.
-    if (today < periodFrom) {
-      return recordedSwept;
-    }
-
-    const byNotes = await this.sweptByTransferNotes(householdId, periodKey);
-    const already = this.roundMoney(Math.max(recordedSwept, byNotes));
-
-    // Already ran the start-of-month sweep — do not keep draining Current.
-    if (alreadyDone || already > 0.001) {
-      if (!alreadyDone || already > recordedSwept + 0.001) {
-        await this.prisma.monthSoftLimit.update({
-          where: { id: rowId },
-          data: {
-            autoSweptAmount: new Prisma.Decimal(already),
-            autoSweepDone: true,
-          },
-        });
-      }
-      return already;
-    }
-
-    const prevKey = shiftBudgetMonthKey(periodKey, -1);
-    const prevRange = budgetMonthRange(prevKey, startDay);
-    const prevFlow = await this.cashFlow(
-      householdId,
-      prevRange.from,
-      prevRange.to,
-    );
-    const target = this.roundMoney(Math.max(0, prevFlow.saved));
-
-    const markDone = async (amount: number) => {
-      await this.prisma.monthSoftLimit.update({
-        where: { id: rowId },
-        data: {
-          autoSweptAmount: new Prisma.Decimal(amount),
-          autoSweepDone: true,
-        },
-      });
-      return amount;
-    };
-
-    if (target < 0.01) {
-      return markDone(0);
-    }
-
-    const balances = await this.accounts.list(householdId);
-    const current = balances.find((a) => a.name === 'Current' && !a.archived);
-    const savings = balances.find((a) => a.name === 'Savings' && !a.archived);
-    if (!current || !savings) {
-      return markDone(0);
-    }
-
-    const amount = this.roundMoney(
-      Math.min(target, Math.max(0, current.balance)),
-    );
-    if (amount < 0.01) {
-      // Surplus already sitting in Savings / Current empty — count as done.
-      return markDone(0);
-    }
-
-    try {
-      await this.accounts.transfer(householdId, 'PERSONAL', userId, {
-        fromAccountId: current.id,
-        toAccountId: savings.id,
-        amount,
-        occurredOn: periodFrom,
-        note: this.planTransferNote(periodKey),
-      });
-      return markDone(amount);
-    } catch {
-      return recordedSwept;
-    }
-  }
-
   private shape(
     periodKey: string,
     periodFrom: string,
@@ -304,7 +164,6 @@ export class MonthSoftLimitsService {
     saveTargetAmount: number | null,
     flow: { income: number; outflow: number; saved: number },
     spends: { spentAll: number; commitmentsSpend: number },
-    autoMovedToSavings: number,
   ): MonthSoftLimitStatus {
     const save = this.saveTrack(saveTargetAmount, flow.saved);
     const spendAllowance =
@@ -324,7 +183,6 @@ export class MonthSoftLimitsService {
       spentAll: spends.spentAll,
       commitmentsSpend: spends.commitmentsSpend,
       savedThisMonth: flow.saved,
-      autoMovedToSavings,
       save,
       spendAllowance,
       overLimit: Boolean(spendAllowance?.overAllowance),
@@ -351,31 +209,13 @@ export class MonthSoftLimitsService {
       this.periodSpend(householdId, range.from, range.to),
     ]);
 
-    const saveTarget =
-      row?.saveTargetAmount != null ? Number(row.saveTargetAmount) : null;
-    let autoMoved = row ? Number(row.autoSweptAmount) : 0;
-
-    if (row && saveTarget != null && saveTarget > 0) {
-      autoMoved = await this.syncAutoSaveToSavings(
-        householdId,
-        userId,
-        row.id,
-        range.key,
-        range.from,
-        startDay,
-        autoMoved,
-        row.autoSweepDone,
-      );
-    }
-
     return this.shape(
       range.key,
       range.from,
       range.to,
-      saveTarget,
+      row?.saveTargetAmount != null ? Number(row.saveTargetAmount) : null,
       flow,
       spends,
-      autoMoved,
     );
   }
 

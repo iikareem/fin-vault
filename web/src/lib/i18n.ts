@@ -936,13 +936,12 @@ const ar = {
   monthLimitHeading: "هدف الادخار",
   monthLimitEmptyTitle: "حدّد هدف ادخار للشهر",
   monthLimitEmptyHint:
-    "اضبط خطة الشهر. في أول يوم من الشهر، فائض الشهر السابق يروح للتوفير مرة واحدة — والحسابات تفضل منفصلة.",
+    "اضغط هنا لتحديد المبلغ الذي تريد ادخاره هذا الشهر.",
   monthLimitSet: "تعيين",
   monthLimitEdit: "تعديل",
   monthLimitEditTitle: "هدف الادخار",
   monthLimitEditHint:
-    "كم تريد أن تدّخر؟ في أول يوم من الشهر المختار، فائض الشهر السابق يُنقل مرة واحدة إلى التوفير. التحليل يعرض ما ادّخرته هذا الشهر فقط.",
-  monthLimitAutoSaveHint: "اتحوّل للتوفير في أول الشهر",
+    "كم تريد أن تدّخر؟ يُحسب المبلغ المتاح للمصروف تلقائيًا من دخلك.",
   monthLimitAmountPlaceholder: "مثلًا: 5000",
   monthLimitAmountHint: "أدخل مبلغًا صحيحًا أكبر من صفر",
   monthLimitModeSave: "ادخار الشهر",
@@ -2053,13 +2052,12 @@ const en = {
   monthLimitHeading: "Save target",
   monthLimitEmptyTitle: "Set a save target",
   monthLimitEmptyHint:
-    "Set a month plan. On the first day of that month, last month’s surplus moves to Savings once — wallets stay separate after that.",
+    "Tap to set how much you want to keep this month.",
   monthLimitSet: "Set",
   monthLimitEdit: "Edit",
   monthLimitEditTitle: "Save target",
   monthLimitEditHint:
-    "How much do you want to keep? On the first day of the month you pick, last month’s surplus moves to Savings once. Charts still show what you actually saved this month.",
-  monthLimitAutoSaveHint: "Moved to Savings on month start",
+    "How much do you want to keep? Spend room is calculated from your income.",
   monthLimitAmountPlaceholder: "e.g. 5000",
   monthLimitAmountHint: "Enter a valid amount greater than zero",
   monthLimitModeSave: "Save this month",

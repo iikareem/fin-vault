@@ -908,7 +908,12 @@ export class AnalyticsService {
     const householdId = membership.householdId;
     const day = new Date(date);
     const txs = await this.prisma.transaction.findMany({
-      where: { householdId, occurredOn: day },
+      where: {
+        householdId,
+        occurredOn: day,
+        // Wallet moves are not day "spends" — keep Days focused on real money in/out.
+        category: { name: { not: 'Wallet transfer' } },
+      },
       include: {
         account: { select: { id: true, name: true } },
         category: { select: { id: true, name: true, nameAr: true, color: true, emoji: true, kind: true } },

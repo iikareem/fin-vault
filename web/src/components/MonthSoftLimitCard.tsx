@@ -34,10 +34,7 @@ export type MonthSoftLimitStatus = {
   periodOutflow: number;
   spentAll: number;
   commitmentsSpend: number;
-  /** Organic month surplus (income − outflow). Unchanged by wallet transfers. */
   savedThisMonth: number;
-  /** Surplus auto-moved Current → Savings for this plan. */
-  autoMovedToSavings?: number;
   save: SaveTrack | null;
   spendAllowance: SpendAllowanceTrack | null;
   overLimit: boolean;
@@ -511,19 +508,6 @@ export function MonthSoftLimitCard({
                   })}
                 </p>
               </div>
-              {(status.autoMovedToSavings ?? 0) > 0.001 ? (
-                <p className="text-[11px] font-medium text-[var(--muted)]">
-                  {t("monthLimitAutoSaveHint")}{" "}
-                  <span className="tabular-nums text-[var(--foreground)]">
-                    <PrivateMoney
-                      amount={status.autoMovedToSavings ?? 0}
-                      currency={currency}
-                      locale={locale}
-                      visible={moneyVisible}
-                    />
-                  </span>
-                </p>
-              ) : null}
             </>
           ) : (
             <p className="text-xs leading-snug text-[var(--muted)]">
@@ -673,19 +657,6 @@ export function MonthSoftLimitCard({
                       </span>
                     </>
                   )}
-                </span>
-              ) : null}
-              {(status.autoMovedToSavings ?? 0) > 0.001 ? (
-                <span>
-                  {t("monthLimitAutoSaveHint")}{" "}
-                  <span className="tabular-nums text-[var(--foreground)]">
-                    <PrivateMoney
-                      amount={status.autoMovedToSavings ?? 0}
-                      currency={currency}
-                      locale={locale}
-                      visible={moneyVisible}
-                    />
-                  </span>
                 </span>
               ) : null}
             </div>
