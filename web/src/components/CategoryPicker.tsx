@@ -13,34 +13,22 @@ export type CategoryItem = {
   emoji?: string | null;
 };
 
-function CatDot({
-  emoji,
+function ColorDot({
   color,
   active = false,
 }: {
-  emoji?: string | null;
   color?: string | null;
   active?: boolean;
 }) {
-  if (emoji) {
-    return (
-      <span
-        className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-sm ${
-          active ? "ring-2 ring-white/70" : ""
-        }`}
-        style={{ backgroundColor: color ? `${color}33` : "transparent" }}
-        aria-hidden
-      >
-        {emoji}
-      </span>
-    );
-  }
   return (
     <span
       className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-        active ? "ring-2 ring-white/70" : ""
+        active ? "ring-2 ring-white/80 ring-offset-1 ring-offset-transparent" : ""
       }`}
-      style={{ backgroundColor: color || "var(--muted)" }}
+      style={{
+        backgroundColor: color || "var(--muted)",
+        ...(active ? { boxShadow: "0 0 0 1px rgba(255,255,255,0.35)" } : {}),
+      }}
       aria-hidden
     />
   );
@@ -148,7 +136,7 @@ export function CategoryPicker({
         }
       }
     }
-    return hits.slice(0, 12);
+    return hits.slice(0, 8);
   }, [parents, childrenByParent, q, locale, t]);
 
   const filteredChildren = useMemo(() => {
@@ -202,11 +190,13 @@ export function CategoryPicker({
 
   return (
     <section className="surface space-y-3 overflow-hidden rounded-[1.5rem] p-3.5">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold">{groupLabel ?? t("forWhat")}</p>
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="shrink-0 text-sm font-semibold text-[var(--foreground)]">
+          {groupLabel ?? t("forWhat")}
+        </p>
         {breadcrumb ? (
           <p
-            className="min-w-0 truncate text-xs font-semibold text-[var(--accent-b-text)]"
+            className="min-w-0 truncate text-sm font-semibold text-[var(--accent-b-text)]"
             dir="auto"
           >
             {breadcrumb}
@@ -220,8 +210,8 @@ export function CategoryPicker({
           aria-hidden
         >
           <svg
-            width="16"
-            height="16"
+            width="15"
+            height="15"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"
@@ -238,7 +228,7 @@ export function CategoryPicker({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t("catSearchGroups")}
-          className="field !rounded-xl !py-2.5 ps-9 text-base"
+          className="field !rounded-xl !py-2.5 ps-9 text-[15px]"
           enterKeyHint="search"
           autoComplete="off"
         />
@@ -249,7 +239,7 @@ export function CategoryPicker({
           <p className="px-0.5 text-xs font-semibold text-[var(--muted)]">
             {t("catQuickResults")}
           </p>
-          <div className="grid grid-cols-1 gap-1.5">
+          <div className="grid max-h-48 grid-cols-1 gap-1.5 overflow-y-auto">
             {searchHits.map((c) => {
               const parent = c.parentId
                 ? parents.find((p) => p.id === c.parentId)
@@ -263,21 +253,19 @@ export function CategoryPicker({
                   key={c.id}
                   type="button"
                   onClick={() => pickLeaf(c.id)}
-                  className={`flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-start transition ${
+                  className={`flex min-h-11 items-center gap-2.5 rounded-xl px-3 py-2 text-start transition ${
                     active
                       ? "bg-[var(--cta-bg)] text-[var(--cta-fg)]"
                       : "bg-[var(--panel-soft)] text-[var(--foreground)]"
                   }`}
                 >
-                  <CatDot
-                    emoji={c.emoji || parent?.emoji}
+                  <ColorDot
                     color={c.color || parent?.color}
                     active={active}
                   />
-                  <span className="min-w-0 flex-1 truncate font-semibold">
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">
                     {title}
                   </span>
-                  {active ? <span aria-hidden>✓</span> : null}
                 </button>
               );
             })}
@@ -291,7 +279,7 @@ export function CategoryPicker({
             </p>
           ) : (
             <div
-              className="grid grid-cols-2 gap-2"
+              className="grid max-h-[11.5rem] grid-cols-2 gap-2 overflow-y-auto pe-0.5"
               role="listbox"
               aria-label={groupLabel ?? t("forWhat")}
             >
@@ -305,14 +293,14 @@ export function CategoryPicker({
                     role="option"
                     aria-selected={active}
                     onClick={() => pickGroup(p.id)}
-                    className={`flex min-h-12 items-center gap-2 rounded-2xl px-3 py-2.5 text-start transition ${
+                    className={`flex min-h-11 items-center gap-2 rounded-2xl px-3 py-2.5 text-start transition active:scale-[0.99] ${
                       active
                         ? "bg-[var(--cta-bg)] text-[var(--cta-fg)] shadow-sm"
                         : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
                     }`}
                   >
-                    <CatDot emoji={p.emoji} color={p.color} active={active} />
-                    <span className="line-clamp-2 min-w-0 flex-1 text-sm font-bold leading-snug">
+                    <ColorDot color={p.color} active={active} />
+                    <span className="line-clamp-1 min-w-0 flex-1 text-sm font-bold leading-snug">
                       {catText(p)}
                     </span>
                   </button>
@@ -342,7 +330,7 @@ export function CategoryPicker({
                       role="option"
                       aria-selected={active}
                       onClick={() => pickLeaf(c.id)}
-                      className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
+                      className={`rounded-full px-3.5 py-1.5 text-sm font-semibold transition active:scale-[0.99] ${
                         active
                           ? "bg-[var(--accent-b-soft)] text-[var(--accent-b-text)] ring-2 ring-[var(--accent-b)]"
                           : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"

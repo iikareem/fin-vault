@@ -627,21 +627,24 @@ function AddForm() {
 
   const amountCard = (
     <label
-      className={`surface block cursor-text rounded-[1.5rem] px-4 py-5 text-center transition ${
+      className={`surface block cursor-text rounded-[1.75rem] px-5 py-6 text-center transition ${
         amountFocused ? "ring-2 ring-[var(--accent-b)]" : ""
       }`}
     >
-      <span className="block text-xs font-medium text-[var(--muted)]">
+      <span className="block text-xs font-medium tracking-wide text-[var(--muted)]">
         {t("amount")}
       </span>
-      <span className="mt-1 flex items-baseline justify-center gap-2" dir="ltr">
-        <span className="text-base font-semibold text-[var(--muted)]">
+      <span
+        className="mt-2 flex items-baseline justify-center gap-2.5"
+        dir="ltr"
+      >
+        <span className="text-[1.75rem] font-bold leading-none tracking-tight text-[var(--foreground)]">
           {preferredCurrency}
         </span>
         <input
           inputMode="decimal"
           dir="ltr"
-          className="amount-input min-w-0 max-w-[12rem] border-0 bg-transparent p-0 text-center text-[2.35rem] font-bold leading-none tracking-tight text-[var(--foreground)] outline-none placeholder:text-[var(--muted)]"
+          className="amount-input min-w-0 max-w-[14rem] border-0 bg-transparent p-0 text-center text-[2.75rem] font-bold leading-none tracking-tight text-[var(--foreground)] outline-none placeholder:text-[var(--muted)]"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           onFocus={() => setAmountFocused(true)}
@@ -652,7 +655,7 @@ function AddForm() {
           aria-label={t("amount")}
         />
       </span>
-      <span className="mt-2 block text-xs text-[var(--muted)]">
+      <span className="mt-3 block text-xs text-[var(--muted)]">
         {t("tapToEdit")}
       </span>
     </label>
