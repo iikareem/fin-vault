@@ -10,11 +10,14 @@ import { Money } from "@/components/Money";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
 import { categoryLabel, labelFor } from "@/lib/i18n";
-import { budgetMonthKey, budgetMonthRange, formatItemDate } from "@/lib/calendar";
+import {
+  budgetMonthKey,
+  budgetMonthRange,
+  formatItemDate,
+  formatItemTime,
+} from "@/lib/calendar";
 import { householdPath } from "@/lib/space";
-import { Hint } from "@/components/Hint";
 import { DateField } from "@/components/DateField";
-import { ItemTime } from "@/components/ItemTime";
 
 type RangeMode = "month" | "custom";
 
@@ -69,7 +72,6 @@ function monthBounds(cursor: Date, startDay = 1) {
 
 function isExactBudgetMonth(from: string, to: string, startDay: number) {
   const range = budgetMonthRange(from.slice(0, 7), startDay);
-  // If `from` falls mid-period, also accept matching the period containing from.
   const byDate = budgetMonthRange(
     new Date(
       Number(from.slice(0, 4)),
@@ -207,7 +209,12 @@ function CategoryLogInner() {
   }
 
   function showUser(name?: string) {
-    if (!name || name === "House" || name === "personal" || name === "Personal") {
+    if (
+      !name ||
+      name === "House" ||
+      name === "personal" ||
+      name === "Personal"
+    ) {
       return false;
     }
     return active?.kind === "HOUSE";
@@ -226,6 +233,7 @@ function CategoryLogInner() {
       to,
     });
     if (excludeCommitments) params.set("excludeCommitments", "1");
+    if (leafParam) params.set("leaf", leafParam);
     return `/analytics/category-log?${params.toString()}`;
   }
 
@@ -241,51 +249,52 @@ function CategoryLogInner() {
     <PageShell>
       <Link
         href="/analytics"
-        className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--muted)]"
+        className="inline-flex min-h-10 items-center gap-1 text-sm font-semibold text-[var(--accent-b-text)]"
       >
         ← {t("categoryLogsBack")}
       </Link>
 
-      <h1 className="page-title mt-2">{t("categoryLogs")}</h1>
-      {excludeCommitments ? (
+      <header className="mt-1">
+        <h1 className="text-[1.65rem] font-bold leading-tight tracking-tight text-[var(--foreground)]">
+          {t("categoryLogs")}
+        </h1>
         <p className="mt-1 text-sm text-[var(--muted)]">
-          {t("withoutCommitmentsHint")}
+          {excludeCommitments
+            ? t("withoutCommitmentsHint")
+            : t("categoryLogsHint")}
         </p>
-      ) : null}
+      </header>
 
       {catIds.length === 0 ? (
-        <p className="mt-4 text-sm text-[var(--muted)]">{t("noCategoryLogs")}</p>
+        <p className="mt-6 text-center text-base text-[var(--muted)]">
+          {t("noCategoryLogs")}
+        </p>
       ) : (
         <>
-          <section className="cat-log-hero mt-4 rounded-[1.75rem] px-4 py-4">
-            <div className="flex flex-wrap items-center gap-2">
+          <section className="surface mt-4 rounded-[1.5rem] px-4 py-4">
+            <div className="flex flex-wrap items-center gap-1.5">
               {loading && !data ? (
-                <span className="cat-log-skel h-6 w-40" />
+                <span className="cat-log-skel h-6 w-40 rounded-full" />
               ) : (
                 <>
                   {visibleCats.map((c) => (
                     <span
                       key={c.id}
-                      className="inline-flex max-w-[9rem] items-center gap-1.5 rounded-full bg-[var(--panel-soft)] px-2.5 py-1 text-xs font-semibold"
+                      className="inline-flex max-w-[10rem] items-center gap-1.5 rounded-full bg-[var(--panel-soft)] px-2.5 py-1 text-xs font-semibold ring-1 ring-[var(--input-border)]"
                     >
                       <span
-                        className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-[10px] leading-none"
-                        style={
-                          c.emoji
-                            ? undefined
-                            : { background: c.color, borderRadius: 999 }
-                        }
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{ background: c.color }}
                         aria-hidden
-                      >
-                        {c.emoji || null}
-                      </span>
+                      />
                       <span className="min-w-0 truncate">
+                        {c.emoji ? `${c.emoji} ` : ""}
                         {categoryLabel(c, locale, t)}
                       </span>
                     </span>
                   ))}
                   {extraCats > 0 ? (
-                    <span className="rounded-full bg-[var(--panel-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--muted)]">
+                    <span className="rounded-full bg-[var(--panel-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--muted)] ring-1 ring-[var(--input-border)]">
                       +{extraCats}
                     </span>
                   ) : null}
@@ -293,10 +302,12 @@ function CategoryLogInner() {
               )}
             </div>
 
-            <p className="mt-4 text-sm text-[var(--muted)]">{t("selectedSpend")}</p>
-            <p className="mt-1 text-3xl font-bold tracking-tight text-red-800 tabular-nums">
+            <p className="mt-4 text-xs font-medium text-[var(--muted)]">
+              {t("selectedSpend")}
+            </p>
+            <p className="mt-1 text-3xl font-bold tracking-tight tabular-nums text-rose-700 dark:text-rose-300">
               {loading && !data ? (
-                <span className="cat-log-skel inline-block h-9 w-36" />
+                <span className="cat-log-skel inline-block h-9 w-36 rounded-xl" />
               ) : hideAggregates ? (
                 "••••"
               ) : (
@@ -309,7 +320,7 @@ function CategoryLogInner() {
             </p>
             <p className="mt-1.5 text-sm text-[var(--muted)]">
               {loading && !data ? (
-                <span className="cat-log-skel inline-block h-4 w-44" />
+                <span className="cat-log-skel inline-block h-4 w-44 rounded-lg" />
               ) : (
                 t("nPurchasesDays", {
                   purchases: String(data?.purchaseCount ?? 0),
@@ -324,7 +335,7 @@ function CategoryLogInner() {
             ) : null}
           </section>
 
-          <section className="mt-4">
+          <section className="surface mt-3.5 rounded-[1.5rem] px-3 py-3.5">
             <div className="seg grid-cols-2">
               {(["month", "custom"] as RangeMode[]).map((mode) => (
                 <button
@@ -333,7 +344,7 @@ function CategoryLogInner() {
                   onClick={() => {
                     setRangeMode(mode);
                     if (mode === "month") {
-                      const bounds = monthBounds(cursor);
+                      const bounds = monthBounds(cursor, startDay);
                       setCustomFrom(bounds.from);
                       setCustomTo(bounds.to);
                     }
@@ -349,10 +360,10 @@ function CategoryLogInner() {
             </div>
 
             {rangeMode === "month" ? (
-              <div className="mt-3 flex items-center gap-2">
+              <div className="mt-3 flex items-center gap-1">
                 <button
                   type="button"
-                  className="icon-btn shrink-0 px-3 text-xl sm:px-4"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl text-[var(--foreground)] transition hover:bg-[var(--panel-soft)]"
                   onClick={() => shiftMonth(-1)}
                   aria-label="Previous month"
                 >
@@ -375,7 +386,7 @@ function CategoryLogInner() {
                 </div>
                 <button
                   type="button"
-                  className="icon-btn shrink-0 px-3 text-xl sm:px-4"
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl text-[var(--foreground)] transition hover:bg-[var(--panel-soft)]"
                   onClick={() => shiftMonth(1)}
                   aria-label="Next month"
                 >
@@ -383,7 +394,7 @@ function CategoryLogInner() {
                 </button>
               </div>
             ) : (
-              <div className="period-range mt-3 space-y-2">
+              <div className="mt-3 space-y-2 px-1">
                 <DateField
                   label={t("fromDate")}
                   value={customFrom}
@@ -391,7 +402,9 @@ function CategoryLogInner() {
                   onChange={setCustomFrom}
                 />
                 <div className="flex justify-center" aria-hidden>
-                  <span className="text-sm font-semibold text-[var(--muted)]">↓</span>
+                  <span className="text-sm font-semibold text-[var(--muted)]">
+                    ↓
+                  </span>
                 </div>
                 <DateField
                   label={t("toDate")}
@@ -403,44 +416,62 @@ function CategoryLogInner() {
             )}
           </section>
 
-          {error ? <p className="mt-3 text-red-700">{error}</p> : null}
+          {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
+
+          <div className="mt-5 flex items-baseline justify-between gap-3">
+            <h2 className="text-base font-bold text-[var(--foreground)]">
+              {t("movesTitle")}
+            </h2>
+            {!loading && data && data.days.length > 0 ? (
+              <p className="text-xs font-medium text-[var(--muted)]">
+                {t("tapDayToOpen")}
+              </p>
+            ) : null}
+          </div>
 
           {loading && !data ? (
-            <div className="mt-5 space-y-3">
+            <div className="mt-3 space-y-2.5">
               {[0, 1, 2].map((i) => (
-                <div key={i} className="surface overflow-hidden rounded-2xl">
-                  <div className="cat-log-day-head flex justify-between px-4 py-2.5">
-                    <span className="cat-log-skel h-4 w-28" />
-                    <span className="cat-log-skel h-4 w-16" />
+                <div
+                  key={i}
+                  className="surface overflow-hidden rounded-[1.35rem]"
+                >
+                  <div className="flex justify-between px-4 py-3">
+                    <span className="cat-log-skel h-4 w-28 rounded-lg" />
+                    <span className="cat-log-skel h-4 w-16 rounded-lg" />
                   </div>
-                  <div className="space-y-3 px-4 py-3">
-                    <span className="cat-log-skel block h-10 w-full" />
-                    <span className="cat-log-skel block h-10 w-[85%]" />
+                  <div className="space-y-2.5 border-t border-[var(--surface-border)] px-4 py-3">
+                    <span className="cat-log-skel block h-10 w-full rounded-xl" />
+                    <span className="cat-log-skel block h-10 w-[85%] rounded-xl" />
                   </div>
                 </div>
               ))}
             </div>
           ) : !data || data.days.length === 0 ? (
             <div className="mt-8 px-2 text-center">
-              <p className="text-base font-medium">{t("noCategoryLogs")}</p>
-              <Hint>{t("noCategoryLogsHint")}</Hint>
+              <p className="text-base text-[var(--muted)]">
+                {t("noCategoryLogs")}
+              </p>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                {t("noCategoryLogsHint")}
+              </p>
             </div>
           ) : (
-            <div className="mt-5 space-y-3">
+            <div className="mt-3 space-y-2.5">
               {data.days.map((day) => (
                 <section
                   key={day.date}
-                  className="cat-log-day surface overflow-hidden rounded-2xl"
+                  className="cat-log-day surface overflow-hidden rounded-[1.35rem]"
                 >
                   <button
                     type="button"
                     onClick={() => openDay(day.date)}
-                    className="cat-log-day-head flex w-full items-baseline justify-between gap-3 px-4 py-2.5 text-start transition active:bg-[var(--panel-soft)]"
+                    className="flex w-full items-baseline justify-between gap-3 px-4 py-3 text-start transition hover:bg-[var(--panel-soft)] active:scale-[0.99]"
                   >
-                    <h2 className="text-sm font-semibold">
+                    <h2 className="text-sm font-bold text-[var(--foreground)]">
                       {formatItemDate(day.date, locale)}
                     </h2>
-                    <p className="text-sm font-bold tabular-nums text-red-800">
+                    <p className="text-sm font-bold tabular-nums text-rose-700 dark:text-rose-300">
                       {hideAggregates ? (
                         "••••"
                       ) : (
@@ -448,70 +479,70 @@ function CategoryLogInner() {
                           amount={day.total}
                           currency={currency}
                           locale={locale}
+                          extraSign="−"
                         />
                       )}
                     </p>
                   </button>
-                  <ul>
+                  <ul className="border-t border-[var(--surface-border)]">
                     {day.items.map((item) => {
                       const note = item.note?.trim();
                       const wallet = walletLabel(item);
                       const userName = item.user?.name;
+                      const timeLabel = formatItemTime(
+                        item.createdAt,
+                        locale,
+                      );
                       const meta = [
+                        note || null,
                         wallet,
                         showUser(userName) ? labelFor(userName!, t) : "",
+                        timeLabel,
                       ].filter(Boolean);
                       return (
                         <li key={`${item.kind}-${item.id}`}>
                           <button
                             type="button"
                             onClick={() => openDay(day.date)}
-                            className="cat-log-row flex w-full items-stretch gap-3 px-4 py-3 text-start transition active:bg-[var(--panel-soft)]"
+                            className="flex w-full items-start gap-3 px-4 py-3 text-start transition hover:bg-[var(--panel-soft)] active:bg-[var(--panel-soft)]"
                           >
                             <span
-                              className="cat-log-tick inline-flex items-center justify-center text-[11px] leading-none"
-                              style={
-                                item.category.emoji
-                                  ? {
-                                      background: `${item.category.color}33`,
-                                    }
-                                  : { background: item.category.color }
-                              }
+                              className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
+                              style={{ background: item.category.color }}
                               aria-hidden
-                            >
-                              {item.category.emoji || null}
-                            </span>
+                            />
                             <div className="min-w-0 flex-1">
-                              <p className="text-sm font-semibold leading-snug">
-                                {rowTitle(item)}
-                              </p>
-                              {note ? (
-                                <p className="mt-0.5 text-sm text-[var(--muted)]">
-                                  {note}
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <p
+                                    className="truncate text-[15px] font-semibold text-[var(--foreground)]"
+                                    dir="auto"
+                                  >
+                                    {rowTitle(item)}
+                                  </p>
+                                  {meta.length > 0 ? (
+                                    <p
+                                      className="mt-0.5 truncate text-sm text-[var(--muted)]"
+                                      dir="auto"
+                                    >
+                                      {meta.join(" · ")}
+                                    </p>
+                                  ) : null}
+                                </div>
+                                <p className="shrink-0 text-base font-bold tabular-nums text-rose-700 dark:text-rose-300">
+                                  {hideAggregates ? (
+                                    "••••"
+                                  ) : (
+                                    <Money
+                                      amount={item.amount}
+                                      currency={currency}
+                                      locale={locale}
+                                      extraSign="−"
+                                    />
+                                  )}
                                 </p>
-                              ) : null}
-                              {meta.length > 0 ? (
-                                <p className="mt-0.5 text-[11px] text-[var(--muted)]">
-                                  {meta.join(" · ")}
-                                </p>
-                              ) : null}
-                              <ItemTime
-                                value={item.createdAt}
-                                locale={locale}
-                                className="mt-1"
-                              />
+                              </div>
                             </div>
-                            <p className="shrink-0 self-center text-sm font-bold tabular-nums text-red-800">
-                              {hideAggregates ? (
-                                "••••"
-                              ) : (
-                                <Money
-                                  amount={item.amount}
-                                  currency={currency}
-                                  locale={locale}
-                                />
-                              )}
-                            </p>
                           </button>
                         </li>
                       );

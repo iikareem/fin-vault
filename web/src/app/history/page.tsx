@@ -18,16 +18,19 @@ import {
 } from "@/lib/i18n";
 import { CategoryPicker } from "@/components/CategoryPicker";
 import { useCalendarClock } from "@/hooks/useCalendarClock";
-import { isoLocal } from "@/lib/calendar";
+import { formatItemDate, formatItemTime, isoLocal } from "@/lib/calendar";
 import { householdPath } from "@/lib/space";
 import { DateField } from "@/components/DateField";
-import { ItemTime } from "@/components/ItemTime";
-import { HIDDEN_EXPENSE_CATEGORIES, HIDDEN_INCOME_CATEGORIES } from "@/lib/category-visibility";
+import {
+  HIDDEN_EXPENSE_CATEGORIES,
+  HIDDEN_INCOME_CATEGORIES,
+} from "@/lib/category-visibility";
 import {
   isLikelyOffline,
   isOfflineNetworkError,
   loadAddSnapshot,
 } from "@/lib/offline-queue";
+import { isCurrentWallet, isSavingsWallet } from "@/lib/wallets";
 
 type Tx = {
   id: string;
@@ -35,9 +38,15 @@ type Tx = {
   amount: number;
   note: string;
   createdAt?: string;
-  category: { id?: string; name: string; nameAr?: string | null };
+  category: {
+    id?: string;
+    name: string;
+    nameAr?: string | null;
+    color?: string | null;
+  };
   categoryId?: string;
   user: { name: string; nameAr?: string | null };
+  account?: { id?: string; name: string; type?: string } | null;
 };
 type Claim = {
   id: string;
@@ -68,7 +77,14 @@ type DayLog = {
   claims: Claim[];
   gifts: Gift[];
 };
-type Category = { id: string; name: string; kind: string; parentId?: string | null; color?: string | null };
+type Category = {
+  id: string;
+  name: string;
+  nameAr?: string | null;
+  kind: string;
+  parentId?: string | null;
+  color?: string | null;
+};
 
 function shiftDay(day: string, dir: number) {
   const d = new Date(`${day}T12:00:00`);
@@ -92,6 +108,32 @@ function safeCategoryLogBack(raw: string | null): string | null {
   return null;
 }
 
+function walletLabel(
+  account: { name: string } | null | undefined,
+  t: (key: MessageKey) => string,
+) {
+  if (!account) return null;
+  if (isSavingsWallet(account)) return t("savingsWallet");
+  if (isCurrentWallet(account)) return t("currentWallet");
+  return labelFor(account.name, t);
+}
+
+function toneDotClass(kind: "in" | "out" | "track" | "claim" | "gift") {
+  if (kind === "in") return "bg-emerald-500";
+  if (kind === "out") return "bg-rose-500";
+  if (kind === "claim") return "bg-amber-500";
+  if (kind === "gift") return "bg-teal-500";
+  return "bg-stone-400";
+}
+
+function amountClass(kind: "in" | "out" | "track" | "claim" | "gift") {
+  if (kind === "in") return "text-emerald-700 dark:text-emerald-300";
+  if (kind === "out") return "text-rose-700 dark:text-rose-300";
+  if (kind === "claim") return "text-amber-900 dark:text-amber-200";
+  if (kind === "gift") return "text-teal-900 dark:text-teal-200";
+  return "text-[var(--foreground)]";
+}
+
 function HistoryInner() {
   const { t, locale } = useI18n();
   const cal = useCalendarClock();
@@ -110,6 +152,8 @@ function HistoryInner() {
   const [note, setNote] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [confirmId, setConfirmId] = useState("");
+  const [catPickerOpen, setCatPickerOpen] = useState(false);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [offlineMode, setOfflineMode] = useState(false);
@@ -177,6 +221,10 @@ function HistoryInner() {
 
   function goDay(next: string) {
     setDay(next);
+    setOpenId("");
+    setConfirmId("");
+    setCatPickerOpen(false);
+    setDatePickerOpen(false);
     if (backTo || isIsoDay(onParam)) {
       const params = new URLSearchParams();
       params.set("on", next);
@@ -191,8 +239,15 @@ function HistoryInner() {
     n: string,
     cat?: string,
   ) {
+    if (openId === id) {
+      setOpenId("");
+      setConfirmId("");
+      setCatPickerOpen(false);
+      return;
+    }
     setOpenId(id);
     setConfirmId("");
+    setCatPickerOpen(false);
     setAmount(String(amt));
     setNote(n);
     setCategoryId(cat ?? "");
@@ -212,6 +267,7 @@ function HistoryInner() {
         }),
       });
       setOpenId("");
+      setCatPickerOpen(false);
       await loadDay(active.householdId, day);
     } catch (e) {
       setError(e instanceof Error ? e.message : t("couldNotSave"));
@@ -234,6 +290,7 @@ function HistoryInner() {
         }),
       });
       setOpenId("");
+      setCatPickerOpen(false);
       await loadDay(active.householdId, day);
     } catch (e) {
       setError(e instanceof Error ? e.message : t("couldNotSave"));
@@ -252,6 +309,7 @@ function HistoryInner() {
         body: JSON.stringify({ amount: parseAmount(amount), note }),
       });
       setOpenId("");
+      setCatPickerOpen(false);
       await loadDay(active.householdId, day);
     } catch (e) {
       setError(e instanceof Error ? e.message : t("couldNotSave"));
@@ -268,6 +326,7 @@ function HistoryInner() {
       await api(householdPath(active.householdId, path), { method: "DELETE" });
       setOpenId("");
       setConfirmId("");
+      setCatPickerOpen(false);
       await loadDay(active.householdId, day);
     } catch (e) {
       setError(e instanceof Error ? e.message : t("couldNotSave"));
@@ -285,6 +344,22 @@ function HistoryInner() {
   const income = log?.income ?? 0;
   const expense = log?.expense ?? 0;
   const isToday = day === cal.today;
+  const dayLabel = (() => {
+    const [y, m, d] = day.split("-").map(Number);
+    if (!y || !m || !d) return formatItemDate(day, locale) || day;
+    const date = new Date(y, m - 1, d);
+    return date.toLocaleDateString(locale === "ar" ? "ar" : "en", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  })();
+
+  const ctaStyle = {
+    background: "var(--cta-bg)",
+    color: "var(--cta-fg)",
+  };
 
   return (
     <PageShell>
@@ -296,67 +371,94 @@ function HistoryInner() {
           ← {t("backToCategoryLogs")}
         </Link>
       ) : null}
-      <h1 className={`text-lg font-semibold ${backTo ? "mt-2" : ""}`}>
-        {t("eachDay")}
-      </h1>
 
-      <div className="mt-3 flex items-center gap-2">
-        <button
-          type="button"
-          aria-label={t("pickDayHint")}
-          className="icon-btn shrink-0 px-3 text-xl"
-          onClick={() => goDay(shiftDay(day, -1))}
-        >
-          ‹
-        </button>
-        <div className="min-w-0 flex-1">
-          <DateField align="center" value={day} onChange={goDay} />
-        </div>
-        <button
-          type="button"
-          aria-label={t("pickDayHint")}
-          className="icon-btn shrink-0 px-3 text-xl"
-          onClick={() => goDay(shiftDay(day, 1))}
-        >
-          ›
-        </button>
+      <div className={backTo ? "mt-2" : ""}>
+        <h1 className="text-[1.65rem] font-bold leading-tight tracking-tight text-[var(--foreground)]">
+          {t("eachDay")}
+        </h1>
+        <p className="mt-1 text-sm text-[var(--muted)]">{t("daysHint")}</p>
       </div>
-      {!isToday ? (
-        <div className="mt-2 flex justify-center">
+
+      <section className="surface mt-4 rounded-[1.5rem] px-2 py-3">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            aria-label={t("pickDayHint")}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl text-[var(--foreground)] transition hover:bg-[var(--panel-soft)]"
+            onClick={() => goDay(shiftDay(day, -1))}
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            className="min-w-0 flex-1 py-1 text-center"
+            onClick={() => setDatePickerOpen((v) => !v)}
+          >
+            <p className="truncate text-base font-bold tabular-nums text-[var(--foreground)]">
+              {dayLabel}
+            </p>
+          </button>
+          <button
+            type="button"
+            aria-label={t("pickDayHint")}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl text-[var(--foreground)] transition hover:bg-[var(--panel-soft)]"
+            onClick={() => goDay(shiftDay(day, 1))}
+          >
+            ›
+          </button>
+        </div>
+        <div className="mt-0.5 flex justify-center">
           <button
             type="button"
             onClick={() => goDay(cal.today)}
-            className="chip text-sm"
+            disabled={isToday}
+            className={`text-sm font-semibold transition ${
+              isToday
+                ? "text-[var(--muted)] opacity-50"
+                : "text-[var(--accent-b-text)]"
+            }`}
           >
-            {t("jumpToday")}
+            {t("today")}
           </button>
         </div>
-      ) : null}
+        {datePickerOpen ? (
+          <DateField
+            className="mt-3 px-2"
+            value={day}
+            onChange={(v) => {
+              goDay(v);
+              setDatePickerOpen(false);
+            }}
+          />
+        ) : null}
+      </section>
 
       {hideAggregates ? (
         <p className="surface mt-4 rounded-2xl px-4 py-3 text-sm text-[var(--muted)]">
           {t("aggregatesAdminOnly")}
         </p>
       ) : (
-        <section className="surface mt-4 rounded-[1.5rem] p-3.5">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="min-w-0">
+        <div className="mt-4">
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="surface rounded-[1.35rem] px-3.5 py-3.5">
               <p className="text-xs font-medium text-[var(--muted)]">{t("in")}</p>
-              <p className="mt-0.5 truncate text-xl font-bold tabular-nums text-emerald-800">
+              <p className="mt-1 truncate text-xl font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
                 <Money amount={income} currency={currency} locale={locale} />
               </p>
             </div>
-            <div className="min-w-0">
+            <div className="surface rounded-[1.35rem] px-3.5 py-3.5">
               <p className="text-xs font-medium text-[var(--muted)]">{t("out")}</p>
-              <p className="mt-0.5 truncate text-xl font-bold tabular-nums text-red-800">
+              <p className="mt-1 truncate text-xl font-bold tabular-nums text-rose-700 dark:text-rose-300">
                 <Money amount={expense} currency={currency} locale={locale} />
               </p>
             </div>
           </div>
-          <p className="mt-2 text-[11px] font-medium text-[var(--muted)]">
-            {fill(t("dayMoves"), { n: String(moveCount) })}
+          <p className="mt-2 text-center text-[11px] font-medium text-[var(--muted)]">
+            {fill(isToday ? t("dayMovesToday") : t("dayMoves"), {
+              n: String(moveCount),
+            })}
           </p>
-        </section>
+        </div>
       )}
 
       {offlineMode ? (
@@ -367,22 +469,43 @@ function HistoryInner() {
         <p className="mt-3 text-base text-red-700">{error}</p>
       ) : null}
 
+      <div className="mt-5 flex items-baseline justify-between gap-3">
+        <h2 className="text-base font-bold text-[var(--foreground)]">
+          {t("movesTitle")}
+        </h2>
+        {!empty && canEditHouse ? (
+          <p className="text-xs font-medium text-[var(--muted)]">
+            {t("tapRowToEdit")}
+          </p>
+        ) : null}
+      </div>
 
       {empty ? (
-        <div className="mt-10 text-center">
+        <div className="mt-8 text-center">
           <p className="text-base text-[var(--muted)]">{t("nothingThisDay")}</p>
         </div>
       ) : (
-        <ul className="mt-5 space-y-2">
+        <ul className="mt-3 space-y-2">
           {log?.txs.map((tx) => {
             const editing = openId === tx.id;
-            const editable =
-              canEditHouse && tx.type !== "REIMBURSEMENT";
+            const editable = canEditHouse && tx.type !== "REIMBURSEMENT";
+            const kind =
+              tx.type === "INCOME"
+                ? "in"
+                : tx.type === "TRACK"
+                  ? "track"
+                  : "out";
+            const wallet = walletLabel(tx.account, t);
+            const subParts = [
+              tx.note || null,
+              tx.type === "TRACK" ? t("trackOnlyBadge") : wallet,
+            ].filter(Boolean);
+            const timeLabel = formatItemTime(tx.createdAt, locale);
             return (
               <li
                 key={tx.id}
-                className={`list-row overflow-hidden !p-0 ${
-                  editing ? "ring-2 ring-[var(--input-focus)]" : ""
+                className={`surface overflow-hidden rounded-[1.35rem] transition ${
+                  editing ? "ring-2 ring-[var(--accent-b)]" : ""
                 }`}
               >
                 <button
@@ -399,61 +522,57 @@ function HistoryInner() {
                       : undefined
                   }
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-base font-bold" dir="auto">
-                        {categoryLabel(tx.category, locale, t)}
-                      </p>
-                      {tx.type === "TRACK" ? (
-                        <span className="mt-1 inline-flex rounded-full bg-[var(--panel-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--muted)]">
-                          {t("trackOnlyBadge")}
-                        </span>
-                      ) : null}
-                      {(() => {
-                        const showUser =
-                          active?.kind === "HOUSE" && tx.user.name !== "House";
-                        const parts = [
-                          showUser ? personLabel(tx.user, locale) : null,
-                          tx.note || null,
-                        ].filter(Boolean);
-                        if (parts.length === 0) return null;
-                        return (
+                  <div className="flex items-start gap-3">
+                    <span
+                      className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${toneDotClass(kind)}`}
+                      aria-hidden
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
                           <p
-                            className="mt-1 truncate text-sm text-[var(--muted)]"
+                            className="truncate text-base font-bold text-[var(--foreground)]"
                             dir="auto"
                           >
-                            {parts.join(" · ")}
+                            {categoryLabel(tx.category, locale, t)}
                           </p>
-                        );
-                      })()}
-                      <ItemTime
-                        value={tx.createdAt}
-                        locale={locale}
-                        className="mt-1.5"
-                      />
+                          {(() => {
+                            const showUser =
+                              active?.kind === "HOUSE" &&
+                              tx.user.name !== "House";
+                            const parts = [
+                              showUser ? personLabel(tx.user, locale) : null,
+                              ...subParts,
+                            ].filter(Boolean);
+                            if (parts.length === 0 && !timeLabel) return null;
+                            return (
+                              <p
+                                className="mt-0.5 truncate text-sm text-[var(--muted)]"
+                                dir="auto"
+                              >
+                                {[...parts, timeLabel].filter(Boolean).join(" · ")}
+                              </p>
+                            );
+                          })()}
+                        </div>
+                        <span
+                          className={`shrink-0 text-base font-bold tabular-nums ${amountClass(kind)}`}
+                        >
+                          <Money
+                            amount={tx.amount}
+                            currency={currency}
+                            locale={locale}
+                            extraSign={
+                              tx.type === "INCOME"
+                                ? "+"
+                                : tx.type === "TRACK"
+                                  ? undefined
+                                  : "−"
+                            }
+                          />
+                        </span>
+                      </div>
                     </div>
-                    <span
-                      className={`shrink-0 text-base font-bold tabular-nums ${
-                        tx.type === "INCOME"
-                          ? "text-emerald-800"
-                          : tx.type === "TRACK"
-                            ? "text-[var(--foreground)]"
-                            : "text-red-800"
-                      }`}
-                    >
-                      <Money
-                        amount={tx.amount}
-                        currency={currency}
-                        locale={locale}
-                        extraSign={
-                          tx.type === "INCOME"
-                            ? "+"
-                            : tx.type === "TRACK"
-                              ? undefined
-                              : "−"
-                        }
-                      />
-                    </span>
                   </div>
                 </button>
                 {editing ? (
@@ -472,11 +591,15 @@ function HistoryInner() {
                           : expenseCats
                       }
                       t={t}
+                      locale={locale}
                       setAmount={setAmount}
                       setNote={setNote}
                       setCategoryId={setCategoryId}
+                      catPickerOpen={catPickerOpen}
+                      setCatPickerOpen={setCatPickerOpen}
                       busy={busy}
                       confirm={confirmId === tx.id}
+                      ctaStyle={ctaStyle}
                       onSave={() => saveTx(tx.id)}
                       onDelete={() =>
                         confirmId === tx.id
@@ -492,10 +615,11 @@ function HistoryInner() {
           {log?.claims.map((c) => {
             const editing = openId === c.id;
             const mine = c.memberId === userId || canEditHouse;
+            const timeLabel = formatItemTime(c.createdAt, locale);
             return (
               <li
                 key={c.id}
-                className={`overflow-hidden rounded-2xl border border-amber-200/80 bg-amber-50/90 shadow-sm ${
+                className={`surface overflow-hidden rounded-[1.35rem] transition ${
                   editing ? "ring-2 ring-amber-400" : ""
                 }`}
               >
@@ -508,50 +632,64 @@ function HistoryInner() {
                       : undefined
                   }
                 >
-                  <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-900">
-                    {t("pocketThatDay")}
-                  </span>
-                  <div className="mt-1.5 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-base font-bold" dir="auto">
-                        {personLabel(c.member, locale)} · {categoryLabel(c.category, locale, t)}
-                      </p>
-                      {c.note ? (
-                        <p
-                          className="mt-1 truncate text-sm text-amber-900/70"
-                          dir="auto"
+                  <div className="flex items-start gap-3">
+                    <span
+                      className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${toneDotClass("claim")}`}
+                      aria-hidden
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p
+                            className="truncate text-base font-bold"
+                            dir="auto"
+                          >
+                            {categoryLabel(c.category, locale, t)}
+                          </p>
+                          <p
+                            className="mt-0.5 truncate text-sm text-[var(--muted)]"
+                            dir="auto"
+                          >
+                            {[
+                              t("pocketThatDay"),
+                              personLabel(c.member, locale),
+                              c.note || null,
+                              timeLabel,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </p>
+                        </div>
+                        <span
+                          className={`shrink-0 text-base font-bold tabular-nums ${amountClass("claim")}`}
                         >
-                          {c.note}
-                        </p>
-                      ) : null}
-                      <ItemTime
-                        value={c.createdAt}
-                        locale={locale}
-                        className="mt-1.5"
-                      />
+                          <Money
+                            amount={c.amount}
+                            currency={currency}
+                            locale={locale}
+                          />
+                        </span>
+                      </div>
                     </div>
-                    <span className="shrink-0 text-base font-bold tabular-nums text-amber-950">
-                      <Money
-                        amount={c.amount}
-                        currency={currency}
-                        locale={locale}
-                      />
-                    </span>
                   </div>
                 </button>
                 {editing ? (
-                  <div className="border-t border-amber-200/80 px-3.5 pb-3.5">
+                  <div className="border-t border-[var(--surface-border)] px-3.5 pb-3.5">
                     <EditFields
                       amount={amount}
                       note={note}
                       categoryId={categoryId}
                       categories={expenseCats}
                       t={t}
+                      locale={locale}
                       setAmount={setAmount}
                       setNote={setNote}
                       setCategoryId={setCategoryId}
+                      catPickerOpen={catPickerOpen}
+                      setCatPickerOpen={setCatPickerOpen}
                       busy={busy}
                       confirm={confirmId === c.id}
+                      ctaStyle={ctaStyle}
                       onSave={() => saveClaim(c.id)}
                       onDelete={() =>
                         confirmId === c.id
@@ -567,10 +705,11 @@ function HistoryInner() {
           {log?.gifts.map((g) => {
             const editing = openId === g.id;
             const mine = g.memberId === userId || canEditHouse;
+            const timeLabel = formatItemTime(g.createdAt, locale);
             return (
               <li
                 key={g.id}
-                className={`overflow-hidden rounded-2xl border border-teal-200/80 bg-teal-50/90 shadow-sm ${
+                className={`surface overflow-hidden rounded-[1.35rem] transition ${
                   editing ? "ring-2 ring-teal-400" : ""
                 }`}
               >
@@ -581,43 +720,63 @@ function HistoryInner() {
                     mine ? startEdit(g.id, g.amount, g.note) : undefined
                   }
                 >
-                  <span className="inline-flex rounded-full bg-teal-100 px-2 py-0.5 text-[10px] font-bold text-teal-900">
-                    {t("charityThatDay")}
-                  </span>
-                  <div className="mt-1.5 flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="truncate text-base font-bold" dir="auto">
-                        {personLabel(g.member, locale)} ·{" "}
-                        {labelFor(g.type.name, t)}
-                      </p>
-                      <ItemTime
-                        value={g.createdAt}
-                        locale={locale}
-                        className="mt-1.5"
-                      />
+                  <div className="flex items-start gap-3">
+                    <span
+                      className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${toneDotClass("gift")}`}
+                      aria-hidden
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p
+                            className="truncate text-base font-bold"
+                            dir="auto"
+                          >
+                            {labelFor(g.type.name, t)}
+                          </p>
+                          <p
+                            className="mt-0.5 truncate text-sm text-[var(--muted)]"
+                            dir="auto"
+                          >
+                            {[
+                              t("charityThatDay"),
+                              personLabel(g.member, locale),
+                              timeLabel,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
+                          </p>
+                        </div>
+                        <span
+                          className={`shrink-0 text-base font-bold tabular-nums ${amountClass("gift")}`}
+                        >
+                          <Money
+                            amount={g.amount}
+                            currency={currency}
+                            locale={locale}
+                          />
+                        </span>
+                      </div>
                     </div>
-                    <span className="shrink-0 text-base font-bold tabular-nums text-teal-950">
-                      <Money
-                        amount={g.amount}
-                        currency={currency}
-                        locale={locale}
-                      />
-                    </span>
                   </div>
                 </button>
                 {editing ? (
-                  <div className="border-t border-teal-200/80 px-3.5 pb-3.5">
+                  <div className="border-t border-[var(--surface-border)] px-3.5 pb-3.5">
                     <EditFields
                       amount={amount}
                       note={note}
                       categoryId=""
                       categories={[]}
                       t={t}
+                      locale={locale}
                       setAmount={setAmount}
                       setNote={setNote}
                       setCategoryId={setCategoryId}
+                      catPickerOpen={false}
+                      setCatPickerOpen={setCatPickerOpen}
                       busy={busy}
                       confirm={confirmId === g.id}
+                      ctaStyle={ctaStyle}
                       onSave={() => saveGift(g.id)}
                       onDelete={() =>
                         confirmId === g.id
@@ -651,11 +810,15 @@ function EditFields({
   categoryId,
   categories,
   t,
+  locale,
   setAmount,
   setNote,
   setCategoryId,
+  catPickerOpen,
+  setCatPickerOpen,
   busy,
   confirm,
+  ctaStyle,
   onSave,
   onDelete,
 }: {
@@ -664,53 +827,113 @@ function EditFields({
   categoryId: string;
   categories: Category[];
   t: (key: MessageKey) => string;
+  locale: "ar" | "en";
   setAmount: (v: string) => void;
   setNote: (v: string) => void;
   setCategoryId: (v: string) => void;
+  catPickerOpen: boolean;
+  setCatPickerOpen: (v: boolean) => void;
   busy: boolean;
   confirm: boolean;
+  ctaStyle: { background: string; color: string };
   onSave: () => void;
   onDelete: () => void;
 }) {
+  const selected = categories.find((c) => c.id === categoryId);
+  const parent = selected?.parentId
+    ? categories.find((c) => c.id === selected.parentId)
+    : null;
+  const breadcrumb = selected
+    ? parent
+      ? fill(t("categoryBreadcrumb"), {
+          group: categoryLabel(parent, locale, t),
+          sub: categoryLabel(selected, locale, t),
+        })
+      : categoryLabel(selected, locale, t)
+    : "";
+
   return (
     <div className="mt-3 space-y-3 pt-3">
-      <input
-        inputMode="decimal"
-        dir="ltr"
-        className="amount-input field text-2xl"
-        value={amount}
-        onChange={(e) => setAmount(e.target.value)}
-        aria-label={t("amount")}
-      />
-      {categories.length > 0 ? (
-        <CategoryPicker
-          categories={categories}
-          value={categoryId}
-          onChange={setCategoryId}
+      <label className="block">
+        <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">
+          {t("amount")}
+        </span>
+        <input
+          inputMode="decimal"
+          dir="ltr"
+          className="amount-input field !rounded-2xl text-2xl font-bold"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          aria-label={t("amount")}
         />
+      </label>
+
+      {categories.length > 0 ? (
+        <div>
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <span className="text-xs font-medium text-[var(--muted)]">
+              {t("forWhat")}
+            </span>
+            <button
+              type="button"
+              onClick={() => setCatPickerOpen(!catPickerOpen)}
+              className="text-sm font-semibold text-[var(--accent-b-text)]"
+            >
+              {t("catChange")}
+            </button>
+          </div>
+          {!catPickerOpen ? (
+            <button
+              type="button"
+              onClick={() => setCatPickerOpen(true)}
+              className="field flex min-h-12 w-full items-center !rounded-2xl text-start text-sm font-semibold"
+            >
+              <span className="min-w-0 truncate" dir="auto">
+                {breadcrumb || t("forWhat")}
+              </span>
+            </button>
+          ) : (
+            <CategoryPicker
+              categories={categories}
+              value={categoryId}
+              onChange={(id) => {
+                setCategoryId(id);
+                setCatPickerOpen(false);
+              }}
+            />
+          )}
+        </div>
       ) : null}
-      <input
-        className="field text-base"
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        placeholder={t("noteOptional")}
-      />
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          disabled={busy}
-          onClick={onSave}
-          className="flex min-h-12 items-center justify-center rounded-2xl bg-stone-900 text-base font-bold text-white disabled:opacity-60"
-        >
-          {busy ? t("saving") : t("save")}
-        </button>
+
+      <label className="block">
+        <span className="mb-1.5 block text-xs font-medium text-[var(--muted)]">
+          {t("noteOptional")}
+        </span>
+        <input
+          className="field !rounded-2xl text-base"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder={t("noteOptional")}
+        />
+      </label>
+
+      <div className="flex items-center gap-2 pt-1">
         <button
           type="button"
           disabled={busy}
           onClick={onDelete}
-          className="flex min-h-12 items-center justify-center rounded-2xl bg-red-800 text-base font-bold text-white disabled:opacity-60"
+          className="flex min-h-12 flex-1 items-center justify-center rounded-[1.25rem] bg-[var(--panel-soft)] text-base font-semibold text-rose-700 ring-1 ring-[var(--input-border)] disabled:opacity-60 dark:text-rose-300"
         >
           {confirm ? t("confirmDelete") : t("deleteItem")}
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={onSave}
+          className="flex min-h-12 flex-[1.35] items-center justify-center rounded-[1.25rem] text-base font-bold disabled:opacity-60"
+          style={ctaStyle}
+        >
+          {busy ? t("saving") : t("save")}
         </button>
       </div>
     </div>
