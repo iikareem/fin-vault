@@ -111,46 +111,53 @@ function ProgressRing({
   paid,
   total,
   color,
+  shortCaption,
   caption,
 }: {
   paid: number;
   total: number;
   color: string;
+  shortCaption: string;
   caption: string;
 }) {
   const pct = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
-  const r = 36;
+  const r = 34;
   const c = 2 * Math.PI * r;
   const offset = c - (pct / 100) * c;
   return (
-    <div className="relative h-[5.5rem] w-[5.5rem] shrink-0">
-      <svg viewBox="0 0 88 88" className="h-full w-full -rotate-90">
-        <circle
-          cx="44"
-          cy="44"
-          r={r}
-          fill="none"
-          stroke="var(--panel-soft)"
-          strokeWidth="8"
-        />
-        <circle
-          cx="44"
-          cy="44"
-          r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth="8"
-          strokeLinecap="round"
-          strokeDasharray={c}
-          strokeDashoffset={offset}
-          className="transition-[stroke-dashoffset] duration-700 ease-out"
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center px-2 text-center">
-        <span className="text-[13px] font-bold leading-tight tabular-nums">
-          {caption}
-        </span>
+    <div className="flex flex-col items-center gap-2">
+      <div className="relative h-[5.75rem] w-[5.75rem] shrink-0">
+        <svg viewBox="0 0 88 88" className="h-full w-full -rotate-90" aria-hidden>
+          <circle
+            cx="44"
+            cy="44"
+            r={r}
+            fill="none"
+            stroke="var(--panel-soft)"
+            strokeWidth="9"
+          />
+          <circle
+            cx="44"
+            cy="44"
+            r={r}
+            fill="none"
+            stroke={color}
+            strokeWidth="9"
+            strokeLinecap="round"
+            strokeDasharray={c}
+            strokeDashoffset={offset}
+            className="transition-[stroke-dashoffset] duration-700 ease-out"
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-lg font-bold tabular-nums leading-none text-[var(--foreground)]">
+            {shortCaption}
+          </span>
+        </div>
       </div>
+      <p className="max-w-[14rem] text-center text-sm font-semibold leading-snug text-[var(--muted)]">
+        {caption}
+      </p>
     </div>
   );
 }
@@ -222,42 +229,58 @@ function PeriodMonthPicker({
     : periodOptionsAround(value);
   const title = periodLabel(value, startDay, locale);
 
+  const isCurrent = Boolean(currentKey && value === currentKey);
+
   return (
-    <div className="w-full space-y-1.5">
-      <div className="flex items-center gap-2">
-        {withArrows ? (
-          <button
-            type="button"
-            aria-label="Previous period"
-            className="icon-btn shrink-0 px-3 text-xl"
-            onClick={() => onChange(shiftBudgetMonthKey(value, -1))}
-          >
-            ‹
-          </button>
-        ) : null}
-        <div className="field flex min-h-[3.25rem] min-w-0 flex-1 flex-col items-center justify-center gap-0.5 !py-1.5">
-          <span className="text-center text-base font-bold leading-tight tabular-nums">
-            {title}
-          </span>
-          {currentKey && value === currentKey && thisPeriodLabel ? (
-            <span className="text-[11px] font-semibold text-[var(--muted)]">
-              {thisPeriodLabel}
-            </span>
+    <div className="w-full space-y-2">
+      <section className="surface rounded-[1.5rem] px-2 py-3">
+        <div className="flex items-center gap-1">
+          {withArrows ? (
+            <button
+              type="button"
+              aria-label="Previous period"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl text-[var(--foreground)] transition hover:bg-[var(--panel-soft)]"
+              onClick={() => onChange(shiftBudgetMonthKey(value, -1))}
+            >
+              ‹
+            </button>
+          ) : null}
+          <div className="min-w-0 flex-1 py-1 text-center">
+            <p className="truncate text-base font-bold tabular-nums text-[var(--foreground)]">
+              {title}
+            </p>
+          </div>
+          {withArrows ? (
+            <button
+              type="button"
+              aria-label="Next period"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-xl text-[var(--foreground)] transition hover:bg-[var(--panel-soft)]"
+              onClick={() => onChange(shiftBudgetMonthKey(value, 1))}
+            >
+              ›
+            </button>
           ) : null}
         </div>
-        {withArrows ? (
-          <button
-            type="button"
-            aria-label="Next period"
-            className="icon-btn shrink-0 px-3 text-xl"
-            onClick={() => onChange(shiftBudgetMonthKey(value, 1))}
-          >
-            ›
-          </button>
+        {currentKey && thisPeriodLabel ? (
+          <div className="mt-2 flex justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                if (!isCurrent) onChange(currentKey);
+              }}
+              className={`rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
+                isCurrent
+                  ? "pointer-events-none bg-[var(--panel-soft)] text-[var(--muted)]"
+                  : "bg-[var(--accent-b-soft)] text-[var(--accent-b-text)]"
+              }`}
+            >
+              {thisPeriodLabel}
+            </button>
+          </div>
         ) : null}
-      </div>
+      </section>
       <select
-        className="field w-full text-sm"
+        className="field w-full !rounded-[1.15rem] text-sm"
         value={value}
         onChange={(e) => {
           if (e.target.value) onChange(e.target.value);
@@ -793,6 +816,10 @@ export default function SubscriptionsPage() {
               paid={paidN}
               total={total}
               color={accent}
+              shortCaption={fill(t("subsPaidOfShort"), {
+                paid: String(paidN),
+                total: String(total),
+              })}
               caption={fill(t("subsPaidOf"), {
                 paid: String(paidN),
                 total: String(total),

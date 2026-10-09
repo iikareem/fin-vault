@@ -332,6 +332,8 @@ function HistoryInner() {
   const income = log?.income ?? 0;
   const expense = log?.expense ?? 0;
   const isToday = day === cal.today;
+  const yesterday = shiftDay(cal.today, -1);
+  const isYesterday = day === yesterday;
   const dayLabel = (() => {
     const [y, m, d] = day.split("-").map(Number);
     if (!y || !m || !d) return formatItemDate(day, locale) || day;
@@ -342,6 +344,11 @@ function HistoryInner() {
       month: "short",
       year: "numeric",
     });
+  })();
+  const dayStrip = (() => {
+    const days: string[] = [];
+    for (let i = -3; i <= 3; i += 1) days.push(shiftDay(day, i));
+    return days;
   })();
 
   const ctaStyle = {
@@ -367,7 +374,7 @@ function HistoryInner() {
         <p className="mt-1 text-sm text-[var(--muted)]">{t("daysHint")}</p>
       </div>
 
-      <section className="surface mt-4 rounded-[1.5rem] px-2 py-3">
+      <section className="surface mt-4 rounded-[1.5rem] px-2.5 py-3.5">
         <div className="flex items-center gap-1">
           <button
             type="button"
@@ -383,8 +390,13 @@ function HistoryInner() {
             onClick={() => setDatePickerOpen((v) => !v)}
           >
             <p className="truncate text-base font-bold tabular-nums text-[var(--foreground)]">
-              {dayLabel}
+              {isToday ? t("today") : isYesterday ? t("yesterday") : dayLabel}
             </p>
+            {isToday || isYesterday ? (
+              <p className="mt-0.5 truncate text-xs font-medium text-[var(--muted)]">
+                {dayLabel}
+              </p>
+            ) : null}
           </button>
           <button
             type="button"
@@ -395,25 +407,66 @@ function HistoryInner() {
             ›
           </button>
         </div>
-        <div className="mt-0.5 flex justify-center">
+
+        <div className="-mx-0.5 mt-3 flex gap-1.5 overflow-x-auto px-0.5 pb-0.5">
+          {dayStrip.map((d) => {
+            const [y, m, dd] = d.split("-").map(Number);
+            const date = new Date(y, m - 1, dd);
+            const weekday = date.toLocaleDateString(
+              locale === "ar" ? "ar" : "en",
+              { weekday: "narrow" },
+            );
+            const selected = d === day;
+            const todayChip = d === cal.today;
+            return (
+              <button
+                key={d}
+                type="button"
+                onClick={() => goDay(d)}
+                aria-current={selected ? "date" : undefined}
+                className={`flex min-w-[2.85rem] flex-1 flex-col items-center rounded-2xl px-1.5 py-2 transition active:scale-[0.98] ${
+                  selected
+                    ? "bg-[var(--cta-bg)] text-[var(--cta-fg)] shadow-sm"
+                    : todayChip
+                      ? "bg-[var(--accent-b-soft)] text-[var(--accent-b-text)] ring-1 ring-[var(--accent-b)]"
+                      : "bg-[var(--panel-soft)] text-[var(--foreground)]"
+                }`}
+              >
+                <span
+                  className={`text-[10px] font-semibold uppercase tracking-wide ${
+                    selected ? "opacity-80" : "text-[var(--muted)]"
+                  }`}
+                >
+                  {weekday}
+                </span>
+                <span className="mt-0.5 text-sm font-bold tabular-nums">
+                  {dd}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-2.5 flex justify-center">
           <button
             type="button"
             onClick={() => {
               if (!isToday) goDay(cal.today);
             }}
-            className={`text-sm font-semibold transition ${
+            className={`rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
               isToday
-                ? "pointer-events-none text-[var(--muted)] opacity-50"
-                : "text-[var(--accent-b-text)]"
+                ? "pointer-events-none bg-[var(--panel-soft)] text-[var(--muted)]"
+                : "bg-[var(--accent-b-soft)] text-[var(--accent-b-text)]"
             }`}
             aria-current={isToday ? "date" : undefined}
           >
-            {t("today")}
+            {isToday ? t("today") : t("jumpToday")}
           </button>
         </div>
+
         {datePickerOpen ? (
           <DateField
-            className="mt-3 px-2"
+            className="mt-3 px-1"
             value={day}
             onChange={(v) => {
               goDay(v);
