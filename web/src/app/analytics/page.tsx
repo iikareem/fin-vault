@@ -343,10 +343,8 @@ export default function AnalyticsPage() {
         setDays(d);
         const expense = c.filter((x) => x.type === "EXPENSE");
         setCats(expense);
-        // Match Charts UX: start with Top 3 so the explorer has a clear story.
-        setSelectedGroups(
-          expense.slice(0, 3).map((x) => x.categoryId ?? x.name),
-        );
+        // Keep explorer unselected until the user picks groups.
+        setSelectedGroups([]);
         setExpandedSubs([]);
         setMembers(m);
         setSavingsOpening(s.opening);

@@ -176,13 +176,11 @@ function HistoryInner() {
     );
   }
 
+  // Sync from URL only. Do not snap back to "today" on clock ticks / focus —
+  // that made arrow navigation feel broken on other days.
   useEffect(() => {
-    if (isIsoDay(onParam)) {
-      setDay(onParam);
-      return;
-    }
-    setDay(cal.today);
-  }, [cal.today, onParam]);
+    if (isIsoDay(onParam)) setDay(onParam);
+  }, [onParam]);
 
   // Categories rarely change — fetch once per household, not on every day flip.
   useEffect(() => {
@@ -225,12 +223,10 @@ function HistoryInner() {
     setConfirmId("");
     setCatPickerOpen(false);
     setDatePickerOpen(false);
-    if (backTo || isIsoDay(onParam)) {
-      const params = new URLSearchParams();
-      params.set("on", next);
-      if (backTo) params.set("back", backTo);
-      router.replace(`/history?${params.toString()}`, { scroll: false });
-    }
+    const params = new URLSearchParams();
+    params.set("on", next);
+    if (backTo) params.set("back", backTo);
+    router.replace(`/history?${params.toString()}`, { scroll: false });
   }
 
   function startEdit(
@@ -410,13 +406,15 @@ function HistoryInner() {
         <div className="mt-0.5 flex justify-center">
           <button
             type="button"
-            onClick={() => goDay(cal.today)}
-            disabled={isToday}
+            onClick={() => {
+              if (!isToday) goDay(cal.today);
+            }}
             className={`text-sm font-semibold transition ${
               isToday
-                ? "text-[var(--muted)] opacity-50"
+                ? "pointer-events-none text-[var(--muted)] opacity-50"
                 : "text-[var(--accent-b-text)]"
             }`}
+            aria-current={isToday ? "date" : undefined}
           >
             {t("today")}
           </button>
