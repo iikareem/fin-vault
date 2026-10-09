@@ -119,6 +119,10 @@ export class AnalyticsController {
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean);
+    const leafIds = (leaf ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
     return this.analytics.categoryLog(
       membership,
       from ?? fallback.from,
@@ -127,7 +131,7 @@ export class AnalyticsController {
       {
         excludeCommitments:
           excludeCommitments === '1' || excludeCommitments === 'true',
-        leafCategoryId: leaf?.trim() || undefined,
+        leafCategoryIds: leafIds.length > 0 ? leafIds : undefined,
       },
     );
   }

@@ -9,7 +9,7 @@ import { PageShell } from "@/components/PageShell";
 import { Money } from "@/components/Money";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
-import { categoryLabel, labelFor } from "@/lib/i18n";
+import { categoryLabel, fill, labelFor } from "@/lib/i18n";
 import {
   budgetMonthKey,
   budgetMonthRange,
@@ -65,6 +65,10 @@ type CategoryLog = {
   truncated?: boolean;
   categories: CatMeta[];
   subcategories?: SubCatMeta[];
+  /** Selected parent groups that have direct (no-sub) spend in range. */
+  directCategoryIds?: string[];
+  leafCategoryIds?: string[];
+  /** @deprecated single-leaf responses */
   leafCategoryId?: string | null;
   days: DayGroup[];
 };
@@ -100,7 +104,7 @@ function CategoryLogInner() {
   const hideAggregates = active?.kind === "HOUSE" && house?.role !== "ADMIN";
 
   const catsParam = search.get("cats") ?? "";
-  const leafParam = search.get("leaf")?.trim() || "";
+  const leafParam = search.get("leaf") ?? "";
   const excludeCommitments =
     search.get("excludeCommitments") === "1" ||
     search.get("excludeCommitments") === "true";
@@ -112,6 +116,12 @@ function CategoryLogInner() {
         .filter(Boolean),
     [catsParam],
   );
+  const leafIds = useMemo(
+    () =>
+      [...new Set(leafParam.split(",").map((s) => s.trim()).filter(Boolean))],
+    [leafParam],
+  );
+  const leafKey = leafIds.join(",");
 
   const initialFrom = search.get("from") ?? "";
   const initialTo = search.get("to") ?? "";
@@ -162,7 +172,7 @@ function CategoryLogInner() {
       categoryIds: catIds.join(","),
     });
     if (excludeCommitments) q.set("excludeCommitments", "1");
-    if (leafParam) q.set("leaf", leafParam);
+    if (leafKey) q.set("leaf", leafKey);
     api<CategoryLog>(
       householdPath(active.householdId, `/analytics/category-log?${q}`),
     )
@@ -178,7 +188,7 @@ function CategoryLogInner() {
     to,
     catIds.join(","),
     excludeCommitments,
-    leafParam,
+    leafKey,
   ]);
 
   useEffect(() => {
@@ -189,9 +199,9 @@ function CategoryLogInner() {
       to,
     });
     if (excludeCommitments) params.set("excludeCommitments", "1");
-    if (leafParam) params.set("leaf", leafParam);
+    if (leafKey) params.set("leaf", leafKey);
     router.replace(`/analytics/category-log?${params}`, { scroll: false });
-  }, [from, to, catIds.join(","), excludeCommitments, leafParam]);
+  }, [from, to, catIds.join(","), excludeCommitments, leafKey]);
 
   const categories = data?.categories ?? [];
   const visibleCats = categories.slice(0, 4);
@@ -230,20 +240,28 @@ function CategoryLogInner() {
     return labelFor(name, t);
   }
 
-  function categoryLogHref(leaf?: string | null) {
+  function categoryLogHref(nextLeaves?: string[]) {
     const params = new URLSearchParams({
       cats: catIds.join(","),
       from,
       to,
     });
     if (excludeCommitments) params.set("excludeCommitments", "1");
-    const nextLeaf = leaf === undefined ? leafParam : leaf;
-    if (nextLeaf) params.set("leaf", nextLeaf);
+    const leaves = nextLeaves ?? leafIds;
+    if (leaves.length > 0) params.set("leaf", leaves.join(","));
     return `/analytics/category-log?${params.toString()}`;
   }
 
-  function setLeaf(leaf: string | null) {
-    router.replace(categoryLogHref(leaf), { scroll: false });
+  function setLeaves(next: string[]) {
+    router.replace(categoryLogHref(next), { scroll: false });
+  }
+
+  function toggleLeaf(id: string) {
+    if (leafIds.includes(id)) {
+      setLeaves(leafIds.filter((x) => x !== id));
+    } else {
+      setLeaves([...leafIds, id]);
+    }
   }
 
   function openDay(date: string) {
@@ -255,7 +273,39 @@ function CategoryLogInner() {
   }
 
   const subcategories = data?.subcategories ?? [];
-  const activeLeaf = data?.leafCategoryId ?? leafParam;
+  const directCategoryIds = data?.directCategoryIds ?? [];
+  const leafSet = useMemo(() => new Set(leafIds), [leafIds]);
+  const filterActive = leafIds.length > 0;
+  const showDirectChip =
+    categories.length === 1 &&
+    !categories[0].id.startsWith("travel:") &&
+    (directCategoryIds.includes(categories[0].id) ||
+      leafSet.has(categories[0].id));
+  const showSubPicker = subcategories.length > 0 || showDirectChip;
+  const pickOptions = useMemo(() => {
+    const opts: {
+      id: string;
+      label: string;
+      color: string;
+      emoji?: string;
+    }[] = [];
+    if (showDirectChip) {
+      opts.push({
+        id: categories[0].id,
+        label: t("subcategoryDirect"),
+        color: categories[0].color,
+      });
+    }
+    for (const s of subcategories) {
+      opts.push({
+        id: s.id,
+        label: categoryLabel(s, locale, t),
+        color: s.color,
+        emoji: s.emoji,
+      });
+    }
+    return opts;
+  }, [showDirectChip, categories, subcategories, locale, t]);
 
   return (
     <PageShell>
@@ -314,57 +364,85 @@ function CategoryLogInner() {
               )}
             </div>
 
-            {subcategories.length > 0 ? (
-              <div className="mt-3">
-                <p className="text-[11px] font-medium text-[var(--muted)]">
-                  {t("categoryLogPickSub")}
-                </p>
-                <div className="mt-1.5 flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  <button
-                    type="button"
-                    onClick={() => setLeaf(null)}
-                    aria-pressed={!activeLeaf}
-                    className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                      !activeLeaf
-                        ? "bg-[var(--accent-b)] text-[var(--accent-b-fg)]"
-                        : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
-                    }`}
-                  >
-                    {t("categoryLogAllSubs")}
-                  </button>
-                  {categories.length === 1 &&
-                  !categories[0].id.startsWith("travel:") ? (
+            {showSubPicker ? (
+              <div className="mt-3 rounded-2xl bg-[var(--panel-soft)] px-3 py-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[var(--foreground)]">
+                      {t("categoryLogPickSub")}
+                    </p>
+                    <p className="mt-0.5 text-[11px] leading-snug text-[var(--muted)]">
+                      {filterActive
+                        ? fill(t("categoryLogSubsSelected"), {
+                            n: String(leafIds.length),
+                          })
+                        : t("categoryLogPickSubHint")}
+                    </p>
+                  </div>
+                  {filterActive ? (
                     <button
                       type="button"
-                      onClick={() => setLeaf(categories[0].id)}
-                      aria-pressed={activeLeaf === categories[0].id}
-                      className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                        activeLeaf === categories[0].id
-                          ? "bg-[var(--accent-b)] text-[var(--accent-b-fg)]"
-                          : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
-                      }`}
+                      onClick={() => setLeaves([])}
+                      className="shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold text-[var(--accent-b-text)]"
                     >
-                      {t("subcategoryDirect")}
+                      {t("categoryLogClearSubs")}
                     </button>
                   ) : null}
-                  {subcategories.map((s) => {
-                    const on = activeLeaf === s.id;
+                </div>
+
+                <div className="mt-2.5 grid grid-cols-2 gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setLeaves([])}
+                    aria-pressed={!filterActive}
+                    className={`flex min-h-[2.75rem] items-center gap-2 rounded-xl px-2.5 py-2 text-start text-xs font-semibold transition ${
+                      !filterActive
+                        ? "bg-[var(--accent-b)] text-[var(--accent-b-fg)] shadow-sm"
+                        : "bg-[var(--surface-bg)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
+                    }`}
+                  >
+                    <span
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] ${
+                        !filterActive
+                          ? "bg-white/25 text-inherit"
+                          : "border border-[var(--input-border)] text-transparent"
+                      }`}
+                      aria-hidden
+                    >
+                      ✓
+                    </span>
+                    <span className="min-w-0 leading-snug">
+                      {t("categoryLogAllSubs")}
+                    </span>
+                  </button>
+                  {pickOptions.map((opt) => {
+                    const on = leafSet.has(opt.id);
                     return (
                       <button
-                        key={s.id}
+                        key={opt.id}
                         type="button"
-                        onClick={() => setLeaf(s.id)}
+                        onClick={() => toggleLeaf(opt.id)}
                         aria-pressed={on}
-                        className={`inline-flex max-w-[11rem] shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                        className={`flex min-h-[2.75rem] items-center gap-2 rounded-xl px-2.5 py-2 text-start text-xs font-semibold transition ${
                           on
-                            ? "text-white"
-                            : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
+                            ? "text-white shadow-sm"
+                            : "bg-[var(--surface-bg)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
                         }`}
-                        style={on ? { background: s.color } : undefined}
+                        style={on ? { background: opt.color } : undefined}
                       >
-                        <span className="min-w-0 truncate">
-                          {s.emoji ? `${s.emoji} ` : ""}
-                          {categoryLabel(s, locale, t)}
+                        <span
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] ${
+                            on
+                              ? "bg-white/25 text-white"
+                              : "border border-[var(--input-border)] text-transparent"
+                          }`}
+                          aria-hidden
+                        >
+                          ✓
+                        </span>
+                        <span className="min-w-0 truncate leading-snug">
+                          {opt.emoji ? `${opt.emoji} ` : ""}
+                          {opt.label}
                         </span>
                       </button>
                     );

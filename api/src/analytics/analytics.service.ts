@@ -670,7 +670,7 @@ export class AnalyticsService {
     from: string,
     to: string,
     categoryIds: string[],
-    opts: { excludeCommitments?: boolean; leafCategoryId?: string } = {},
+    opts: { excludeCommitments?: boolean; leafCategoryIds?: string[] } = {},
   ) {
     const excludeCommitments = Boolean(opts.excludeCommitments);
     const ids = [...new Set(categoryIds.filter(Boolean))];
@@ -732,27 +732,43 @@ export class AnalyticsService {
       })
       .filter((c): c is NonNullable<typeof c> => !!c);
 
-    const subcategories = cats
-      .filter((c) => c.parentId && selected.has(c.parentId))
-      .map((c) => ({
-        id: c.id,
-        name: c.name,
-        nameAr: c.nameAr,
-        color: c.color,
-        emoji: c.emoji,
-        parentId: c.parentId as string,
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-
     const ITEM_CAP = 500;
-    const leafId = opts.leafCategoryId?.trim() || '';
-    const leafOk =
-      Boolean(leafId) &&
-      (expanded.has(leafId) || selected.has(leafId));
-    const plainCategoryFilter = leafOk
-      ? { categoryId: leafId }
+    const requestedLeaves = [
+      ...new Set((opts.leafCategoryIds ?? []).map((s) => s.trim()).filter(Boolean)),
+    ];
+    const leafIds = requestedLeaves.filter(
+      (id) => expanded.has(id) || selected.has(id),
+    );
+    const leafFilterOn = leafIds.length > 0;
+    const plainCategoryFilter = leafFilterOn
+      ? { categoryId: { in: leafIds } }
       : { categoryId: { in: expandedIds } };
-    const travelLeafFilter = leafOk ? { categoryId: leafId } : {};
+    const travelLeafFilter = leafFilterOn
+      ? { categoryId: { in: leafIds } }
+      : {};
+
+    const periodBounds = {
+      gte: dateOnlyUtc(from),
+      lte: dateOnlyUtc(to),
+    };
+    const commitFilter = excludeCommitments
+      ? { subscriptionPayment: { is: null } as const }
+      : {};
+
+    // Full group scope (ignore leaf) — used to list only subs that appear in this period.
+    const scopeBranches: Record<string, unknown>[] = [];
+    if (expandedIds.length > 0) {
+      scopeBranches.push({
+        travelId: null,
+        categoryId: { in: expandedIds },
+      });
+    }
+    if (travelIds.length > 0) {
+      scopeBranches.push({ travelId: { in: travelIds } });
+    }
+    if (scopeBranches.length === 0) {
+      throw new BadRequestException('Pick at least one category');
+    }
 
     const orBranches: Record<string, unknown>[] = [];
     if (expandedIds.length > 0) {
@@ -767,48 +783,65 @@ export class AnalyticsService {
         ...travelLeafFilter,
       });
     }
-    if (orBranches.length === 0) {
-      throw new BadRequestException('Pick at least one category');
-    }
 
-    const txs = await this.prisma.transaction.findMany({
-      where: {
-        householdId,
-        type: { in: ['EXPENSE', 'TRACK'] },
-        occurredOn: { gte: dateOnlyUtc(from), lte: dateOnlyUtc(to) },
-        category: nonSpendCategoryFilter,
-        OR: orBranches,
-        ...(excludeCommitments
-          ? { subscriptionPayment: { is: null } }
-          : {}),
-      },
-      include: {
-        account: { select: { id: true, name: true } },
-        category: {
-          select: {
-            id: true,
-            name: true,
-            nameAr: true,
-            color: true,
-            emoji: true,
-            kind: true,
-            parentId: true,
-          },
+    const [usedCatRows, usedClaimRows, txs, claims] = await Promise.all([
+      this.prisma.transaction.groupBy({
+        by: ['categoryId'],
+        where: {
+          householdId,
+          type: { in: ['EXPENSE', 'TRACK'] },
+          occurredOn: periodBounds,
+          category: nonSpendCategoryFilter,
+          OR: scopeBranches,
+          ...commitFilter,
         },
-        user: { select: { id: true, name: true, nameAr: true } },
-      },
-      orderBy: [{ occurredOn: 'desc' }, { createdAt: 'desc' }],
-      take: ITEM_CAP,
-    });
-
-    const claims =
+        _sum: { amount: true },
+      }),
       membership.kind === 'HOUSE' && expandedIds.length > 0
-        ? await this.prisma.houseClaim.findMany({
+        ? this.prisma.houseClaim.groupBy({
+            by: ['categoryId'],
             where: {
               householdId,
-              occurredOn: { gte: dateOnlyUtc(from), lte: dateOnlyUtc(to) },
-              ...(leafOk
-                ? { categoryId: leafId }
+              occurredOn: periodBounds,
+              categoryId: { in: expandedIds },
+            },
+            _sum: { amount: true },
+          })
+        : Promise.resolve([] as { categoryId: string }[]),
+      this.prisma.transaction.findMany({
+        where: {
+          householdId,
+          type: { in: ['EXPENSE', 'TRACK'] },
+          occurredOn: periodBounds,
+          category: nonSpendCategoryFilter,
+          OR: orBranches,
+          ...commitFilter,
+        },
+        include: {
+          account: { select: { id: true, name: true } },
+          category: {
+            select: {
+              id: true,
+              name: true,
+              nameAr: true,
+              color: true,
+              emoji: true,
+              kind: true,
+              parentId: true,
+            },
+          },
+          user: { select: { id: true, name: true, nameAr: true } },
+        },
+        orderBy: [{ occurredOn: 'desc' }, { createdAt: 'desc' }],
+        take: ITEM_CAP,
+      }),
+      membership.kind === 'HOUSE' && expandedIds.length > 0
+        ? this.prisma.houseClaim.findMany({
+            where: {
+              householdId,
+              occurredOn: periodBounds,
+              ...(leafFilterOn
+                ? { categoryId: { in: leafIds } }
                 : { categoryId: { in: expandedIds } }),
             },
             include: {
@@ -827,7 +860,35 @@ export class AnalyticsService {
             orderBy: [{ occurredOn: 'desc' }, { createdAt: 'desc' }],
             take: ITEM_CAP,
           })
-        : [];
+        : Promise.resolve([]),
+    ]);
+
+    const usedIds = new Set<string>([
+      ...usedCatRows.map((r) => r.categoryId),
+      ...usedClaimRows.map((r) => r.categoryId),
+    ]);
+    // Keep selected leaf chips even if the period window has no rows for them.
+    for (const id of leafIds) usedIds.add(id);
+
+    const byId = new Map(cats.map((c) => [c.id, c]));
+    const directCategoryIds = [...selected].filter((id) => usedIds.has(id));
+    const travelOnly = travelIds.length > 0 && plainIds.length === 0;
+    const subcategories = [...usedIds]
+      .map((id) => byId.get(id))
+      .filter((c): c is NonNullable<typeof c> => {
+        if (!c) return false;
+        if (travelOnly) return true;
+        return !!c.parentId && selected.has(c.parentId);
+      })
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        nameAr: c.nameAr,
+        color: c.color,
+        emoji: c.emoji,
+        parentId: (c.parentId ?? c.id) as string,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
 
     type LogItem = {
       id: string;
@@ -920,7 +981,8 @@ export class AnalyticsService {
       truncated,
       categories,
       subcategories,
-      leafCategoryId: leafOk ? leafId : null,
+      directCategoryIds,
+      leafCategoryIds: leafIds,
       days,
     };
   }
