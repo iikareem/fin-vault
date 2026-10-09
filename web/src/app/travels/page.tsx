@@ -145,27 +145,18 @@ export default function TravelsPage() {
 
   return (
     <PageShell>
-      <header className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-sky-800">
-            {t("navTravels")}
-          </p>
-          <h1 className="text-2xl font-bold text-[var(--foreground)]">
-            {t("travelsTitle")}
-          </h1>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            {t("travelsPageHint")}
-          </p>
-        </div>
-        {canAdd ? (
-          <button
-            type="button"
-            onClick={() => (showCreate ? setShowCreate(false) : openCreate())}
-            className="shrink-0 rounded-2xl bg-sky-800 px-3 py-2 text-sm font-semibold text-white"
-          >
-            {showCreate ? t("travelsCancel") : `＋ ${t("travelsAdd")}`}
-          </button>
-        ) : null}
+      <Link
+        href="/tools"
+        className="inline-flex min-h-10 items-center gap-1 text-sm font-semibold text-[var(--accent-b-text)]"
+      >
+        ← {t("toolsTitle")}
+      </Link>
+
+      <header className="mt-1 mb-4">
+        <h1 className="page-title">{t("travelsTitle")}</h1>
+        <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">
+          {t("travelsPageHint")}
+        </p>
       </header>
 
       {error ? (
@@ -175,7 +166,7 @@ export default function TravelsPage() {
       {openTrip ? (
         <Link
           href={`/travels/${openTrip.id}`}
-          className="mb-4 block overflow-hidden rounded-[1.75rem] bg-[var(--soft-sky)] p-4 shadow-sm ring-1 ring-sky-200/60"
+          className="mb-4 block overflow-hidden rounded-[1.5rem] border border-[var(--surface-border)] bg-[var(--surface-bg)] p-4 shadow-[var(--surface-shadow)]"
         >
           <div className="flex items-center justify-between gap-2">
             <span className="rounded-full bg-sky-800 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
@@ -183,14 +174,14 @@ export default function TravelsPage() {
                 ? t("travelsUpcoming")
                 : t("travelsActive")}
             </span>
-            <span className="text-xs font-medium text-sky-900/70">
+            <span className="text-xs font-medium text-[var(--muted)]">
               {tripRangeLabel(openTrip, locale)}
             </span>
           </div>
-          <h2 className="mt-2 text-xl font-bold text-[var(--foreground)]">
-            ✈ {openTrip.name}
+          <h2 className="mt-2.5 text-lg font-bold text-[var(--foreground)]">
+            {openTrip.name}
           </h2>
-          <p className="mt-1 text-2xl font-bold tabular-nums">
+          <p className="mt-1 text-xl font-bold tabular-nums">
             <Money
               amount={openTrip.spent}
               currency={openTrip.currency}
@@ -211,10 +202,17 @@ export default function TravelsPage() {
           <div className="mt-3">
             <LimitBar pct={openTrip.pct} over={openTrip.overLimit} />
           </div>
-          <p className="mt-2 text-sm font-semibold text-sky-900">
-            {t("travelsOpenTrip")} →
-          </p>
         </Link>
+      ) : null}
+
+      {canAdd ? (
+        <button
+          type="button"
+          onClick={() => (showCreate ? setShowCreate(false) : openCreate())}
+          className="mb-4 flex min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--cta-bg)] text-base font-semibold text-[var(--cta-fg)] shadow-sm"
+        >
+          {showCreate ? t("travelsCancel") : `＋ ${t("travelsAdd")}`}
+        </button>
       ) : null}
 
       {showCreate && canAdd ? (
@@ -283,9 +281,9 @@ export default function TravelsPage() {
           </label>
           <button
             disabled={busy}
-            className="w-full rounded-3xl bg-sky-800 px-4 py-3.5 text-base font-semibold text-white disabled:opacity-60"
+            className="w-full rounded-2xl bg-[var(--cta-bg)] px-4 py-3.5 text-base font-semibold text-[var(--cta-fg)] disabled:opacity-60"
           >
-            {busy ? t("saving") : `✅ ${t("travelsSave")}`}
+            {busy ? t("saving") : t("travelsSave")}
           </button>
         </form>
       ) : null}
@@ -336,56 +334,34 @@ export default function TravelsPage() {
               <li key={trip.id}>
                 <Link
                   href={`/travels/${trip.id}`}
-                  className="surface block rounded-[1.5rem] px-4 py-3.5 transition hover:opacity-95 active:scale-[0.99]"
+                  className="surface flex items-center gap-3 rounded-[1.35rem] px-4 py-3.5 transition hover:opacity-95 active:scale-[0.99]"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-[var(--foreground)]">
-                        ✈ {trip.name}
-                      </p>
-                      <p className="mt-0.5 text-xs text-[var(--muted)]">
-                        {tripRangeLabel(trip, locale)}
-                      </p>
-                    </div>
-                    <div className="shrink-0 text-end">
-                      <p className="text-sm font-bold tabular-nums">
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full bg-sky-600"
+                    aria-hidden
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-[var(--foreground)]">
+                          {trip.name}
+                        </p>
+                        <p className="mt-0.5 text-xs text-[var(--muted)]">
+                          {tripRangeLabel(trip, locale)}
+                        </p>
+                      </div>
+                      <p className="shrink-0 text-sm font-bold tabular-nums">
                         <Money
                           amount={trip.spent}
                           currency={trip.currency}
                           locale={locale}
                         />
-                      </p>
-                      <p className="text-[11px] font-medium text-sky-800">
-                        {trip.currency}
                       </p>
                     </div>
                   </div>
-                  {trip.softLimit != null ? (
-                    <div className="mt-2.5 space-y-1">
-                      <LimitBar pct={trip.pct} over={trip.overLimit} />
-                      <p className="text-[11px] text-[var(--muted)]">
-                        <Money
-                          amount={trip.spent}
-                          currency={trip.currency}
-                          locale={locale}
-                        />
-                        {" / "}
-                        <Money
-                          amount={trip.softLimit}
-                          currency={trip.currency}
-                          locale={locale}
-                        />
-                        {trip.pct != null
-                          ? ` · ${fill(t("travelsProgressHint"), {
-                              pct: String(Math.round(trip.pct)),
-                            })}`
-                          : ""}
-                      </p>
-                    </div>
-                  ) : null}
-                  <p className="mt-2 text-xs font-semibold text-sky-800">
-                    {t("travelsOpenLog")} →
-                  </p>
+                  <span className="shrink-0 text-[var(--muted)] opacity-60" aria-hidden>
+                    →
+                  </span>
                 </Link>
               </li>
             ))}
@@ -412,17 +388,11 @@ export default function TravelsPage() {
         </div>
       ) : null}
 
-      {data && data.past.length > 0 && !showCreate && canAdd ? (
-        <button
-          type="button"
-          onClick={openCreate}
-          className="mb-4 w-full rounded-3xl bg-sky-800 px-4 py-3.5 text-base font-semibold text-white"
-        >
-          ＋ {t("travelsAdd")}
-        </button>
+      {openTrip ? (
+        <p className="mb-2 text-xs text-[var(--muted)]">
+          {t("travelsOneActiveHint")}
+        </p>
       ) : null}
-
-      {openTrip ? <Hint>{t("travelsOneActiveHint")}</Hint> : null}
 
       <BottomNav />
     </PageShell>

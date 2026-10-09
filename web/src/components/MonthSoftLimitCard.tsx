@@ -47,6 +47,8 @@ type Props = {
   status: MonthSoftLimitStatus | null;
   /** True while home summary is still loading — keeps the card slot stable. */
   loading?: boolean;
+  /** Slim progress strip for the redesigned personal home. */
+  variant?: "card" | "strip";
   onUpdated: (next: MonthSoftLimitStatus) => void;
 };
 
@@ -113,6 +115,7 @@ export function MonthSoftLimitCard({
   moneyVisible = true,
   status,
   loading = false,
+  variant = "card",
   onUpdated,
 }: Props) {
   const { t, locale } = useI18n();
@@ -221,6 +224,27 @@ export function MonthSoftLimitCard({
 
   if (loading || !status) {
     if (!loading) return null;
+    if (variant === "strip") {
+      return (
+        <section
+          className="surface overflow-hidden rounded-[1.25rem] px-4 py-3.5"
+          aria-busy="true"
+          aria-label={t("monthLimitThisMonth")}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-[var(--foreground)]">
+              {t("monthLimitThisMonth")}
+            </p>
+            <span className="text-xs font-semibold text-[var(--muted)]">…</span>
+          </div>
+          <div className="mt-2.5 h-1.5 rounded-full bg-[var(--panel-soft)]" />
+          <div className="mt-2 flex items-center justify-between gap-2 text-xs text-[var(--muted)]">
+            <span>…</span>
+            <span>…</span>
+          </div>
+        </section>
+      );
+    }
     return (
       <section
         className="surface overflow-hidden rounded-[1.75rem] p-3.5"
@@ -382,6 +406,82 @@ export function MonthSoftLimitCard({
   } else if (verdict?.kind === "overSpend") {
     statusLabel = t("monthLimitStatusOver");
     heroLabel = t("monthLimitOverSpendBy");
+  }
+
+  if (variant === "strip") {
+    const statusTone =
+      tone === "good"
+        ? "text-[var(--accent-a-text)]"
+        : tone === "warn"
+          ? "text-amber-800 dark:text-amber-300"
+          : "text-[var(--accent-b-text)]";
+
+    return (
+      <section className="surface overflow-hidden rounded-[1.25rem] px-4 py-3.5">
+        <button
+          type="button"
+          onClick={openEdit}
+          className="flex w-full flex-col gap-2.5 text-start"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-[var(--foreground)]">
+              {t("monthLimitThisMonth")}
+            </p>
+            {hasPlan && verdict ? (
+              <span className={`text-xs font-semibold ${statusTone}`}>
+                {statusLabel}
+              </span>
+            ) : (
+              <span className="text-xs font-semibold text-[var(--accent-b-text)]">
+                {t("monthLimitSet")}
+              </span>
+            )}
+          </div>
+          {hasPlan && save && verdict ? (
+            <>
+              <LimitBar
+                pct={save.pct}
+                over={verdict.kind === "overSpend"}
+                tone="save"
+                size="sm"
+              />
+              <div className="flex items-baseline justify-between gap-2 text-xs font-medium text-[var(--muted)]">
+                <p className="min-w-0 tabular-nums">
+                  {t("monthLimitSavedSoFar")}{" "}
+                  <span className="text-[var(--foreground)]">
+                    <PrivateMoney
+                      amount={Math.max(0, save.saved)}
+                      currency={currency}
+                      locale={locale}
+                      visible={moneyVisible}
+                    />
+                  </span>
+                  <span>
+                    {" "}
+                    /{" "}
+                    <PrivateMoney
+                      amount={save.amount}
+                      currency={currency}
+                      locale={locale}
+                      visible={moneyVisible}
+                    />
+                  </span>
+                </p>
+                <p className="shrink-0 tabular-nums">
+                  {fill(t("monthLimitPct"), {
+                    n: String(Math.min(999, Math.round(save.pct))),
+                  })}
+                </p>
+              </div>
+            </>
+          ) : (
+            <p className="text-xs leading-snug text-[var(--muted)]">
+              {t("monthLimitEmptyHint")}
+            </p>
+          )}
+        </button>
+      </section>
+    );
   }
 
   return (
