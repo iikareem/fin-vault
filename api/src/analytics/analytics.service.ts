@@ -732,22 +732,39 @@ export class AnalyticsService {
       })
       .filter((c): c is NonNullable<typeof c> => !!c);
 
+    const subcategories = cats
+      .filter((c) => c.parentId && selected.has(c.parentId))
+      .map((c) => ({
+        id: c.id,
+        name: c.name,
+        nameAr: c.nameAr,
+        color: c.color,
+        emoji: c.emoji,
+        parentId: c.parentId as string,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+
     const ITEM_CAP = 500;
-    const leafFilter = opts.leafCategoryId
-      ? { categoryId: opts.leafCategoryId }
-      : {};
+    const leafId = opts.leafCategoryId?.trim() || '';
+    const leafOk =
+      Boolean(leafId) &&
+      (expanded.has(leafId) || selected.has(leafId));
+    const plainCategoryFilter = leafOk
+      ? { categoryId: leafId }
+      : { categoryId: { in: expandedIds } };
+    const travelLeafFilter = leafOk ? { categoryId: leafId } : {};
 
     const orBranches: Record<string, unknown>[] = [];
     if (expandedIds.length > 0) {
       orBranches.push({
         travelId: null,
-        categoryId: { in: expandedIds },
+        ...plainCategoryFilter,
       });
     }
     if (travelIds.length > 0) {
       orBranches.push({
         travelId: { in: travelIds },
-        ...leafFilter,
+        ...travelLeafFilter,
       });
     }
     if (orBranches.length === 0) {
@@ -790,7 +807,9 @@ export class AnalyticsService {
             where: {
               householdId,
               occurredOn: { gte: dateOnlyUtc(from), lte: dateOnlyUtc(to) },
-              categoryId: { in: expandedIds },
+              ...(leafOk
+                ? { categoryId: leafId }
+                : { categoryId: { in: expandedIds } }),
             },
             include: {
               member: { select: { id: true, name: true, nameAr: true } },
@@ -900,6 +919,8 @@ export class AnalyticsService {
       dayCount: days.length,
       truncated,
       categories,
+      subcategories,
+      leafCategoryId: leafOk ? leafId : null,
       days,
     };
   }

@@ -54,6 +54,8 @@ type DayGroup = {
   items: LogItem[];
 };
 
+type SubCatMeta = CatMeta & { parentId: string };
+
 type CategoryLog = {
   from: string;
   to: string;
@@ -62,6 +64,8 @@ type CategoryLog = {
   dayCount: number;
   truncated?: boolean;
   categories: CatMeta[];
+  subcategories?: SubCatMeta[];
+  leafCategoryId?: string | null;
   days: DayGroup[];
 };
 
@@ -226,15 +230,20 @@ function CategoryLogInner() {
     return labelFor(name, t);
   }
 
-  function categoryLogHref() {
+  function categoryLogHref(leaf?: string | null) {
     const params = new URLSearchParams({
       cats: catIds.join(","),
       from,
       to,
     });
     if (excludeCommitments) params.set("excludeCommitments", "1");
-    if (leafParam) params.set("leaf", leafParam);
+    const nextLeaf = leaf === undefined ? leafParam : leaf;
+    if (nextLeaf) params.set("leaf", nextLeaf);
     return `/analytics/category-log?${params.toString()}`;
+  }
+
+  function setLeaf(leaf: string | null) {
+    router.replace(categoryLogHref(leaf), { scroll: false });
   }
 
   function openDay(date: string) {
@@ -244,6 +253,9 @@ function CategoryLogInner() {
     });
     router.push(`/history?${params.toString()}`);
   }
+
+  const subcategories = data?.subcategories ?? [];
+  const activeLeaf = data?.leafCategoryId ?? leafParam;
 
   return (
     <PageShell>
@@ -301,6 +313,65 @@ function CategoryLogInner() {
                 </>
               )}
             </div>
+
+            {subcategories.length > 0 ? (
+              <div className="mt-3">
+                <p className="text-[11px] font-medium text-[var(--muted)]">
+                  {t("categoryLogPickSub")}
+                </p>
+                <div className="mt-1.5 flex gap-1.5 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <button
+                    type="button"
+                    onClick={() => setLeaf(null)}
+                    aria-pressed={!activeLeaf}
+                    className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                      !activeLeaf
+                        ? "bg-[var(--accent-b)] text-[var(--accent-b-fg)]"
+                        : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
+                    }`}
+                  >
+                    {t("categoryLogAllSubs")}
+                  </button>
+                  {categories.length === 1 &&
+                  !categories[0].id.startsWith("travel:") ? (
+                    <button
+                      type="button"
+                      onClick={() => setLeaf(categories[0].id)}
+                      aria-pressed={activeLeaf === categories[0].id}
+                      className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                        activeLeaf === categories[0].id
+                          ? "bg-[var(--accent-b)] text-[var(--accent-b-fg)]"
+                          : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
+                      }`}
+                    >
+                      {t("subcategoryDirect")}
+                    </button>
+                  ) : null}
+                  {subcategories.map((s) => {
+                    const on = activeLeaf === s.id;
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setLeaf(s.id)}
+                        aria-pressed={on}
+                        className={`inline-flex max-w-[11rem] shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                          on
+                            ? "text-white"
+                            : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
+                        }`}
+                        style={on ? { background: s.color } : undefined}
+                      >
+                        <span className="min-w-0 truncate">
+                          {s.emoji ? `${s.emoji} ` : ""}
+                          {categoryLabel(s, locale, t)}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
 
             <p className="mt-4 text-xs font-medium text-[var(--muted)]">
               {t("selectedSpend")}

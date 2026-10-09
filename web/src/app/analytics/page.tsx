@@ -1534,15 +1534,15 @@ export default function AnalyticsPage() {
                                           ? `/analytics/category-log?${new URLSearchParams(
                                               {
                                                 cats:
-                                                  group.kind === "travel" &&
-                                                  group.categoryId
-                                                    ? group.categoryId
-                                                    : kid.categoryId,
+                                                  group.categoryId ||
+                                                  kid.categoryId,
                                                 from,
                                                 to,
-                                                ...(group.kind === "travel"
-                                                  ? { leaf: kid.categoryId }
-                                                  : {}),
+                                                ...(direct
+                                                  ? {}
+                                                  : {
+                                                      leaf: kid.categoryId,
+                                                    }),
                                                 ...(excludeCommitments
                                                   ? {
                                                       excludeCommitments: "1",

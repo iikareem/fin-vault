@@ -579,9 +579,6 @@ function HistoryInner() {
                           >
                             {categoryLabel(tx.category, locale, t)}
                           </p>
-                          <div className="mt-1">
-                            <ItemTime value={tx.createdAt} locale={locale} />
-                          </div>
                           {(() => {
                             const showUser =
                               active?.kind === "HOUSE" &&
@@ -600,6 +597,9 @@ function HistoryInner() {
                               </p>
                             );
                           })()}
+                          <div className="mt-1">
+                            <ItemTime value={tx.createdAt} locale={locale} />
+                          </div>
                         </div>
                         <span
                           className={`shrink-0 text-base font-bold tabular-nums ${amountClass(kind)}`}
@@ -688,9 +688,6 @@ function HistoryInner() {
                           >
                             {categoryLabel(c.category, locale, t)}
                           </p>
-                          <div className="mt-1">
-                            <ItemTime value={c.createdAt} locale={locale} />
-                          </div>
                           <p
                             className="mt-0.5 truncate text-sm text-[var(--muted)]"
                             dir="auto"
@@ -703,6 +700,9 @@ function HistoryInner() {
                               .filter(Boolean)
                               .join(" · ")}
                           </p>
+                          <div className="mt-1">
+                            <ItemTime value={c.createdAt} locale={locale} />
+                          </div>
                         </div>
                         <span
                           className={`shrink-0 text-base font-bold tabular-nums ${amountClass("claim")}`}
@@ -774,9 +774,6 @@ function HistoryInner() {
                           >
                             {labelFor(g.type.name, t)}
                           </p>
-                          <div className="mt-1">
-                            <ItemTime value={g.createdAt} locale={locale} />
-                          </div>
                           <p
                             className="mt-0.5 truncate text-sm text-[var(--muted)]"
                             dir="auto"
@@ -788,6 +785,9 @@ function HistoryInner() {
                               .filter(Boolean)
                               .join(" · ")}
                           </p>
+                          <div className="mt-1">
+                            <ItemTime value={g.createdAt} locale={locale} />
+                          </div>
                         </div>
                         <span
                           className={`shrink-0 text-base font-bold tabular-nums ${amountClass("gift")}`}
