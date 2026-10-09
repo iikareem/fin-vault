@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import Link from "next/link";
 import { api, parseAmount, todayISO } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
@@ -255,27 +254,35 @@ export default function OutsideLoansPage() {
 
   return (
     <PageShell>
-      <Link
-        href="/tools"
-        className="inline-flex min-h-10 items-center gap-1 text-sm font-semibold text-[var(--accent-b-text)]"
-      >
-        ← {t("toolsTitle")}
-      </Link>
-
-      <header className="mt-1">
-        <h1 className="page-title">{t("outsideLoansTitle")}</h1>
-        <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">
-          {t("outsideLoansHint")}
-        </p>
-      </header>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="page-title">🤝 {t("outsideLoansTitle")}</h1>
+          <Hint>{t("outsideLoansHint")}</Hint>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setShowForm((v) => !v);
+            setError("");
+            setMessage("");
+          }}
+          className={`shrink-0 rounded-2xl px-4 py-3 text-sm font-bold shadow-sm ${
+            showForm
+              ? "bg-stone-200 text-stone-800"
+              : "bg-stone-900 text-white"
+          }`}
+        >
+          {showForm
+            ? t("goalsCancel")
+            : `＋ ${direction === "BORROW" ? t("outsideBorrowTitle") : t("outsideLendTitle")}`}
+        </button>
+      </div>
 
       {data ? (
-        <div className="mt-4 grid grid-cols-2 gap-2.5">
-          <section className="rounded-[1.35rem] bg-[var(--soft-emerald)] px-3.5 py-3.5">
-            <p className="text-xs font-medium text-emerald-800/80 dark:text-emerald-300/80">
-              {t("outsideOwedToYou")}
-            </p>
-            <p className="mt-1 text-lg font-bold tabular-nums text-emerald-800 dark:text-emerald-300">
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <section className="surface rounded-[1.75rem] p-4">
+            <p className="text-sm text-stone-500">{t("outsideOwedToYou")}</p>
+            <p className="mt-1 text-xl font-bold tabular-nums">
               <Money
                 amount={data.owedToYou}
                 currency={currency}
@@ -283,11 +290,9 @@ export default function OutsideLoansPage() {
               />
             </p>
           </section>
-          <section className="rounded-[1.35rem] bg-[var(--soft-red)] px-3.5 py-3.5">
-            <p className="text-xs font-medium text-red-800/80 dark:text-red-300/80">
-              {t("outsideYouOwe")}
-            </p>
-            <p className="mt-1 text-lg font-bold tabular-nums text-red-800 dark:text-red-300">
+          <section className="surface rounded-[1.75rem] p-4">
+            <p className="text-sm text-stone-500">{t("outsideYouOwe")}</p>
+            <p className="mt-1 text-xl font-bold tabular-nums">
               <Money
                 amount={data.youOwe ?? 0}
                 currency={currency}
@@ -297,18 +302,6 @@ export default function OutsideLoansPage() {
           </section>
         </div>
       ) : null}
-
-      <button
-        type="button"
-        onClick={() => {
-          setShowForm((v) => !v);
-          setError("");
-          setMessage("");
-        }}
-        className="mt-4 flex min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--cta-bg)] text-base font-semibold text-[var(--cta-fg)] shadow-sm"
-      >
-        {showForm ? t("goalsCancel") : `＋ ${t("outsideAddLoan")}`}
-      </button>
 
       {showForm ? (
         <form
@@ -435,9 +428,10 @@ export default function OutsideLoansPage() {
       {error ? <p className="mt-3 text-red-700">{error}</p> : null}
       {message ? <p className="flash mt-3">{message}</p> : null}
 
-      <section className="mt-6 space-y-2.5">
+      <section className="mt-6 space-y-3">
+        <h2 className="text-xl font-bold">{t("outsideOpen")}</h2>
         {!data?.open.length ? (
-          <p className="text-sm text-[var(--muted)]">{t("outsideNoOpen")}</p>
+          <p className="text-stone-500">{t("outsideNoOpen")}</p>
         ) : (
           data.open.map((loan) => {
             const borrow = loan.direction === "BORROW";
@@ -450,58 +444,57 @@ export default function OutsideLoansPage() {
             const target = collectTarget[loan.id] || "CURRENT";
             const editable = canEditLoan(loan);
             return (
-              <article key={loan.id} className="surface rounded-[1.35rem] p-4">
-                <div className="flex items-start gap-3">
-                  <span
-                    className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${
-                      borrow ? "bg-red-500" : "bg-emerald-500"
-                    }`}
-                    aria-hidden
-                  />
+              <article key={loan.id} className="surface rounded-[1.75rem] p-4">
+                <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-[15px] font-semibold" dir="auto">
-                          {loan.personName}
-                        </p>
-                        <p className="mt-0.5 text-xs text-[var(--muted)]">
-                          {borrow
-                            ? t("outsideDirectionBorrow")
-                            : t("outsideDirectionLend")}
-                          {" · "}
-                          <ItemDate value={loan.occurredOn} locale={locale} />
-                        </p>
-                      </div>
-                      <div className="shrink-0 text-end">
-                        <p
-                          className={`text-base font-bold tabular-nums ${
-                            borrow
-                              ? "text-red-800 dark:text-red-300"
-                              : "text-emerald-800 dark:text-emerald-300"
-                          }`}
-                        >
-                          <Money
-                            amount={loan.remaining}
-                            currency={currency}
-                            locale={locale}
-                          />
-                        </p>
-                        {editable ? (
-                          <button
-                            type="button"
-                            onClick={() => openLoanEdit(loan)}
-                            className="mt-1 text-xs font-semibold text-[var(--accent-b-text)]"
-                          >
-                            {t("edit")}
-                          </button>
-                        ) : null}
-                      </div>
-                    </div>
+                    <p className="text-xl font-bold" dir="auto">
+                      {loan.personName}
+                    </p>
+                    <p className="text-sm font-semibold text-stone-600">
+                      {borrow
+                        ? t("outsideDirectionBorrow")
+                        : t("outsideDirectionLend")}
+                    </p>
+                    <p className="text-sm text-stone-500">
+                      {borrow ? t("outsideBorrowedOn") : t("outsideLentOn")}{" "}
+                      <ItemDate value={loan.occurredOn} locale={locale} />
+                    </p>
                     {loan.note ? (
-                      <p className="mt-1 text-xs text-[var(--muted)]" dir="auto">
+                      <p className="mt-1 text-stone-600" dir="auto">
                         {loan.note}
                       </p>
                     ) : null}
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <div className="text-left">
+                      <p className="font-semibold tabular-nums">
+                        <Money
+                          amount={loan.remaining}
+                          currency={currency}
+                          locale={locale}
+                        />
+                      </p>
+                      <p className="text-sm text-stone-500">
+                        {t("outsideRemaining")}
+                      </p>
+                    </div>
+                    {editable ? (
+                      <button
+                        type="button"
+                        onClick={() => openLoanEdit(loan)}
+                        className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[var(--panel-soft)] text-lg ring-1 ring-[var(--input-border)] transition active:scale-95"
+                        aria-label={t("edit")}
+                      >
+                        ✏️
+                      </button>
+                    ) : (
+                      <span
+                        className="rounded-full bg-stone-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-stone-500"
+                        title={t("outsideEditLocked")}
+                      >
+                        🔒
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -579,15 +572,13 @@ export default function OutsideLoansPage() {
                     type="button"
                     disabled={busy}
                     onClick={() => settle(loan, true)}
-                    className={`flex min-h-11 w-full items-center justify-center rounded-2xl text-sm font-semibold disabled:opacity-60 ${
-                      borrow
-                        ? "bg-[var(--cta-bg)] text-[var(--cta-fg)]"
-                        : "bg-sky-800 text-white"
-                    }`}
+                    className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-emerald-800 font-semibold text-white disabled:opacity-60"
                   >
-                    {borrow ? t("outsideRepay") : t("outsideCollect")}
-                    <span className="ms-1.5 tabular-nums opacity-90">
-                      ·{" "}
+                    {borrow
+                      ? t("outsideRepayRemaining")
+                      : t("outsideCollectRemaining")}{" "}
+                    ·{" "}
+                    <span className="ms-1 tabular-nums">
                       <Money
                         amount={loan.remaining}
                         currency={currency}

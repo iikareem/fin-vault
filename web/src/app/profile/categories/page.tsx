@@ -516,24 +516,18 @@ export default function MyCategoriesPage() {
     <PageShell>
       <Link
         href="/profile"
-        className="inline-flex min-h-10 items-center gap-1 text-sm font-semibold text-[var(--accent-b-text)]"
+        className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--muted)]"
       >
-        ← {t("settingsBack")}
+        ← {t("navProfile")}
       </Link>
-      <header className="mt-1">
-        <h1 className="text-[1.65rem] font-bold leading-tight tracking-tight text-[var(--foreground)]">
-          {t("catsManageTitle")}
-        </h1>
-        <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">
-          {t("catsManageHint")}
-        </p>
-      </header>
+      <h1 className="page-title mt-2">🏷️ {t("catsManageTitle")}</h1>
+      <Hint>{t("catsManageHint")}</Hint>
       {flash ? <p className="flash mt-3">{flash}</p> : null}
       {error && editor.type === "closed" ? (
         <p className="mt-3 text-red-700">{error}</p>
       ) : null}
 
-      <div className="seg mt-4 grid-cols-2">
+      <div className="seg mt-5 grid-cols-2">
         {(["EXPENSE", "INCOME"] as KindTab[]).map((k) => (
           <button
             key={k}
@@ -550,20 +544,20 @@ export default function MyCategoriesPage() {
         ))}
       </div>
 
-      <div className="mt-3.5 flex gap-2">
+      <div className="mt-4 flex gap-2">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={t("catsSearch")}
-          className="field min-w-0 flex-1 !rounded-[1.15rem] px-4 py-3"
+          className="field min-w-0 flex-1 rounded-2xl px-4 py-3"
           dir="auto"
         />
         <button
           type="button"
           onClick={() => openCreate(null)}
-          className="shrink-0 rounded-[1.15rem] bg-[var(--cta-bg)] px-4 py-3 text-sm font-bold text-[var(--cta-fg)]"
+          className="shrink-0 rounded-2xl bg-[var(--cta-bg)] px-4 py-3 text-sm font-bold text-[var(--cta-fg)]"
         >
-          + {t("catsAddGroup")}
+          ＋ {t("catsAddGroup")}
         </button>
       </div>
 
@@ -587,9 +581,9 @@ export default function MyCategoriesPage() {
             return (
               <section
                 key={p.id}
-                className={`surface overflow-hidden rounded-[1.35rem] transition ${
+                className={`surface overflow-hidden rounded-[1.5rem] transition ${
                   parentEditing
-                    ? "ring-2 ring-[var(--accent-b)]"
+                    ? "ring-2 ring-[var(--accent-a)]"
                     : ""
                 }`}
               >
@@ -640,7 +634,7 @@ export default function MyCategoriesPage() {
                       }
                       className={`rounded-xl px-2.5 py-1.5 text-xs font-semibold ${
                         parentEditing
-                          ? "bg-[var(--cta-bg)] text-[var(--cta-fg)]"
+                          ? "bg-[var(--accent-a)] text-[var(--accent-a-fg)]"
                           : "bg-[var(--panel-soft)]"
                       }`}
                     >

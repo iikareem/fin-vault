@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
 import { PrivateMoney } from "@/components/PrivateMoney";
+import { Hint } from "@/components/Hint";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
 import { householdPath } from "@/lib/space";
@@ -181,12 +182,8 @@ export default function NetPage() {
         ← {t("netBack")}
       </Link>
 
-      <header className="mt-1">
-        <h1 className="page-title">{t("netTitle")}</h1>
-        <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">
-          {t("netHint")}
-        </p>
-      </header>
+      <h1 className="page-title mt-2">{t("netTitle")}</h1>
+      <Hint>{t("netHint")}</Hint>
       {error ? <p className="mt-2 text-red-700">{error}</p> : null}
 
       <section
@@ -470,6 +467,31 @@ export default function NetPage() {
           ) : null}
         </section>
       ) : null}
+
+      <section className="mt-4 grid grid-cols-2 gap-3">
+        <Link
+          href="/gold"
+          className="surface flex min-h-14 flex-col justify-center rounded-[1.35rem] px-3.5 py-3 transition hover:opacity-95 active:scale-[0.99]"
+        >
+          <span className="text-base leading-none" aria-hidden>
+            🥇
+          </span>
+          <span className="mt-1.5 text-sm font-semibold leading-snug">
+            {t("netOpenGold")}
+          </span>
+        </Link>
+        <Link
+          href="/goals"
+          className="surface flex min-h-14 flex-col justify-center rounded-[1.35rem] px-3.5 py-3 transition hover:opacity-95 active:scale-[0.99]"
+        >
+          <span className="text-base leading-none" aria-hidden>
+            🎯
+          </span>
+          <span className="mt-1.5 text-sm font-semibold leading-snug">
+            {t("netOpenGoals")}
+          </span>
+        </Link>
+      </section>
 
       <BottomNav />
     </PageShell>

@@ -23,7 +23,6 @@ import {
   HIDDEN_INCOME_CATEGORIES,
 } from "@/lib/category-visibility";
 import { categoryLabel, personLabel } from "@/lib/i18n";
-import { formatItemDate } from "@/lib/calendar";
 import {
   enqueueTransaction,
   isLikelyOffline,
@@ -109,8 +108,6 @@ function AddForm() {
   const [trackOnly, setTrackOnly] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [usingOfflineData, setUsingOfflineData] = useState(false);
-  const [amountFocused, setAmountFocused] = useState(false);
-  const [datePickerOpen, setDatePickerOpen] = useState(false);
 
   const houseAdmin = space?.kind === "HOUSE" && space.role === "ADMIN";
   const personalBooks = space?.kind === "PERSONAL";
@@ -570,26 +567,11 @@ function AddForm() {
   }
 
   function walletBtn(active: boolean) {
-    return `seg-item px-3 ${active ? "seg-active" : ""}`;
+    return `seg-item px-3 ${active ? "seg-active" : "ring-1 ring-[var(--input-border)]"}`;
   }
 
   const modeChip = (active: boolean) =>
     `chip shrink-0 whitespace-nowrap ${active ? "chip-active" : ""}`;
-
-  const saveLabel = withdrawMode
-    ? t("saveCash")
-    : transferMode
-      ? t("saveMove")
-      : type === "INCOME" && !claimMode && !coverMode
-        ? t("saveIncome")
-        : t("saveSpend");
-
-  const ctaClass =
-    "w-full rounded-[1.25rem] px-4 py-3.5 text-base font-bold shadow-md transition hover:opacity-95 active:scale-[0.99] disabled:opacity-60";
-  const ctaStyle = {
-    background: "var(--cta-bg)",
-    color: "var(--cta-fg)",
-  };
 
   const selectedCategory = categories.find((c) => c.id === categoryId);
   const selectedPerson = people.find((p) => p.id === toUserId);
@@ -625,50 +607,13 @@ function AddForm() {
           ? "bg-stone-100 text-stone-800 ring-stone-300/80 dark:bg-stone-800/60 dark:text-stone-100 dark:ring-stone-600/60"
           : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-[var(--input-border)]";
 
-  const amountCard = (
-    <label
-      className={`surface block cursor-text rounded-[1.5rem] px-4 py-5 text-center transition ${
-        amountFocused ? "ring-2 ring-[var(--accent-b)]" : ""
-      }`}
-    >
-      <span className="block text-xs font-medium text-[var(--muted)]">
-        {t("amount")}
-      </span>
-      <span className="mt-1 flex items-baseline justify-center gap-2" dir="ltr">
-        <span className="text-base font-semibold text-[var(--muted)]">
-          {preferredCurrency}
-        </span>
-        <input
-          inputMode="decimal"
-          dir="ltr"
-          className="amount-input min-w-0 max-w-[12rem] border-0 bg-transparent p-0 text-center text-[2.35rem] font-bold leading-none tracking-tight text-[var(--foreground)] outline-none placeholder:text-[var(--muted)]"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          onFocus={() => setAmountFocused(true)}
-          onBlur={() => setAmountFocused(false)}
-          placeholder="0"
-          required
-          autoFocus={!transferMode && type !== "INCOME"}
-          aria-label={t("amount")}
-        />
-      </span>
-      <span className="mt-2 block text-xs text-[var(--muted)]">
-        {t("tapToEdit")}
-      </span>
-    </label>
-  );
-
   return (
     <PageShell>
-      <div>
-        <h1 className="text-[1.65rem] font-bold leading-tight tracking-tight text-[var(--foreground)]">
-          {t("navAdd")}
-        </h1>
-        <p className="mt-1 text-sm text-[var(--muted)]">{t("whatHappened")}</p>
-      </div>
+      <h1 className="text-lg font-semibold">➕ {t("navAdd")}</h1>
+      <p className="mt-1 text-sm text-[var(--muted)]">{t("whatHappened")}</p>
 
       {houseAdmin ? (
-        <div className="mt-4 -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+        <div className="mt-3 -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
           <button
             type="button"
             onClick={() => {
@@ -678,7 +623,7 @@ function AddForm() {
             }}
             className={modeChip(!claimMode && !coverMode && type === "EXPENSE")}
           >
-            {t("paid")}
+            🧾 {t("paid")}
           </button>
           <button
             type="button"
@@ -689,7 +634,7 @@ function AddForm() {
             }}
             className={modeChip(!claimMode && !coverMode && type === "INCOME")}
           >
-            {t("moneyIn")}
+            📈 {t("moneyIn")}
           </button>
           <button
             type="button"
@@ -700,7 +645,7 @@ function AddForm() {
             }}
             className={modeChip(!claimMode && !coverMode && type === "GIVE")}
           >
-            {t("giveFromHouse")}
+            💵 {t("giveFromHouse")}
           </button>
           <button
             type="button"
@@ -710,7 +655,7 @@ function AddForm() {
             }}
             className={modeChip(coverMode)}
           >
-            {t("housePaidForTitle")}
+            🏠 {t("housePaidForTitle")}
           </button>
           <button
             type="button"
@@ -720,25 +665,22 @@ function AddForm() {
             }}
             className={modeChip(claimMode)}
           >
-            {t("paidFromMyMoneyTitle")}
+            👛 {t("paidFromMyMoneyTitle")}
           </button>
         </div>
-      ) : claimMode ? null : personalBooks ? (
-        <div className="seg mt-4 grid w-full min-w-0 grid-cols-4">
+      ) : claimMode ? null : (
+        <div className="mt-3 -mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
           <button
             type="button"
             onClick={() => {
               setMode("wallet");
               setType("EXPENSE");
             }}
-            className={`seg-item min-w-0 px-0.5 text-[11px] sm:text-sm ${
-              !transferMode && !withdrawMode && type === "EXPENSE"
-                ? "seg-active"
-                : ""
-            }`}
-            aria-pressed={!transferMode && !withdrawMode && type === "EXPENSE"}
+            className={modeChip(
+              !transferMode && !withdrawMode && type === "EXPENSE",
+            )}
           >
-            {t("paid")}
+            🧾 {t("paid")}
           </button>
           <button
             type="button"
@@ -747,71 +689,36 @@ function AddForm() {
               setType("INCOME");
               setTrackOnly(false);
             }}
-            className={`seg-item min-w-0 px-0.5 text-[11px] sm:text-sm ${
-              !transferMode && !withdrawMode && type === "INCOME"
-                ? "seg-active"
-                : ""
-            }`}
-            aria-pressed={!transferMode && !withdrawMode && type === "INCOME"}
+            className={modeChip(
+              !transferMode && !withdrawMode && type === "INCOME",
+            )}
           >
-            {t("moneyIn")}
+            📈 {t("moneyIn")}
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode("transfer");
-              setTrackOnly(false);
-            }}
-            className={`seg-item min-w-0 px-0.5 text-[11px] sm:text-sm ${
-              transferMode ? "seg-active" : ""
-            }`}
-            aria-pressed={transferMode}
-          >
-            {t("homeMove")}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode("withdraw");
-              setTrackOnly(false);
-            }}
-            className={`seg-item min-w-0 px-0.5 text-[11px] sm:text-sm ${
-              withdrawMode ? "seg-active" : ""
-            }`}
-            aria-pressed={withdrawMode}
-          >
-            {t("addModeCash")}
-          </button>
-        </div>
-      ) : (
-        <div className="seg mt-4 grid w-full min-w-0 grid-cols-2">
-          <button
-            type="button"
-            onClick={() => {
-              setMode("wallet");
-              setType("EXPENSE");
-            }}
-            className={`seg-item ${
-              type === "EXPENSE" ? "seg-active" : ""
-            }`}
-            aria-pressed={type === "EXPENSE"}
-          >
-            {t("paid")}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMode("wallet");
-              setType("INCOME");
-              setTrackOnly(false);
-            }}
-            className={`seg-item ${
-              type === "INCOME" ? "seg-active" : ""
-            }`}
-            aria-pressed={type === "INCOME"}
-          >
-            {t("moneyIn")}
-          </button>
+          {personalBooks ? (
+            <>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("transfer");
+                  setTrackOnly(false);
+                }}
+                className={modeChip(transferMode)}
+              >
+                🔁 {t("transferWallets")}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("withdraw");
+                  setTrackOnly(false);
+                }}
+                className={modeChip(withdrawMode)}
+              >
+                💵 {t("cashWithdraw")}
+              </button>
+            </>
+          ) : null}
         </div>
       )}
       <p className="mt-2 text-sm leading-snug text-[var(--muted)]">{modeHint}</p>
@@ -823,7 +730,7 @@ function AddForm() {
               <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">
                 {t("transferFrom")}
               </p>
-              <div className="seg grid-cols-2">
+              <div className="grid grid-cols-2 gap-2">
                 {accounts.map((a) => (
                   <button
                     key={`from-${a.id}`}
@@ -838,8 +745,8 @@ function AddForm() {
                     className={walletBtn(accountId === a.id)}
                   >
                     {isSavingsWallet(a)
-                      ? t("savingsWallet")
-                      : t("currentWallet")}
+                      ? "💰 " + t("savingsWallet")
+                      : "💵 " + t("currentWallet")}
                   </button>
                 ))}
               </div>
@@ -848,7 +755,7 @@ function AddForm() {
               <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">
                 {t("transferTo")}
               </p>
-              <div className="seg grid-cols-2">
+              <div className="grid grid-cols-2 gap-2">
                 {accounts.map((a) => (
                   <button
                     key={`to-${a.id}`}
@@ -863,13 +770,44 @@ function AddForm() {
                     className={walletBtn(toAccountId === a.id)}
                   >
                     {isSavingsWallet(a)
-                      ? t("savingsWallet")
-                      : t("currentWallet")}
+                      ? "💰 " + t("savingsWallet")
+                      : "💵 " + t("currentWallet")}
                   </button>
                 ))}
               </div>
             </div>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
+                {t("amount")}
+              </span>
+              <input
+                inputMode="decimal"
+                dir="ltr"
+                className="amount-input field text-3xl font-bold"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder={t("payBackAmount")}
+                required
+              />
+            </label>
           </section>
+        ) : null}
+
+        {withdrawMode ? (
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
+              {t("amount")}
+            </span>
+            <input
+              inputMode="decimal"
+              dir="ltr"
+              className="amount-input field text-3xl font-bold"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0"
+              required
+            />
+          </label>
         ) : null}
 
         {!transferMode && !withdrawMode && (giveMode || coverMode) ? (
@@ -894,6 +832,69 @@ function AddForm() {
 
         {!transferMode &&
         !withdrawMode &&
+        (claimMode || coverMode || type !== "INCOME") ? (
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
+              {t("amount")}
+            </span>
+            <input
+              inputMode="decimal"
+              dir="ltr"
+              className="amount-input field text-3xl font-bold"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0"
+              required
+              autoFocus
+            />
+          </label>
+        ) : null}
+
+        {personalPaid ? (
+          <div>
+            <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">
+              {t("addPaidFrom")}
+            </p>
+            <div className="seg grid-cols-3">
+              <button
+                type="button"
+                onClick={() => setPaidFrom("current")}
+                className={`seg-item ${paidFromCurrent ? "seg-active" : ""}`}
+                aria-pressed={paidFromCurrent}
+              >
+                <span className="seg-ico" aria-hidden>
+                  💵
+                </span>
+                {t("currentWallet")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaidFrom("savings")}
+                className={`seg-item ${paidFromSavings ? "seg-active" : ""}`}
+                aria-pressed={paidFromSavings}
+              >
+                <span className="seg-ico" aria-hidden>
+                  💰
+                </span>
+                {t("savingsWallet")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaidFrom("track")}
+                className={`seg-item ${trackOnly ? "seg-active" : ""}`}
+                aria-pressed={!!trackOnly}
+              >
+                <span className="seg-ico" aria-hidden>
+                  📋
+                </span>
+                {t("spendTrackOnly")}
+              </button>
+            </div>
+          </div>
+        ) : null}
+
+        {!transferMode &&
+        !withdrawMode &&
         !claimMode &&
         !coverMode &&
         type === "INCOME" ? (
@@ -903,7 +904,7 @@ function AddForm() {
             </p>
             <label className="block">
               <span className="mb-1 block text-sm font-semibold">
-                {t("incomeToCurrent")}
+                💵 {t("incomeToCurrent")}
               </span>
               <input
                 inputMode="decimal"
@@ -916,7 +917,7 @@ function AddForm() {
             </label>
             <label className="block">
               <span className="mb-1 block text-sm font-semibold">
-                {t("incomeToSavings")}
+                💰 {t("incomeToSavings")}
               </span>
               <input
                 inputMode="decimal"
@@ -928,48 +929,6 @@ function AddForm() {
               />
             </label>
           </section>
-        ) : (
-          amountCard
-        )}
-
-        {personalPaid ? (
-          <div>
-            <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">
-              {t("addPaidFrom")}
-            </p>
-            <div className="seg grid-cols-3">
-              <button
-                type="button"
-                onClick={() => setPaidFrom("current")}
-                className={`seg-item text-[11px] sm:text-sm ${
-                  paidFromCurrent ? "seg-active" : ""
-                }`}
-                aria-pressed={paidFromCurrent}
-              >
-                {t("currentWallet")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setPaidFrom("savings")}
-                className={`seg-item text-[11px] sm:text-sm ${
-                  paidFromSavings ? "seg-active" : ""
-                }`}
-                aria-pressed={paidFromSavings}
-              >
-                {t("savingsWallet")}
-              </button>
-              <button
-                type="button"
-                onClick={() => setPaidFrom("track")}
-                className={`seg-item text-[11px] sm:text-sm ${
-                  trackOnly ? "seg-active" : ""
-                }`}
-                aria-pressed={!!trackOnly}
-              >
-                {t("spendTrackOnly")}
-              </button>
-            </div>
-          </div>
         ) : null}
 
         {!transferMode && !withdrawMode && !giveMode ? (
@@ -980,23 +939,20 @@ function AddForm() {
                   {t("addRecentCategories")}
                 </p>
                 <div className="flex flex-wrap gap-1.5">
-                  {recentCats.map((c) => {
-                    const on = categoryId === c.id;
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        onClick={() => setCategoryId(c.id)}
-                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
-                          on
-                            ? "bg-[var(--accent-b-soft)] text-[var(--accent-b-text)] ring-2 ring-[var(--accent-b)]"
-                            : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
-                        }`}
-                      >
-                        {categoryLabel(c, locale, t)}
-                      </button>
-                    );
-                  })}
+                  {recentCats.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setCategoryId(c.id)}
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                        categoryId === c.id
+                          ? "bg-emerald-800 text-white shadow"
+                          : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
+                      }`}
+                    >
+                      {categoryLabel(c, locale, t)}
+                    </button>
+                  ))}
                 </div>
               </div>
             ) : null}
@@ -1030,6 +986,9 @@ function AddForm() {
                   className={`seg-item ${accountId === a.id ? "seg-active" : ""}`}
                   aria-pressed={accountId === a.id}
                 >
+                  <span className="seg-ico" aria-hidden>
+                    {isSavingsWallet(a) ? "💰" : "💵"}
+                  </span>
                   {isSavingsWallet(a)
                     ? t("savingsWallet")
                     : t("currentWallet")}
@@ -1040,55 +999,25 @@ function AddForm() {
         ) : null}
 
         <div className="surface rounded-[1.5rem] p-3.5">
-          <div className="seg grid-cols-2">
+          <div className="flex gap-1.5">
             <button
               type="button"
-              onClick={() => {
-                setOccurredOn(today);
-                setDatePickerOpen(false);
-              }}
-              className={`seg-item ${occurredOn === today ? "seg-active" : ""}`}
-              aria-pressed={occurredOn === today}
+              onClick={() => setOccurredOn(today)}
+              className={`chip flex-1 ${occurredOn === today ? "chip-active" : ""}`}
             >
               {t("today")}
             </button>
             <button
               type="button"
-              onClick={() => {
-                setOccurredOn(yesterday);
-                setDatePickerOpen(false);
-              }}
-              className={`seg-item ${
-                occurredOn === yesterday ? "seg-active" : ""
+              onClick={() => setOccurredOn(yesterday)}
+              className={`chip flex-1 ${
+                occurredOn === yesterday ? "chip-active" : ""
               }`}
-              aria-pressed={occurredOn === yesterday}
             >
               {t("yesterday")}
             </button>
           </div>
-          <div className="mt-3 flex items-center justify-between gap-3">
-            <p className="text-sm font-semibold tabular-nums">
-              {formatItemDate(occurredOn, locale) || occurredOn}
-            </p>
-            <button
-              type="button"
-              onClick={() => setDatePickerOpen((v) => !v)}
-              className="text-sm font-semibold text-[var(--accent-b-text)]"
-            >
-              {t("catChange")}
-            </button>
-          </div>
-          {datePickerOpen ||
-          (occurredOn !== today && occurredOn !== yesterday) ? (
-            <DateField
-              className="mt-2"
-              value={occurredOn}
-              onChange={(v) => {
-                setOccurredOn(v);
-                setDatePickerOpen(false);
-              }}
-            />
-          ) : null}
+          <DateField className="mt-2" value={occurredOn} onChange={setOccurredOn} />
         </div>
 
         <label className="block">
@@ -1108,8 +1037,11 @@ function AddForm() {
         ) : null}
         {error ? <p className="text-sm text-red-700">{error}</p> : null}
 
-        <button disabled={busy} className={ctaClass} style={ctaStyle}>
-          {busy ? t("saving") : saveLabel}
+        <button
+          disabled={busy}
+          className="w-full rounded-3xl bg-emerald-800 px-4 py-3.5 text-base font-semibold text-white disabled:opacity-60"
+        >
+          {busy ? t("saving") : `✅ ${t("save")}`}
         </button>
       </form>
 
@@ -1299,16 +1231,15 @@ function AddForm() {
                 type="button"
                 disabled={busy}
                 onClick={() => confirmSave()}
-                className="flex min-h-12 flex-1 items-center justify-center rounded-[1.25rem] text-base font-bold disabled:opacity-60"
-                style={ctaStyle}
+                className="flex min-h-12 flex-1 items-center justify-center rounded-3xl bg-emerald-800 text-base font-semibold text-white disabled:opacity-60"
               >
-                {busy ? t("saving") : t("addConfirmAction")}
+                {busy ? t("saving") : `✅ ${t("addConfirmAction")}`}
               </button>
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => setConfirmOpen(false)}
-                className="min-h-12 rounded-[1.25rem] px-4 text-sm font-semibold text-[var(--muted)] disabled:opacity-60"
+                className="min-h-12 rounded-3xl px-4 text-sm font-semibold text-[var(--muted)] disabled:opacity-60"
               >
                 {t("subsCancel")}
               </button>

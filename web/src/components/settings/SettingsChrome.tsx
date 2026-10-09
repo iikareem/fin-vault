@@ -11,7 +11,7 @@ export function SettingsBack() {
   return (
     <Link
       href="/profile"
-      className="inline-flex min-h-10 items-center gap-1 text-sm font-semibold text-[var(--accent-b-text)]"
+      className="mb-3 inline-flex min-h-10 items-center gap-1 text-sm font-semibold text-[var(--accent-b-text)]"
     >
       ← {t("settingsBack")}
     </Link>
@@ -30,33 +30,19 @@ export function SettingsPage({
   return (
     <PageShell>
       <SettingsBack />
-      <header className="mt-1">
-        <h1 className="text-[1.65rem] font-bold leading-tight tracking-tight text-[var(--foreground)]">
-          {title}
-        </h1>
-        {hint ? (
-          <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">
-            {hint}
-          </p>
-        ) : null}
-      </header>
-      <div className="mt-4 space-y-3.5">{children}</div>
+      <h1 className="page-title">{title}</h1>
+      {hint ? (
+        <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">{hint}</p>
+      ) : null}
+      <div className="mt-4 space-y-4">{children}</div>
       <BottomNav />
     </PageShell>
   );
 }
 
-export function SettingsCard({
-  children,
-  className = "",
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
+export function SettingsCard({ children }: { children: ReactNode }) {
   return (
-    <section
-      className={`surface space-y-3.5 rounded-[1.35rem] p-4 ${className}`.trim()}
-    >
+    <section className="surface space-y-4 rounded-[1.75rem] p-4">
       {children}
     </section>
   );
@@ -82,13 +68,13 @@ export function PrefToggle({
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className="flex w-full items-start gap-3 rounded-[1.15rem] bg-[var(--panel-soft)] px-3.5 py-3.5 text-start transition hover:opacity-95 active:scale-[0.99] disabled:opacity-60"
+      className="flex w-full items-start gap-3 rounded-2xl bg-[var(--panel-soft)] px-3 py-3 text-start transition hover:bg-[var(--press)] disabled:opacity-60"
     >
       <span className="min-w-0 flex-1">
-        <span className="block text-[15px] font-semibold leading-tight text-[var(--foreground)]">
+        <span className="block text-base font-semibold leading-tight">
           {label}
         </span>
-        <span className="mt-1 block text-xs leading-snug text-[var(--muted)]">
+        <span className="mt-1 block text-sm leading-relaxed text-[var(--muted)]">
           {hint}
         </span>
       </span>

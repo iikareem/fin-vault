@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { fill } from "@/lib/i18n";
@@ -43,13 +43,25 @@ type TravelsHome = {
   active: TravelHomeCard | null;
 };
 
-type ToolChip = {
+type SnapshotRow = {
   key: string;
   href: string;
+  emoji: string;
   title: string;
-  detail: ReactNode;
-  warn?: boolean;
+  detail: string;
+  detailTone?: "warn" | "good" | "muted";
+  amount?: number;
+  amountCurrency?: string;
+  amountSign?: "+" | "−";
   score: number;
+};
+
+type ToolTile = {
+  key: string;
+  href: string;
+  emoji: string;
+  title: string;
+  attention?: boolean;
 };
 
 type Props = {
@@ -95,153 +107,215 @@ export function MoneyToolsHomeCard({
     };
   }, [householdId]);
 
-  const chips = useMemo((): ToolChip[] => {
-    const next: ToolChip[] = [];
-
-    const unpaid = subs?.unpaidCount ?? 0;
-    if (subs && subs.subscriptions.length > 0) {
-      next.push({
+  const tiles = useMemo((): ToolTile[] => {
+    const unpaid = (subs?.unpaidCount ?? 0) > 0;
+    const owed =
+      (outside?.owedToYou ?? 0) > 0.001 || (outside?.youOwe ?? 0) > 0.001;
+    const tripWarn = Boolean(travels?.active?.overLimit);
+    return [
+      {
+        key: "goals",
+        href: "/goals",
+        emoji: "🎯",
+        title: t("navGoals"),
+      },
+      {
         key: "subs",
         href: "/commitments",
+        emoji: "📌",
         title: t("navSubs"),
-        detail:
-          unpaid > 0
-            ? unpaid === 1
-              ? t("toolsDueSoonOne")
-              : fill(t("toolsDueSoon"), { n: String(unpaid) })
-            : t("toolsBadgeClear"),
-        warn: unpaid > 0,
-        score: unpaid > 0 ? 100 : 40,
-      });
-    }
-
-    if (goals && goals.goals.length > 0) {
-      next.push({
-        key: "goals",
-        href: "/goals",
-        title: t("navGoals"),
-        detail: (
-          <PrivateMoney
-            amount={goals.allocated}
-            currency={currency}
-            locale={locale}
-            visible={moneyVisible}
-          />
-        ),
-        score: 55,
-      });
-    } else {
-      next.push({
-        key: "goals",
-        href: "/goals",
-        title: t("navGoals"),
-        detail: t("monthLimitSet"),
-        score: 20,
-      });
-    }
-
-    if (gold && gold.totalValue > 0.001) {
-      const pct = gold.totalGainLossPct;
-      const up = (gold.totalGainLoss ?? 0) >= 0;
-      next.push({
+        attention: unpaid,
+      },
+      {
         key: "gold",
         href: "/gold",
+        emoji: "🥇",
         title: t("navGold"),
-        detail:
-          pct == null
-            ? (
-                <PrivateMoney
-                  amount={gold.totalValue}
-                  currency={currency}
-                  locale={locale}
-                  visible={moneyVisible}
-                />
-              )
-            : `${up ? "+" : ""}${pct.toFixed(1)}%`,
-        score: 50,
-      });
+      },
+      {
+        key: "outside",
+        href: "/outside-loans",
+        emoji: "🤝",
+        title: t("navOutsideLoans"),
+        attention: owed,
+      },
+      {
+        key: "travel",
+        href: travels?.active ? `/travels/${travels.active.id}` : "/travels",
+        emoji: "✈",
+        title: t("navTravels"),
+        attention: tripWarn,
+      },
+    ];
+  }, [subs, outside, travels, t]);
+
+  const rows = useMemo(() => {
+    const next: SnapshotRow[] = [];
+
+    if (subs && subs.subscriptions.length > 0) {
+      const unpaid = subs.unpaidCount > 0;
+      if (unpaid) {
+        next.push({
+          key: "subs",
+          href: "/commitments",
+          emoji: "📌",
+          title: t("navSubs"),
+          detail:
+            subs.unpaidCount === 1
+              ? t("subsHomeUnpaidOne")
+              : fill(t("subsHomeUnpaid"), { n: String(subs.unpaidCount) }),
+          detailTone: "warn",
+          amount: subs.dueAmount,
+          score: 100,
+        });
+      }
     }
 
     if (travels?.active?.overLimit) {
+      const trip = travels.active;
       next.push({
         key: "travel",
-        href: `/travels/${travels.active.id}`,
-        title: t("navTravels"),
+        href: `/travels/${trip.id}`,
+        emoji: "✈",
+        title: trip.name,
         detail: t("travelsHomeOverLimit"),
-        warn: true,
+        detailTone: "warn",
+        amount: trip.spent,
+        amountCurrency: trip.currency,
         score: 95,
       });
     }
 
-    const owedAmt = outside?.owedToYou ?? 0;
-    const borrowAmt = outside?.youOwe ?? 0;
-    if (owedAmt > 0.001 || borrowAmt > 0.001) {
-      next.push({
-        key: "outside",
-        href: "/outside-loans",
-        title: t("navOutsideLoans"),
-        detail:
-          borrowAmt > owedAmt ? t("outsideYouOwe") : t("outsideOwedToYou"),
-        warn: true,
-        score: 70,
-      });
+    if (outside && outside.open.length > 0) {
+      const owedAmt = outside.owedToYou;
+      const borrowAmt = outside.youOwe ?? 0;
+      const owed = owedAmt > 0.001;
+      const borrow = borrowAmt > 0.001;
+      if (owed || borrow) {
+        const preferBorrow = borrow && (!owed || borrowAmt >= owedAmt);
+        next.push({
+          key: "outside",
+          href: "/outside-loans",
+          emoji: "🤝",
+          title: t("navOutsideLoans"),
+          detail: preferBorrow ? t("outsideYouOwe") : t("outsideOwedToYou"),
+          detailTone: "warn",
+          amount: preferBorrow ? borrowAmt : owedAmt,
+          score: 70,
+        });
+      }
     }
 
-    return next.sort((a, b) => b.score - a.score).slice(0, 3);
-  }, [subs, goals, gold, outside, travels, currency, locale, moneyVisible, t]);
+    return next.sort((a, b) => b.score - a.score).slice(0, 2);
+  }, [outside, travels, subs, t]);
+
+  const attentionCount = tiles.filter((tile) => tile.attention).length;
+  const loaded =
+    goals != null || gold != null || outside != null || travels != null;
+
+  const subtitle =
+    attentionCount > 0
+      ? attentionCount === 1
+        ? t("toolsHomeAttentionOne")
+        : fill(t("toolsHomeAttention"), { n: String(attentionCount) })
+      : loaded
+        ? t("toolsHomeQuiet")
+        : t("toolsHomeHint");
 
   return (
-    <section className="mt-5">
-      <div className="flex items-center justify-between gap-3 px-0.5">
-        <h2 className="text-[15px] font-semibold text-[var(--foreground)]">
-          {t("toolsHomeTitle")}
-        </h2>
-        <Link
-          href="/tools"
-          className="text-xs font-medium text-[var(--accent-b-text)]"
-        >
-          {t("latestSeeAll")}
-        </Link>
-      </div>
-      <div className="-mx-1 mt-2.5 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {chips.map((chip) => (
-          <Link
-            key={chip.key}
-            href={chip.href}
-            className={`min-w-[7.25rem] shrink-0 rounded-2xl border bg-[var(--surface-bg)] px-3 py-3 transition hover:opacity-95 active:scale-[0.98] ${
-              chip.warn
-                ? "border-amber-300/80 dark:border-amber-500/40"
-                : "border-[var(--surface-border)]"
+    <section className="surface mt-5 overflow-hidden rounded-[1.75rem]">
+      <Link
+        href="/tools"
+        className="flex items-center justify-between gap-3 px-4 py-3.5 transition hover:bg-[var(--panel-soft)] active:scale-[0.99]"
+      >
+        <span className="min-w-0">
+          <span className="block text-base font-semibold text-[var(--foreground)]">
+            {t("toolsHomeTitle")}
+          </span>
+          <span
+            className={`mt-0.5 block text-xs leading-snug ${
+              attentionCount > 0
+                ? "font-semibold text-amber-800 dark:text-amber-300"
+                : "text-[var(--muted)]"
             }`}
           >
-            <span className="block text-[13px] font-semibold text-[var(--foreground)]">
-              {chip.title}
-            </span>
-            <span
-              className={`mt-1.5 block truncate text-[11px] leading-snug ${
-                chip.warn
-                  ? "font-medium text-amber-800 dark:text-amber-300"
-                  : "text-[var(--muted)]"
-              }`}
+            {subtitle}
+          </span>
+        </span>
+        <span className="shrink-0 text-lg opacity-60" aria-hidden>
+          →
+        </span>
+      </Link>
+
+      <div className="border-t border-[var(--surface-border)] px-3 py-3">
+        <div className="grid grid-cols-5 gap-1.5">
+          {tiles.map((tile) => (
+            <Link
+              key={tile.key}
+              href={tile.href}
+              aria-label={tile.title}
+              className="relative flex min-h-[4.25rem] flex-col items-center justify-center gap-1 rounded-2xl bg-[var(--panel-soft)] px-1 py-2 text-center transition hover:opacity-95 active:scale-[0.98]"
             >
-              {chip.detail}
-            </span>
-          </Link>
-        ))}
-        {chips.length === 0 ? (
-          <Link
-            href="/tools"
-            className="min-w-[7.25rem] shrink-0 rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-bg)] px-3 py-3"
-          >
-            <span className="block text-[13px] font-semibold text-[var(--foreground)]">
-              {t("toolsHomeTitle")}
-            </span>
-            <span className="mt-1.5 block text-[11px] text-[var(--muted)]">
-              {t("toolsHomeHint")}
-            </span>
-          </Link>
-        ) : null}
+              {tile.attention ? (
+                <span
+                  className="absolute end-1.5 top-1.5 h-2 w-2 rounded-full bg-amber-500"
+                  aria-hidden
+                />
+              ) : null}
+              <span className="text-lg leading-none" aria-hidden>
+                {tile.emoji}
+              </span>
+              <span className="max-w-full truncate text-[0.65rem] font-semibold leading-tight text-[var(--foreground)]">
+                {tile.title}
+              </span>
+            </Link>
+          ))}
+        </div>
       </div>
+
+      {rows.length > 0 ? (
+        <ul className="border-t border-[var(--surface-border)]">
+          {rows.map((row) => (
+            <li
+              key={row.key}
+              className="border-t border-[var(--surface-border)] first:border-t-0"
+            >
+              <Link
+                href={row.href}
+                className="flex items-center gap-3 px-4 py-3 transition hover:bg-[var(--panel-soft)] active:scale-[0.99]"
+              >
+                <span
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--panel-soft)] text-lg"
+                  aria-hidden
+                >
+                  {row.emoji}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center justify-between gap-2">
+                    <span className="truncate text-sm font-semibold text-[var(--foreground)]">
+                      {row.title}
+                    </span>
+                    {row.amount != null ? (
+                      <span className="shrink-0 text-sm font-bold tabular-nums text-[var(--foreground)]">
+                        <PrivateMoney
+                          amount={row.amount}
+                          currency={row.amountCurrency ?? currency}
+                          locale={locale}
+                          visible={moneyVisible}
+                          extraSign={row.amountSign}
+                        />
+                      </span>
+                    ) : null}
+                  </span>
+                  <span className="mt-0.5 block truncate text-xs font-semibold leading-snug text-amber-800 dark:text-amber-300">
+                    {row.detail}
+                  </span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </section>
   );
 }

@@ -371,15 +371,15 @@ export default function TravelDetailPage() {
         <div className="flex items-center justify-between gap-3">
           <Link
             href="/travels"
-            className="inline-flex min-h-10 items-center gap-1 text-sm font-semibold text-[var(--accent-b-text)]"
+            className="text-sm font-semibold text-sky-800"
           >
-            ← {t("travelsTitle")}
+            ← {t("navTravels")}
           </Link>
-          <span className="rounded-full bg-sky-800/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-sky-900 dark:text-sky-200">
+          <span className="rounded-full bg-sky-800/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-sky-900">
             {statusLabel}
           </span>
         </div>
-        <h1 className="page-title mt-1">{trip.name}</h1>
+        <h1 className="mt-3 text-2xl font-bold tracking-tight">{trip.name}</h1>
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-[var(--muted)]">
           <span>
             {rangeLabel} · {trip.currency}
@@ -388,7 +388,7 @@ export default function TravelDetailPage() {
             <button
               type="button"
               onClick={openEdit}
-              className="font-semibold text-[var(--accent-b-text)] underline-offset-2 hover:underline"
+              className="font-semibold text-sky-800 underline-offset-2 hover:underline"
             >
               {t("travelsEdit")}
             </button>
@@ -396,11 +396,11 @@ export default function TravelDetailPage() {
         </div>
       </header>
 
-      <section className="surface mb-3 rounded-[1.5rem] p-4">
+      <section className="surface mb-3 rounded-[1.75rem] p-4">
         <p className="text-xs font-medium text-[var(--muted)]">
           {t("travelsSpent")}
         </p>
-        <p className="mt-1 text-[clamp(1.5rem,7vw,2.25rem)] font-bold leading-tight tabular-nums">
+        <p className="mt-1 text-3xl font-bold tabular-nums">
           <Money
             amount={trip.spent}
             currency={trip.currency}
@@ -423,9 +423,7 @@ export default function TravelDetailPage() {
             <LimitBar pct={trip.pct} over={trip.overLimit} />
             <p
               className={`text-xs font-semibold ${
-                trip.overLimit
-                  ? "text-amber-800 dark:text-amber-300"
-                  : "text-[var(--muted)]"
+                trip.overLimit ? "text-amber-800" : "text-[var(--muted)]"
               }`}
             >
               {trip.overLimit
@@ -464,10 +462,10 @@ export default function TravelDetailPage() {
         <button
           type="button"
           onClick={openSpend}
-          className="mb-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[var(--cta-bg)] px-4 text-base font-semibold text-[var(--cta-fg)] shadow-sm transition hover:opacity-95 active:scale-[0.99]"
+          className="mb-4 flex w-full items-center justify-center gap-2 rounded-3xl bg-sky-800 px-4 py-3.5 text-base font-semibold text-white shadow-sm transition hover:opacity-95 active:scale-[0.99]"
         >
           <span aria-hidden>＋</span>
-          {t("travelsAddSpend")}
+          {t("travelsActionSpend")}
         </button>
       ) : null}
 
@@ -675,11 +673,11 @@ export default function TravelDetailPage() {
       ) : null}
 
       <section className="mb-5">
-        <h2 className="mb-2.5 text-base font-semibold text-[var(--foreground)]">
+        <h2 className="mb-2 text-sm font-semibold text-[var(--muted)]">
           {t("travelsLog")}
         </h2>
         {(trip.items?.length ?? 0) === 0 ? (
-          <div className="surface rounded-[1.35rem] p-4 text-sm text-[var(--muted)]">
+          <div className="surface rounded-[1.5rem] p-4 text-sm text-[var(--muted)]">
             {t("travelsLogEmpty")}
           </div>
         ) : (
@@ -687,35 +685,27 @@ export default function TravelDetailPage() {
             {(trip.items ?? []).map((item) => (
               <li
                 key={item.id}
-                className="surface flex items-start gap-3 rounded-[1.35rem] px-4 py-3"
+                className="surface flex items-start justify-between gap-3 rounded-[1.25rem] px-3.5 py-2.5"
               >
-                <span
-                  className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ background: item.category.color || "#0369a1" }}
-                  aria-hidden
-                />
-                <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-[15px] font-semibold">
-                      {categoryLabel(item.category, locale, t)}
-                    </p>
-                    <p className="mt-0.5 text-xs text-[var(--muted)]">
-                      <ItemDate value={item.occurredOn} locale={locale} /> ·{" "}
-                      {item.paidFrom === "CURRENT"
-                        ? t("travelsFromCurrent")
-                        : t("travelsFromCash")}
-                      {item.note ? ` · ${item.note}` : ""}
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-base font-bold tabular-nums text-red-800 dark:text-red-300">
-                    −
-                    <Money
-                      amount={item.amount}
-                      currency={trip.currency}
-                      locale={locale}
-                    />
-                  </span>
+                <div className="min-w-0">
+                  <p className="font-semibold">
+                    {categoryLabel(item.category, locale, t)}
+                  </p>
+                  <p className="text-xs text-[var(--muted)]">
+                    <ItemDate value={item.occurredOn} locale={locale} /> ·{" "}
+                    {item.paidFrom === "CURRENT"
+                      ? t("travelsFromCurrent")
+                      : t("travelsFromCash")}
+                    {item.note ? ` · ${item.note}` : ""}
+                  </p>
                 </div>
+                <span className="shrink-0 font-bold tabular-nums">
+                  <Money
+                    amount={item.amount}
+                    currency={trip.currency}
+                    locale={locale}
+                  />
+                </span>
               </li>
             ))}
           </ul>

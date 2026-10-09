@@ -112,11 +112,9 @@ export default function MoneySettingsPage() {
 
       <SettingsCard>
         <label className="block">
-          <span className="mb-1.5 block text-[15px] font-semibold">
-            {t("currencyPref")}
-          </span>
+          <span className="mb-1.5 block font-medium">{t("currencyPref")}</span>
           <select
-            className="field !rounded-[1.15rem] text-lg"
+            className="field text-lg"
             value={preferredCurrency}
             disabled={currencyBusy}
             onChange={(e) => onCurrency(e.target.value)}
@@ -137,11 +135,11 @@ export default function MoneySettingsPage() {
 
       <SettingsCard>
         <label className="block">
-          <span className="mb-1.5 block text-[15px] font-semibold">
+          <span className="mb-1.5 block font-medium">
             {t("budgetMonthStartPref")}
           </span>
           <select
-            className="field !rounded-[1.15rem] text-lg"
+            className="field text-lg"
             value={paydayDraft}
             disabled={paydayBusy}
             onChange={(e) => onPaydayDraft(Number(e.target.value))}
@@ -155,7 +153,7 @@ export default function MoneySettingsPage() {
         </label>
         <Hint>{t("budgetMonthStartHint")}</Hint>
         {paydayDirty ? (
-          <div className="space-y-3 rounded-[1.15rem] bg-[var(--panel-soft)] p-3.5">
+          <div className="space-y-3 rounded-2xl bg-[var(--panel-soft)] p-3">
             <p className="text-sm leading-relaxed text-[var(--foreground)]">
               {fill(t("budgetMonthStartPreview"), {
                 from: formatIsoDate(draftRange.from, locale),
@@ -172,7 +170,7 @@ export default function MoneySettingsPage() {
                 type="button"
                 disabled={paydayBusy}
                 onClick={savePayday}
-                className="rounded-[1.15rem] bg-[var(--cta-bg)] px-4 py-2.5 text-base font-semibold text-[var(--cta-fg)] disabled:opacity-60"
+                className="rounded-2xl bg-[var(--cta-bg)] px-4 py-2.5 text-base font-semibold text-[var(--cta-fg)] disabled:opacity-60"
               >
                 {paydayConfirming
                   ? t("budgetMonthStartConfirm")
@@ -182,7 +180,7 @@ export default function MoneySettingsPage() {
                 type="button"
                 disabled={paydayBusy}
                 onClick={cancelPayday}
-                className="rounded-[1.15rem] border border-[var(--input-border)] bg-[var(--surface-bg)] px-4 py-2.5 text-base font-semibold disabled:opacity-60"
+                className="rounded-2xl border border-[var(--input-border)] bg-[var(--surface-bg)] px-4 py-2.5 text-base font-semibold disabled:opacity-60"
               >
                 {t("budgetMonthStartCancel")}
               </button>

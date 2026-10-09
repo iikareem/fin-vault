@@ -35,7 +35,6 @@ import {
   saveHomeSnapshot,
 } from "@/lib/offline-queue";
 import { offlineAwareNavigate } from "@/lib/offline-nav";
-import { formatItemDate, toDateKey } from "@/lib/calendar";
 
 type Summary = {
   totalMoney: number;
@@ -156,6 +155,7 @@ export default function HomePage() {
     if (typeof window === "undefined") return false;
     return !readUiPrefs().hideBalances;
   });
+  const [walletDetailsOpen, setWalletDetailsOpen] = useState(false);
 
   useEffect(() => {
     setPersonalMoneyVisible(!readUiPrefs().hideBalances);
@@ -328,6 +328,7 @@ export default function HomePage() {
   const houseCashHidden = isHouse && !houseAdmin;
   /** Personal cash is masked until tapped. */
   const moneyVisible = isHouse ? !houseCashHidden : personalMoneyVisible;
+  const canToggleMoney = !isHouse;
   const cashAccounts = sortCashWallets(accounts.filter(isCashAccount));
   const currentWallet = cashAccounts.find(isCurrentWallet);
   const savingsWallet = cashAccounts.find(isSavingsWallet);
@@ -339,6 +340,16 @@ export default function HomePage() {
   const personalTransferHref = suggestTransferToCurrent
     ? "/add?mode=transfer&from=savings&to=current"
     : "/add?mode=transfer&from=current&to=savings";
+  const personalTransferTitle = suggestTransferToCurrent
+    ? t("homeTransferToCurrent")
+    : currentBal > 0.001 || savingsBal > 0.001
+      ? t("homeTransferToSavings")
+      : t("transferWallets");
+  const personalTransferHint = suggestTransferToCurrent
+    ? t("homeTransferToCurrentHint")
+    : currentBal > savingsBal && currentBal > 0.001
+      ? t("homeTransferToSavingsHint")
+      : t("homeTransferNeutralHint");
   const cashId = payWalletId || currentWallet?.id || cashAccounts[0]?.id;
   const personalCashAccounts = sortCashWallets(
     personalAccounts.filter(isCashAccount),
@@ -368,27 +379,6 @@ export default function HomePage() {
   const attentionCount =
     waitingClaims.length + waitingCovers.length + peerIouCount;
   const quietAdminHome = Boolean(isHouse && isAdmin);
-  const hour = cal.now.getHours();
-  const greetingKey =
-    hour < 12
-      ? "homeGreetingMorning"
-      : hour < 17
-        ? "homeGreetingAfternoon"
-        : "homeGreetingEvening";
-  const weekdayLabel = cal.now.toLocaleDateString(
-    locale === "ar" ? "ar" : "en",
-    { weekday: "long" },
-  );
-  const daysLeftShort =
-    cal.remainingDays === 0
-      ? t("homeLastDayShort")
-      : cal.remainingDays === 1
-        ? t("homeDaysLeftShortOne")
-        : fill(t("homeDaysLeftShort"), { n: String(cal.remainingDays) });
-  const avatarLetter = (displayName?.trim()?.[0] || "?").toUpperCase();
-  const moveHint = suggestTransferToCurrent
-    ? t("currentWallet")
-    : t("savingsWallet");
 
   async function refreshHouseLists() {
     if (!active) return;
@@ -547,40 +537,15 @@ export default function HomePage() {
 
   return (
     <PageShell>
+      <p className="text-lg font-semibold text-[var(--foreground)]">
+        {isHouse ? "👋 " : ""}
+        {displayName ? t("helloName", { name: displayName }) : t("hello")}
+      </p>
       {isHouse ? (
-        <>
-          <p className="text-lg font-semibold text-[var(--foreground)]">
-            👋{" "}
-            {displayName ? t("helloName", { name: displayName }) : t("hello")}
-          </p>
-          <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">
-            {t("homeHintHouse")}
-          </p>
-        </>
-      ) : (
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-[1.35rem] font-bold leading-tight tracking-tight text-[var(--foreground)]">
-              {displayName
-                ? t(greetingKey, { name: displayName })
-                : t("hello")}
-            </h1>
-            <p className="mt-1 text-sm text-[var(--muted)]">
-              {fill(t("homeGreetingSub"), {
-                day: weekdayLabel,
-                left: daysLeftShort,
-              })}
-            </p>
-          </div>
-          <Link
-            href="/profile"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[var(--accent-b-soft)] text-base font-semibold text-[var(--accent-b-text)] ring-1 ring-[var(--chrome-edge)] transition hover:opacity-90 active:scale-[0.98]"
-            aria-label={t("navProfile")}
-          >
-            {avatarLetter}
-          </Link>
-        </div>
-      )}
+        <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">
+          {t("homeHintHouse")}
+        </p>
+      ) : null}
       {flash ? <p className="flash mt-3">{flash}</p> : null}
       {error ? <p className="mt-2 text-red-700">{error}</p> : null}
       {offlineMode ? (
@@ -604,22 +569,42 @@ export default function HomePage() {
         </section>
       ) : null}
 
-      {!isHouse ? (
-        <section
-          className="mt-4 rounded-[1.75rem] p-5 shadow-lg"
-          style={{ color: "#fff", background: "var(--wallet-b)" }}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <p className="text-sm font-medium opacity-90">{t("yourMoneyNow")}</p>
-            <button
-              type="button"
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full transition hover:opacity-95 active:scale-[0.98]"
-              style={{ background: "rgba(255,255,255,0.22)" }}
-              aria-label={
-                moneyVisible ? t("tapToHideMoney") : t("tapToShowMoney")
+      <section
+        className={`mt-3 rounded-[1.75rem] p-5 shadow-lg ${
+          canToggleMoney ? "cursor-pointer select-none" : ""
+        }`}
+        style={{
+          color: "#fff",
+          background: isHouse ? "var(--wallet-a)" : "var(--wallet-b)",
+        }}
+        onClick={
+          canToggleMoney
+            ? () => setPersonalMoneyVisible((v) => !v)
+            : undefined
+        }
+        onKeyDown={
+          canToggleMoney
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setPersonalMoneyVisible((v) => !v);
+                }
               }
-              aria-pressed={personalMoneyVisible}
-              onClick={() => setPersonalMoneyVisible((v) => !v)}
+            : undefined
+        }
+        role={canToggleMoney ? "button" : undefined}
+        tabIndex={canToggleMoney ? 0 : undefined}
+        aria-pressed={canToggleMoney ? personalMoneyVisible : undefined}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <p className="text-base" style={{ color: "#fff" }}>
+            {isHouse ? `💵 ${t("houseMoneyNow")}` : t("yourMoneyNow")}
+          </p>
+          {canToggleMoney ? (
+            <span
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+              style={{ background: "rgba(255,255,255,0.22)" }}
+              aria-hidden
             >
               {moneyVisible ? (
                 <svg
@@ -630,7 +615,6 @@ export default function HomePage() {
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  aria-hidden
                 >
                   <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z" />
                   <circle cx="12" cy="12" r="3" />
@@ -644,7 +628,6 @@ export default function HomePage() {
                   strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  aria-hidden
                 >
                   <path d="M3 3l18 18" />
                   <path d="M10.6 10.6a3 3 0 0 0 4.2 4.2" />
@@ -652,184 +635,195 @@ export default function HomePage() {
                   <path d="M6.1 6.1C3.9 7.7 2 12 2 12s3.5 7 10 7a10.4 10.4 0 0 0 4.3-.9" />
                 </svg>
               )}
-            </button>
-          </div>
-          <p className="mt-1 text-[clamp(1.6rem,7.5vw,2.35rem)] font-bold leading-tight tracking-tight">
-            {accounts.length ? (
-              <PrivateMoney
-                amount={cashTotal}
-                currency={currency}
-                locale={locale}
-                visible={moneyVisible}
-              />
-            ) : (
-              "…"
-            )}
-          </p>
-          <div className="mt-3.5 grid grid-cols-2 gap-2.5">
-            <div
-              className="rounded-2xl px-3 py-2.5"
-              style={{ background: "rgba(255,255,255,0.18)" }}
-            >
-              <p className="text-xs opacity-90">{t("currentWallet")}</p>
-              <p className="mt-0.5 text-lg font-semibold leading-tight">
-                {accounts.length ? (
-                  <PrivateMoney
-                    amount={currentWallet?.balance ?? 0}
-                    currency={currency}
-                    locale={locale}
-                    visible={moneyVisible}
-                  />
-                ) : (
-                  "…"
-                )}
-              </p>
-            </div>
-            <div
-              className="rounded-2xl px-3 py-2.5"
-              style={{ background: "rgba(255,255,255,0.18)" }}
-            >
-              <p className="text-xs opacity-90">{t("savingsWallet")}</p>
-              <p className="mt-0.5 text-lg font-semibold leading-tight">
-                {accounts.length ? (
-                  <PrivateMoney
-                    amount={savingsWallet?.balance ?? 0}
-                    currency={currency}
-                    locale={locale}
-                    visible={moneyVisible}
-                  />
-                ) : (
-                  "…"
-                )}
-              </p>
-            </div>
-          </div>
-          <Link
-            href="/net"
-            className="mt-3 flex min-h-11 items-center justify-between gap-3 rounded-2xl px-3 py-2.5 transition hover:opacity-95 active:scale-[0.99]"
-            style={{ background: "rgba(255,255,255,0.14)" }}
-          >
-            <span className="min-w-0 text-start">
-              <span className="block text-sm font-semibold leading-snug">
-                {t("homeNetWorth")}
-              </span>
-              <span className="mt-0.5 block text-xs font-medium leading-snug opacity-80">
-                {t("homeNetSeeFull")}
-              </span>
             </span>
-            <span className="shrink-0 text-base opacity-80" aria-hidden>
-              →
-            </span>
-          </Link>
-        </section>
-      ) : (
-        <section
-          className="mt-3 rounded-[1.75rem] p-5 shadow-lg"
-          style={{ color: "#fff", background: "var(--wallet-a)" }}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <p className="text-base" style={{ color: "#fff" }}>
-              💵 {t("houseMoneyNow")}
+          ) : null}
+        </div>
+        {houseCashHidden ? (
+          <p className="mt-3 text-base opacity-90">{t("houseCashAdminOnly")}</p>
+        ) : (
+          <>
+            <p className="mt-1 text-[clamp(1.4rem,7.2vw,2.25rem)] font-bold leading-tight">
+              {accounts.length ? (
+                <PrivateMoney
+                  amount={cashTotal}
+                  currency={currency}
+                  locale={locale}
+                  visible={moneyVisible}
+                />
+              ) : (
+                "…"
+              )}
             </p>
-          </div>
-          {houseCashHidden ? (
-            <p className="mt-3 text-base opacity-90">{t("houseCashAdminOnly")}</p>
-          ) : (
-            <>
-              <p className="mt-1 text-[clamp(1.4rem,7.2vw,2.25rem)] font-bold leading-tight">
-                {accounts.length ? (
-                  <PrivateMoney
-                    amount={cashTotal}
-                    currency={currency}
-                    locale={locale}
-                    visible={moneyVisible}
-                  />
-                ) : (
-                  "…"
-                )}
+            {!isHouse ? (
+              <p className="mt-3 text-sm opacity-90">
+                {cal.remainingDays === 0
+                  ? t("lastDayOfMonth")
+                  : cal.remainingDays === 1
+                    ? t("daysLeftOne")
+                    : fill(t("daysLeft"), { n: String(cal.remainingDays) })}
+                {" · "}
+                {fill(t("monthLength"), { n: String(cal.daysInMonth) })}
               </p>
-              <div className="mt-4 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
-                <div
-                  className="rounded-2xl px-3 py-2"
-                  style={{ background: "rgba(255,255,255,0.18)" }}
-                >
-                  <p className="text-sm opacity-90">💵 {t("currentWallet")}</p>
-                  <p className="text-xl font-semibold leading-tight">
-                    {accounts.length ? (
-                      <PrivateMoney
-                        amount={currentWallet?.balance ?? 0}
-                        currency={currency}
-                        locale={locale}
-                        visible={moneyVisible}
-                      />
-                    ) : (
-                      "…"
-                    )}
-                  </p>
-                  <p className="mt-1 text-xs opacity-80">{t("currentHint")}</p>
+            ) : null}
+            {!isHouse ? (
+              <button
+                type="button"
+                className="mt-3 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-2xl px-3 py-2.5 text-sm font-medium transition hover:opacity-95 active:scale-[0.99]"
+                style={{ background: "rgba(255,255,255,0.16)" }}
+                aria-expanded={walletDetailsOpen}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setWalletDetailsOpen((v) => !v);
+                }}
+              >
+                {walletDetailsOpen
+                  ? t("homeWalletDetailsHide")
+                  : t("homeWalletDetails")}
+                <span aria-hidden className="opacity-80">
+                  {walletDetailsOpen ? "▴" : "▾"}
+                </span>
+              </button>
+            ) : null}
+            {isHouse || walletDetailsOpen ? (
+              <>
+                <div className="mt-4 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
+                  <div
+                    className="rounded-2xl px-3 py-2"
+                    style={{ background: "rgba(255,255,255,0.18)" }}
+                  >
+                    <p className="text-sm opacity-90">
+                      {isHouse ? "💵 " : ""}
+                      {t("currentWallet")}
+                    </p>
+                    <p className="text-xl font-semibold leading-tight">
+                      {accounts.length ? (
+                        <PrivateMoney
+                          amount={currentWallet?.balance ?? 0}
+                          currency={currency}
+                          locale={locale}
+                          visible={moneyVisible}
+                        />
+                      ) : (
+                        "…"
+                      )}
+                    </p>
+                    {isHouse ? (
+                      <p className="mt-1 text-xs opacity-80">
+                        {t("currentHint")}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div
+                    className="rounded-2xl px-3 py-2"
+                    style={{ background: "rgba(255,255,255,0.18)" }}
+                  >
+                    <p className="text-sm opacity-90">
+                      {isHouse ? "💰 " : ""}
+                      {t("savingsWallet")}
+                    </p>
+                    <p className="text-xl font-semibold leading-tight">
+                      {accounts.length ? (
+                        <PrivateMoney
+                          amount={savingsWallet?.balance ?? 0}
+                          currency={currency}
+                          locale={locale}
+                          visible={moneyVisible}
+                        />
+                      ) : (
+                        "…"
+                      )}
+                    </p>
+                    {isHouse ? (
+                      <p className="mt-1 text-xs opacity-80">
+                        {t("savingsHint")}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
-                <div
-                  className="rounded-2xl px-3 py-2"
-                  style={{ background: "rgba(255,255,255,0.18)" }}
-                >
-                  <p className="text-sm opacity-90">💰 {t("savingsWallet")}</p>
-                  <p className="text-xl font-semibold leading-tight">
-                    {accounts.length ? (
-                      <PrivateMoney
-                        amount={savingsWallet?.balance ?? 0}
-                        currency={currency}
-                        locale={locale}
-                        visible={moneyVisible}
-                      />
-                    ) : (
-                      "…"
-                    )}
-                  </p>
-                  <p className="mt-1 text-xs opacity-80">{t("savingsHint")}</p>
+                <div className="mt-3 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
+                  <div
+                    className="rounded-2xl px-3 py-2"
+                    style={{ background: "rgba(255,255,255,0.18)" }}
+                  >
+                    <p className="text-sm opacity-90">
+                      {isHouse ? "📈 " : ""}
+                      {t("monthIn")}
+                    </p>
+                    <p className="text-lg font-semibold leading-tight">
+                      {summary ? (
+                        <PrivateMoney
+                          amount={summary.monthIncome}
+                          currency={currency}
+                          locale={locale}
+                          visible={moneyVisible}
+                        />
+                      ) : (
+                        "…"
+                      )}
+                    </p>
+                    {isHouse ? (
+                      <p className="mt-1 text-xs opacity-80">
+                        {t("monthInHint")}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div
+                    className="rounded-2xl px-3 py-2"
+                    style={{ background: "rgba(255,255,255,0.18)" }}
+                  >
+                    <p className="text-sm opacity-90">
+                      {isHouse ? "📉 " : ""}
+                      {t("monthOut")}
+                    </p>
+                    <p className="text-lg font-semibold leading-tight">
+                      {summary ? (
+                        <PrivateMoney
+                          amount={summary.monthExpense}
+                          currency={currency}
+                          locale={locale}
+                          visible={moneyVisible}
+                        />
+                      ) : (
+                        "…"
+                      )}
+                    </p>
+                    {isHouse ? (
+                      <p className="mt-1 text-xs opacity-80">
+                        {t("monthOutHint")}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-              <div className="mt-3 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
-                <div
-                  className="rounded-2xl px-3 py-2"
-                  style={{ background: "rgba(255,255,255,0.18)" }}
-                >
-                  <p className="text-sm opacity-90">📈 {t("monthIn")}</p>
-                  <p className="text-lg font-semibold leading-tight">
-                    {summary ? (
-                      <PrivateMoney
-                        amount={summary.monthIncome}
-                        currency={currency}
-                        locale={locale}
-                        visible={moneyVisible}
-                      />
-                    ) : (
-                      "…"
-                    )}
-                  </p>
-                  <p className="mt-1 text-xs opacity-80">{t("monthInHint")}</p>
-                </div>
-                <div
-                  className="rounded-2xl px-3 py-2"
-                  style={{ background: "rgba(255,255,255,0.18)" }}
-                >
-                  <p className="text-sm opacity-90">📉 {t("monthOut")}</p>
-                  <p className="text-lg font-semibold leading-tight">
-                    {summary ? (
-                      <PrivateMoney
-                        amount={summary.monthExpense}
-                        currency={currency}
-                        locale={locale}
-                        visible={moneyVisible}
-                      />
-                    ) : (
-                      "…"
-                    )}
-                  </p>
-                  <p className="mt-1 text-xs opacity-80">{t("monthOutHint")}</p>
-                </div>
-              </div>
-            </>
-          )}
+                {!isHouse ? (
+                  <Link
+                    href="/net"
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-3 flex min-h-12 items-center justify-between gap-3 rounded-2xl px-3 py-2.5 transition hover:opacity-95 active:scale-[0.99]"
+                    style={{ background: "rgba(255,255,255,0.18)" }}
+                  >
+                    <span className="min-w-0 text-start">
+                      <span className="block text-base font-semibold leading-snug">
+                        {t("homeNet")}
+                      </span>
+                      <span className="mt-0.5 block text-xs font-medium leading-snug opacity-80">
+                        {t("homeNetOpen")}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-lg opacity-80" aria-hidden>
+                      →
+                    </span>
+                  </Link>
+                ) : null}
+              </>
+            ) : null}
+            {canToggleMoney ? (
+              <p className="mt-3 text-sm opacity-90">
+                {moneyVisible ? t("tapToHideMoney") : t("tapToShowMoney")}
+              </p>
+            ) : null}
+          </>
+        )}
+        {isHouse ? (
           <p className="mt-3 text-sm opacity-90">
             📅{" "}
             {cal.remainingDays === 0
@@ -840,8 +834,8 @@ export default function HomePage() {
             {" · "}
             {fill(t("monthLength"), { n: String(cal.daysInMonth) })}
           </p>
-        </section>
-      )}
+        ) : null}
+      </section>
 
       {!offlineMode && !isHouse && active ? (
         <div className="mt-4">
@@ -851,7 +845,6 @@ export default function HomePage() {
             moneyVisible={moneyVisible}
             loading={!summary}
             status={summary?.softLimit ?? null}
-            variant="strip"
             onUpdated={(next) =>
               setSummary((prev) => (prev ? { ...prev, softLimit: next } : prev))
             }
@@ -860,48 +853,66 @@ export default function HomePage() {
       ) : null}
 
       {!offlineMode && !isHouse ? (
-        <div className="mt-4 space-y-2.5">
+        <div className="mt-4 space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <Link
+              href="/add?type=expense"
+              className="flex min-h-[5.5rem] flex-col justify-between rounded-[1.5rem] px-3.5 py-3 shadow-md transition hover:opacity-95 active:scale-[0.99]"
+              style={{ background: "var(--cta-bg)", color: "var(--cta-fg)" }}
+            >
+              <span className="flex items-start justify-between gap-2">
+                <span className="text-base font-semibold leading-snug">
+                  {t("homeSpend")}
+                </span>
+                <span className="shrink-0 text-lg opacity-80" aria-hidden>
+                  →
+                </span>
+              </span>
+              <span className="text-xs font-medium leading-snug opacity-70">
+                {t("homeSpendHint")}
+              </span>
+            </Link>
+            <Link
+              href="/add?type=income"
+              className="flex min-h-[5.5rem] flex-col justify-between rounded-[1.5rem] px-3.5 py-3 shadow-md transition hover:opacity-95 active:scale-[0.99]"
+              style={{
+                background: "var(--accent-a)",
+                color: "var(--accent-a-fg)",
+              }}
+            >
+              <span className="flex items-start justify-between gap-2">
+                <span className="text-base font-semibold leading-snug">
+                  {t("homeIncome")}
+                </span>
+                <span className="shrink-0 text-lg opacity-80" aria-hidden>
+                  →
+                </span>
+              </span>
+              <span className="text-xs font-medium leading-snug opacity-70">
+                {t("homeIncomeHint")}
+              </span>
+            </Link>
+          </div>
           <Link
-            href="/add?type=expense"
-            className="flex min-h-14 items-center justify-between gap-3 rounded-[1.15rem] px-4 py-3.5 shadow-md transition hover:opacity-95 active:scale-[0.99]"
-            style={{ background: "var(--accent-b)", color: "var(--accent-b-fg)" }}
+            href={personalTransferHref}
+            className="flex min-h-14 items-center justify-between gap-3 rounded-[1.5rem] px-4 py-3 shadow-md transition hover:opacity-95 active:scale-[0.99]"
+            style={{
+              background: "var(--accent-b)",
+              color: "var(--accent-b-fg)",
+            }}
           >
             <span className="min-w-0 text-start">
               <span className="block text-base font-semibold leading-snug">
-                {t("homeSpend")}
+                {personalTransferTitle}
               </span>
-              <span className="mt-0.5 block text-xs font-medium leading-snug opacity-80">
-                {t("homeSpendLogHint")}
+              <span className="mt-0.5 block text-xs font-medium leading-snug opacity-70">
+                {personalTransferHint}
               </span>
             </span>
             <span className="shrink-0 text-lg opacity-80" aria-hidden>
               →
             </span>
           </Link>
-          <div className="grid grid-cols-2 gap-2.5">
-            <Link
-              href="/add?type=income"
-              className="rounded-[1.15rem] bg-[var(--soft-emerald)] px-3.5 py-3.5 transition hover:opacity-95 active:scale-[0.99]"
-            >
-              <span className="block text-sm font-semibold text-[var(--accent-a-text)]">
-                {t("homeIncome")}
-              </span>
-              <span className="mt-1 block text-[11px] font-medium leading-snug text-[var(--accent-a-text)] opacity-80">
-                {t("homeIncomeAddHint")}
-              </span>
-            </Link>
-            <Link
-              href={personalTransferHref}
-              className="rounded-[1.15rem] bg-[var(--soft-sky)] px-3.5 py-3.5 transition hover:opacity-95 active:scale-[0.99]"
-            >
-              <span className="block text-sm font-semibold text-[var(--accent-b-text)]">
-                {t("homeMove")}
-              </span>
-              <span className="mt-1 block text-[11px] font-medium leading-snug text-[var(--accent-b-text)] opacity-80">
-                {moveHint}
-              </span>
-            </Link>
-          </div>
         </div>
       ) : null}
 
@@ -1764,42 +1775,52 @@ export default function HomePage() {
       ) : null}
 
       {!offlineMode && txs.length > 0 ? (
-        isHouse ? (
-          <>
-            <div className="mt-8 flex items-end justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="text-xl font-semibold">🕒 {t("latest")}</h2>
-                <Hint>{t("latestHint")}</Hint>
-              </div>
+        <>
+          <div className="mt-8 flex items-end justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-xl font-semibold">
+                {isHouse ? `🕒 ${t("latest")}` : t("latest")}
+              </h2>
+              <Hint>{isHouse ? t("latestHint") : t("latestHintPersonal")}</Hint>
             </div>
-            <ul className="mt-3 space-y-2">
-              {txs.map((tx) => (
-                <li key={tx.id} className="list-row text-[var(--foreground)]">
-                  <div className="money-row min-w-0">
-                    <div className="min-w-0 text-start" dir="auto">
-                      <span className="font-medium">
-                        {categoryLabel(tx.category, locale, t)}
-                        {tx.type === "TRACK" ? (
-                          <span className="ms-2 text-sm font-normal text-[var(--muted)]">
-                            ({t("trackOnlyBadge")})
-                          </span>
-                        ) : null}
-                      </span>
-                      <ItemDate
-                        value={tx.occurredOn}
-                        locale={locale}
-                        className="mt-1 block"
-                      />
-                    </div>
-                    <span
-                      className={`shrink-0 font-semibold ${
-                        tx.type === "INCOME"
-                          ? "text-emerald-800 dark:text-emerald-300"
-                          : tx.type === "TRACK"
-                            ? "text-[var(--muted)]"
-                            : "text-red-800 dark:text-red-300"
-                      }`}
-                    >
+            {!isHouse ? (
+              <Link
+                href="/history"
+                className="shrink-0 text-sm font-semibold text-[var(--accent-a-text)]"
+              >
+                {t("latestSeeAll")}
+              </Link>
+            ) : null}
+          </div>
+          <ul className="mt-3 space-y-2">
+            {txs.map((tx) => (
+              <li key={tx.id} className="list-row text-[var(--foreground)]">
+                <div className="money-row min-w-0">
+                  <div className="min-w-0 text-start" dir="auto">
+                    <span className="font-medium">
+                      {categoryLabel(tx.category, locale, t)}
+                      {tx.type === "TRACK" ? (
+                        <span className="ms-2 text-sm font-normal text-[var(--muted)]">
+                          ({t("trackOnlyBadge")})
+                        </span>
+                      ) : null}
+                    </span>
+                    <ItemDate
+                      value={tx.occurredOn}
+                      locale={locale}
+                      className="mt-1 block"
+                    />
+                  </div>
+                  <span
+                    className={`shrink-0 font-semibold ${
+                      tx.type === "INCOME"
+                        ? "text-emerald-800 dark:text-emerald-300"
+                        : tx.type === "TRACK"
+                          ? "text-[var(--muted)]"
+                          : "text-red-800 dark:text-red-300"
+                    }`}
+                  >
+                    {isHouse ? (
                       <Money
                         amount={Number(tx.amount)}
                         currency={currency}
@@ -1812,135 +1833,46 @@ export default function HomePage() {
                               : "−"
                         }
                       />
-                    </span>
-                  </div>
-                  {(() => {
-                    const parts = [
-                      tx.user.name !== "House"
-                        ? personLabel(tx.user, locale)
-                        : null,
-                      tx.type === "TRACK"
-                        ? null
-                        : tx.account
-                          ? labelFor(tx.account.name, t)
-                          : null,
-                      tx.note || null,
-                    ].filter(Boolean);
-                    if (parts.length === 0) return null;
-                    return (
-                      <p
-                        className="mt-1 text-start text-sm text-[var(--muted)]"
-                        dir="auto"
-                      >
-                        {parts.join(" · ")}
-                      </p>
-                    );
-                  })()}
-                </li>
-              ))}
-            </ul>
-          </>
-        ) : (
-          <section className="mt-6">
-            <div className="flex items-center justify-between gap-3 px-0.5">
-              <h2 className="text-[15px] font-semibold text-[var(--foreground)]">
-                {t("latest")}
-              </h2>
-              <Link
-                href="/history"
-                className="text-xs font-medium text-[var(--accent-b-text)]"
-              >
-                {t("latestSeeAll")}
-              </Link>
-            </div>
-            <ul className="mt-2.5 space-y-2">
-              {txs.map((tx) => {
-                const isIn = tx.type === "INCOME";
-                const isTrack = tx.type === "TRACK";
-                const dayKey = toDateKey(tx.occurredOn);
-                const dateLabel =
-                  dayKey === cal.today
-                    ? t("today")
-                    : dayKey ===
-                        toDateKey(
-                          new Date(
-                            cal.now.getFullYear(),
-                            cal.now.getMonth(),
-                            cal.now.getDate() - 1,
-                          ),
-                        )
-                      ? t("yesterday")
-                      : formatItemDate(tx.occurredOn, locale);
-                const walletLabel =
-                  !isTrack && tx.account
-                    ? labelFor(tx.account.name, t)
-                    : null;
-                const meta = [dateLabel, walletLabel].filter(Boolean).join(" · ");
-                return (
-                  <li
-                    key={tx.id}
-                    className="flex items-center gap-3 rounded-2xl bg-[var(--surface-bg)] px-3.5 py-3 ring-1 ring-[var(--surface-border)]"
-                  >
-                    <span
-                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
-                        isIn
-                          ? "bg-[var(--soft-emerald)]"
-                          : isTrack
-                            ? "bg-[var(--panel-soft)]"
-                            : "bg-[var(--soft-red)]"
-                      }`}
-                      aria-hidden
-                    >
-                      <span
-                        className={`h-2 w-2 rounded-full ${
-                          isIn
-                            ? "bg-emerald-600"
-                            : isTrack
-                              ? "bg-[var(--muted)]"
-                              : "bg-red-600"
-                        }`}
-                      />
-                    </span>
-                    <div className="min-w-0 flex-1 text-start" dir="auto">
-                      <p className="truncate text-sm font-semibold text-[var(--foreground)]">
-                        {categoryLabel(tx.category, locale, t)}
-                        {isTrack ? (
-                          <span className="ms-1.5 text-xs font-normal text-[var(--muted)]">
-                            ({t("trackOnlyBadge")})
-                          </span>
-                        ) : null}
-                      </p>
-                      {meta ? (
-                        <p className="mt-0.5 truncate text-xs text-[var(--muted)]">
-                          {meta}
-                        </p>
-                      ) : null}
-                    </div>
-                    <span
-                      className={`shrink-0 text-sm font-semibold tabular-nums ${
-                        isIn
-                          ? "text-emerald-800 dark:text-emerald-300"
-                          : isTrack
-                            ? "text-[var(--muted)]"
-                            : "text-red-800 dark:text-red-300"
-                      }`}
-                    >
+                    ) : (
                       <PrivateMoney
                         amount={Number(tx.amount)}
                         currency={currency}
                         locale={locale}
                         visible={moneyVisible}
                         extraSign={
-                          isIn ? "+" : isTrack ? undefined : "−"
+                          tx.type === "INCOME"
+                            ? "+"
+                            : tx.type === "TRACK"
+                              ? undefined
+                              : "−"
                         }
                       />
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        )
+                    )}
+                  </span>
+                </div>
+                {(() => {
+                  const parts = [
+                    isHouse && tx.user.name !== "House"
+                      ? personLabel(tx.user, locale)
+                      : null,
+                    tx.type === "TRACK"
+                      ? null
+                      : tx.account
+                        ? labelFor(tx.account.name, t)
+                        : null,
+                    tx.note || null,
+                  ].filter(Boolean);
+                  if (parts.length === 0) return null;
+                  return (
+                    <p className="mt-1 text-start text-sm text-[var(--muted)]" dir="auto">
+                      {parts.join(" · ")}
+                    </p>
+                  );
+                })()}
+              </li>
+            ))}
+          </ul>
+        </>
       ) : null}
       <BottomNav />
     </PageShell>

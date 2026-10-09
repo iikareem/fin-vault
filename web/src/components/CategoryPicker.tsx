@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { categoryLabel, fill } from "@/lib/i18n";
+import { categoryLabel } from "@/lib/i18n";
 import { useI18n } from "@/components/I18nProvider";
 
 export type CategoryItem = {
@@ -13,7 +13,7 @@ export type CategoryItem = {
   emoji?: string | null;
 };
 
-function CatDot({
+function CatIcon({
   emoji,
   color,
   active = false,
@@ -37,9 +37,7 @@ function CatDot({
   }
   return (
     <span
-      className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-        active ? "ring-2 ring-white/70" : ""
-      }`}
+      className={`h-2.5 w-2.5 shrink-0 rounded-full ${active ? "ring-2 ring-white/70" : ""}`}
       style={{ backgroundColor: color || "var(--muted)" }}
       aria-hidden
     />
@@ -59,6 +57,7 @@ export function CategoryPicker({
 }) {
   const { t, locale } = useI18n();
   const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
   const activeGroupRef = useRef<HTMLButtonElement | null>(null);
 
   const parents = useMemo(
@@ -86,17 +85,6 @@ export function CategoryPicker({
   const q = query.trim().toLowerCase();
   const catText = (c: CategoryItem) => categoryLabel(c, locale, t);
 
-  const breadcrumb = useMemo(() => {
-    if (!selected) return "";
-    if (hasSubs && selected.parentId && group) {
-      return fill(t("categoryBreadcrumb"), {
-        group: catText(group),
-        sub: catText(selected),
-      });
-    }
-    return catText(selected);
-  }, [selected, hasSubs, group, locale, t]);
-
   const filteredParents = useMemo(() => {
     if (!q) return parents;
     return parents.filter((p) => {
@@ -119,6 +107,7 @@ export function CategoryPicker({
     });
   }, [parents, childrenByParent, q, locale, t]);
 
+  /** When searching, flatten matching leaf categories for one-tap pick. */
   const searchHits = useMemo(() => {
     if (!q) return [] as CategoryItem[];
     const hits: CategoryItem[] = [];
@@ -165,11 +154,12 @@ export function CategoryPicker({
   }, [groupChildren, hasSubs, q, locale, t]);
 
   useEffect(() => {
+    if (!open) return;
     activeGroupRef.current?.scrollIntoView({
       block: "nearest",
       behavior: "smooth",
     });
-  }, [groupId]);
+  }, [groupId, open]);
 
   function pickGroup(id: string) {
     const kids = childrenByParent.get(id);
@@ -191,172 +181,195 @@ export function CategoryPicker({
     }
     onChange(id);
     setQuery("");
+    setOpen(false);
   }
 
   function pickLeaf(id: string) {
     onChange(id);
     setQuery("");
+    setOpen(false);
   }
+
+  const selectedLabel = selected
+    ? hasSubs && selected.parentId
+      ? `${catText(group ?? selected)} · ${catText(selected)}`
+      : catText(selected)
+    : t("catPickGroup");
 
   const showSearchHits = q.length >= 1 && searchHits.length > 0;
 
   return (
-    <section className="surface space-y-3 overflow-hidden rounded-[1.5rem] p-3.5">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-sm font-semibold">{groupLabel ?? t("forWhat")}</p>
-        {breadcrumb ? (
-          <p
-            className="min-w-0 truncate text-xs font-semibold text-[var(--accent-b-text)]"
-            dir="auto"
-          >
-            {breadcrumb}
-          </p>
-        ) : null}
-      </div>
+    <div className="space-y-2">
+      <p className="font-medium">{groupLabel ?? t("forWhat")}</p>
 
-      <div className="relative">
-        <span
-          className="pointer-events-none absolute inset-y-0 start-3 flex items-center text-[var(--muted)]"
-          aria-hidden
-        >
-          <svg
-            width="16"
-            height="16"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="11" cy="11" r="7" />
-            <path d="m20 20-3.5-3.5" />
-          </svg>
-        </span>
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder={t("catSearchGroups")}
-          className="field !rounded-xl !py-2.5 ps-9 text-base"
-          enterKeyHint="search"
-          autoComplete="off"
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className="flex w-full min-h-12 items-center gap-2 rounded-2xl bg-[var(--panel-soft)] px-3 py-2.5 text-start ring-1 ring-[var(--input-border)]"
+      >
+        <CatIcon
+          emoji={selected?.emoji || group?.emoji}
+          color={selected?.color || group?.color}
         />
-      </div>
+        <span className="min-w-0 flex-1 truncate font-semibold" dir="auto">
+          {selectedLabel}
+        </span>
+        <span className="shrink-0 text-sm font-bold text-[var(--muted)]">
+          {open ? t("catDone") : t("catChange")}
+        </span>
+      </button>
 
-      {showSearchHits ? (
-        <div className="space-y-1.5">
-          <p className="px-0.5 text-xs font-semibold text-[var(--muted)]">
-            {t("catQuickResults")}
-          </p>
-          <div className="grid grid-cols-1 gap-1.5">
-            {searchHits.map((c) => {
-              const parent = c.parentId
-                ? parents.find((p) => p.id === c.parentId)
-                : null;
-              const active = value === c.id;
-              const title = parent
-                ? `${catText(parent)} · ${catText(c)}`
-                : catText(c);
-              return (
-                <button
-                  key={c.id}
-                  type="button"
-                  onClick={() => pickLeaf(c.id)}
-                  className={`flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-start transition ${
-                    active
-                      ? "bg-[var(--cta-bg)] text-[var(--cta-fg)]"
-                      : "bg-[var(--panel-soft)] text-[var(--foreground)]"
-                  }`}
-                >
-                  <CatDot
-                    emoji={c.emoji || parent?.emoji}
-                    color={c.color || parent?.color}
-                    active={active}
-                  />
-                  <span className="min-w-0 flex-1 truncate font-semibold">
-                    {title}
-                  </span>
-                  {active ? <span aria-hidden>✓</span> : null}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : (
-        <>
-          {filteredParents.length === 0 ? (
-            <p className="rounded-xl bg-[var(--panel-soft)] px-3 py-3 text-sm text-[var(--muted)]">
-              {t("catNoMatch")}
-            </p>
-          ) : (
-            <div
-              className="grid grid-cols-2 gap-2"
-              role="listbox"
-              aria-label={groupLabel ?? t("forWhat")}
-            >
-              {filteredParents.map((p) => {
-                const active = groupId === p.id;
-                return (
-                  <button
-                    key={p.id}
-                    ref={active ? activeGroupRef : undefined}
-                    type="button"
-                    role="option"
-                    aria-selected={active}
-                    onClick={() => pickGroup(p.id)}
-                    className={`flex min-h-12 items-center gap-2 rounded-2xl px-3 py-2.5 text-start transition ${
-                      active
-                        ? "bg-[var(--cta-bg)] text-[var(--cta-fg)] shadow-sm"
-                        : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
-                    }`}
-                  >
-                    <CatDot emoji={p.emoji} color={p.color} active={active} />
-                    <span className="line-clamp-2 min-w-0 flex-1 text-sm font-bold leading-snug">
-                      {catText(p)}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
+      {open ? (
+        <div className="space-y-2.5 rounded-2xl bg-[var(--panel-soft)] p-2.5 ring-1 ring-[var(--input-border)]">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("catSearch")}
+            className="field !rounded-xl !py-2.5 text-base"
+            enterKeyHint="search"
+            autoComplete="off"
+          />
 
-          {hasSubs ? (
-            <div>
-              <p className="mb-1.5 text-xs font-semibold text-[var(--muted)]">
-                {group
-                  ? fill(t("inGroup"), { name: catText(group) })
-                  : t("pickSubCategory")}
+          {showSearchHits ? (
+            <div className="space-y-1.5">
+              <p className="px-0.5 text-xs font-semibold text-[var(--muted)]">
+                {t("catQuickResults")}
               </p>
-              <div
-                className="flex flex-wrap gap-1.5"
-                role="listbox"
-                aria-label={t("pickSubCategory")}
-              >
-                {filteredChildren.map((c) => {
-                  const active = selected?.parentId ? value === c.id : false;
+              <div className="grid grid-cols-1 gap-1.5">
+                {searchHits.map((c) => {
+                  const parent = c.parentId
+                    ? parents.find((p) => p.id === c.parentId)
+                    : null;
+                  const active = value === c.id;
+                  const title = parent
+                    ? `${catText(parent)} · ${catText(c)}`
+                    : catText(c);
                   return (
                     <button
                       key={c.id}
                       type="button"
-                      role="option"
-                      aria-selected={active}
                       onClick={() => pickLeaf(c.id)}
-                      className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
+                      className={`flex min-h-11 items-center gap-2 rounded-xl px-3 py-2 text-start ${
                         active
-                          ? "bg-[var(--accent-b-soft)] text-[var(--accent-b-text)] ring-2 ring-[var(--accent-b)]"
-                          : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
+                          ? "bg-[var(--cta-bg)] text-[var(--cta-fg)]"
+                          : "bg-[var(--surface-bg)] text-[var(--foreground)]"
                       }`}
                     >
-                      {catText(c)}
+                      <CatIcon
+                        emoji={c.emoji || parent?.emoji}
+                        color={c.color || parent?.color}
+                        active={active}
+                      />
+                      <span className="min-w-0 flex-1 truncate font-semibold">
+                        {title}
+                      </span>
+                      {active ? <span aria-hidden>✓</span> : null}
                     </button>
                   );
                 })}
               </div>
             </div>
-          ) : null}
-        </>
-      )}
-    </section>
+          ) : (
+            <>
+              <div>
+                <p className="mb-1.5 px-0.5 text-xs font-semibold text-[var(--muted)]">
+                  {t("catPickGroup")}
+                </p>
+                {filteredParents.length === 0 ? (
+                  <p className="rounded-xl bg-[var(--surface-bg)] px-3 py-3 text-sm text-[var(--muted)]">
+                    {t("catNoMatch")}
+                  </p>
+                ) : (
+                  <div
+                    className="grid max-h-48 grid-cols-3 gap-1.5 overflow-y-auto overscroll-contain sm:grid-cols-4"
+                    role="listbox"
+                    aria-label={groupLabel ?? t("forWhat")}
+                  >
+                    {filteredParents.map((p) => {
+                      const active = groupId === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          ref={active ? activeGroupRef : undefined}
+                          type="button"
+                          role="option"
+                          aria-selected={active}
+                          onClick={() => pickGroup(p.id)}
+                          className={`flex min-h-[3.25rem] flex-col items-center justify-center gap-1 rounded-xl px-1.5 py-2 text-center ${
+                            active
+                              ? "bg-[var(--cta-bg)] text-[var(--cta-fg)] shadow-sm"
+                              : "bg-[var(--surface-bg)] text-[var(--foreground)]"
+                          }`}
+                        >
+                          <CatIcon
+                            emoji={p.emoji}
+                            color={p.color}
+                            active={active}
+                          />
+                          <span className="line-clamp-2 text-[0.7rem] font-bold leading-tight">
+                            {catText(p)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {hasSubs ? (
+                <div>
+                  <p className="mb-1.5 px-0.5 text-xs font-semibold text-[var(--muted)]">
+                    {t("pickSubCategory")}
+                    {group ? (
+                      <span className="font-medium">
+                        {" "}
+                        · {catText(group)}
+                      </span>
+                    ) : null}
+                  </p>
+                  <div
+                    className="grid max-h-40 grid-cols-2 gap-1.5 overflow-y-auto overscroll-contain"
+                    role="listbox"
+                    aria-label={t("pickSubCategory")}
+                  >
+                    {filteredChildren.map((c) => {
+                      const active = selected?.parentId
+                        ? value === c.id
+                        : false;
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          role="option"
+                          aria-selected={active}
+                          onClick={() => pickLeaf(c.id)}
+                          className={`flex min-h-11 items-center gap-2 rounded-xl px-2.5 py-2 text-start ${
+                            active
+                              ? "bg-[var(--cta-bg)] text-[var(--cta-fg)]"
+                              : "bg-[var(--surface-bg)] text-[var(--foreground)]"
+                          }`}
+                        >
+                          <CatIcon
+                            emoji={c.emoji || group?.emoji}
+                            color={c.color || group?.color}
+                            active={active}
+                          />
+                          <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                            {catText(c)}
+                          </span>
+                          {active ? <span aria-hidden>✓</span> : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
+      ) : null}
+    </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { BottomNav } from "@/components/BottomNav";
+import { Hint } from "@/components/Hint";
 import { PageShell } from "@/components/PageShell";
 import { useBooks } from "@/components/BooksProvider";
 import { useI18n } from "@/components/I18nProvider";
@@ -26,26 +27,11 @@ const THEME_LABEL: Record<ThemeId, MessageKey> = {
 
 type Section = {
   href: string;
+  emoji: string;
   titleKey: MessageKey;
   hintKey: MessageKey;
   summary?: string;
-  tone: "info" | "good" | "warn";
 };
-
-function StatusDot({ tone }: { tone: Section["tone"] }) {
-  const color =
-    tone === "warn"
-      ? "bg-amber-500"
-      : tone === "good"
-        ? "bg-emerald-500"
-        : "bg-[var(--accent-b)]";
-  return (
-    <span
-      className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${color}`}
-      aria-hidden
-    />
-  );
-}
 
 export default function ProfilePage() {
   const { t, locale } = useI18n();
@@ -56,116 +42,117 @@ export default function ProfilePage() {
   const currencyLabel =
     CURRENCY_OPTIONS.find((c) => c.code === preferredCurrency) ??
     CURRENCY_OPTIONS[0];
-  const currencyText =
-    locale === "ar" ? currencyLabel.labelAr : currencyLabel.labelEn;
-  const paydayText = fill(t("settingsPaydaySummary"), {
-    n: String(budgetMonthStartDay),
-  });
 
   const sections: Section[] = [
     {
       href: "/profile/appearance",
+      emoji: "🎨",
       titleKey: "themeSection",
       hintKey: "themeSectionHint",
       summary: t(THEME_LABEL[theme]),
-      tone: "info",
     },
     {
       href: "/profile/money",
+      emoji: "💵",
       titleKey: "moneySection",
       hintKey: "moneySectionHint",
-      summary: `${preferredCurrency} · ${paydayText}`,
-      tone: "good",
+      summary: `${preferredCurrency} · ${fill(t("settingsPaydaySummary"), {
+        n: String(budgetMonthStartDay),
+      })}`,
     },
     {
       href: "/profile/privacy",
+      emoji: "🔒",
       titleKey: "privacySection",
       hintKey: "privacySectionHint",
-      tone: "info",
     },
     {
       href: "/profile/categories",
+      emoji: "🏷️",
       titleKey: "myCategories",
       hintKey: "myCategoriesLinkHint",
-      tone: "info",
     },
     {
       href: "/profile/security",
+      emoji: "🛡️",
       titleKey: "securitySection",
       hintKey: "securitySectionHint",
-      tone: "warn",
     },
     {
       href: "/profile/account",
+      emoji: "👤",
       titleKey: "accountSection",
       hintKey: "accountSectionHint",
-      tone: "info",
     },
   ];
 
   return (
     <PageShell>
-      <header>
-        <h1 className="text-[1.65rem] font-bold leading-tight tracking-tight text-[var(--foreground)]">
-          {t("profileTitle")}
-        </h1>
-        <p className="mt-1 text-sm text-[var(--muted)]">{t("profileHint")}</p>
-      </header>
-
-      <section className="surface mt-4 flex items-center gap-3.5 rounded-[1.5rem] px-4 py-4">
-        <span
-          className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-xl font-bold"
+      <header className="surface relative overflow-hidden rounded-[1.75rem] p-4">
+        <div
+          className="pointer-events-none absolute inset-0 opacity-80"
           style={{
-            background: "var(--accent-b-soft)",
-            color: "var(--accent-b-text)",
+            background:
+              "linear-gradient(135deg, color-mix(in srgb, var(--accent-b) 16%, transparent), color-mix(in srgb, var(--accent-a) 10%, transparent))",
           }}
           aria-hidden
-        >
-          {initial}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-lg font-bold text-[var(--foreground)]">
-            {displayName || t("profileTitle")}
-          </p>
-          <p className="mt-0.5 truncate text-sm text-[var(--muted)]">
-            {currencyText}
-            {" · "}
-            {paydayText}
-          </p>
+        />
+        <div className="relative flex items-center gap-3">
+          <span
+            className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-xl font-bold text-[var(--accent-b-fg)]"
+            style={{ background: "var(--accent-b)" }}
+            aria-hidden
+          >
+            {initial}
+          </span>
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-2xl font-bold tracking-tight">
+              {displayName || t("profileTitle")}
+            </h1>
+            <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">
+              {locale === "ar" ? currencyLabel.labelAr : currencyLabel.labelEn}
+              {" · "}
+              {fill(t("settingsPaydaySummary"), {
+                n: String(budgetMonthStartDay),
+              })}
+            </p>
+          </div>
         </div>
-      </section>
+      </header>
 
+      <Hint>{t("profileHint")}</Hint>
       <IosHomeScreenTip />
 
       <section className="mt-5">
-        <h2 className="mb-2.5 text-base font-bold text-[var(--foreground)]">
+        <h2 className="mb-2 text-sm font-bold uppercase tracking-wide text-[var(--muted)]">
           {t("settingsTitle")}
         </h2>
-        <ul className="space-y-2.5">
+        <ul className="space-y-2">
           {sections.map((section) => (
             <li key={section.href}>
               <Link
                 href={section.href}
-                className="surface flex min-h-[4.5rem] items-start gap-3 rounded-[1.35rem] px-4 py-3.5 transition hover:bg-[var(--panel-soft)] active:scale-[0.99]"
+                className="surface flex min-h-[4.5rem] items-center gap-3 rounded-[1.5rem] px-3 py-3 transition hover:bg-[var(--panel-soft)]"
               >
-                <StatusDot tone={section.tone} />
+                <span
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--panel-soft)] text-xl"
+                  aria-hidden
+                >
+                  {section.emoji}
+                </span>
                 <span className="min-w-0 flex-1">
-                  <span className="flex items-start justify-between gap-3">
-                    <span className="min-w-0">
-                      <span className="block truncate text-[15px] font-semibold text-[var(--foreground)]">
-                        {t(section.titleKey)}
-                      </span>
-                      <span className="mt-0.5 block text-xs leading-snug text-[var(--muted)]">
-                        {section.summary || t(section.hintKey)}
-                      </span>
-                    </span>
-                    <span
-                      className="shrink-0 pt-0.5 text-lg text-[var(--muted)] opacity-60"
-                      aria-hidden
-                    >
-                      →
-                    </span>
+                  <span className="block text-base font-bold leading-tight">
+                    {t(section.titleKey)}
                   </span>
+                  <span className="mt-0.5 block text-sm leading-relaxed text-[var(--muted)]">
+                    {section.summary || t(section.hintKey)}
+                  </span>
+                </span>
+                <span
+                  className="shrink-0 text-lg text-[var(--muted)]"
+                  aria-hidden
+                >
+                  →
                 </span>
               </Link>
             </li>

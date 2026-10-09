@@ -62,8 +62,8 @@ export default function AppearanceSettingsPage() {
 
       <SettingsCard>
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[15px] font-semibold">{t("themePref")}</span>
-          <span className="text-xs font-semibold text-[var(--accent-b-text)]">
+          <span className="font-medium">{t("themePref")}</span>
+          <span className="text-xs font-semibold text-[var(--muted)]">
             {fill(t("settingsCurrentTheme"), {
               name: t(THEME_LABEL[theme]),
             })}
@@ -80,7 +80,7 @@ export default function AppearanceSettingsPage() {
                 disabled={themeBusy}
                 onClick={() => onTheme(opt.id)}
                 aria-pressed={active}
-                className={`overflow-hidden rounded-[1.15rem] text-start ring-2 transition active:scale-[0.99] ${
+                className={`overflow-hidden rounded-2xl text-start ring-2 transition ${
                   active
                     ? "ring-[var(--cta-bg)]"
                     : "ring-transparent hover:ring-[var(--input-border)]"
@@ -106,7 +106,7 @@ export default function AppearanceSettingsPage() {
                   ) : null}
                 </span>
                 <span
-                  className={`block px-3 py-2.5 text-sm font-bold leading-tight ${
+                  className={`block px-3 py-2 text-sm font-bold leading-tight ${
                     active
                       ? "bg-[var(--cta-bg)] text-[var(--cta-fg)]"
                       : "bg-[var(--surface-bg)] text-[var(--foreground)]"
@@ -122,9 +122,7 @@ export default function AppearanceSettingsPage() {
       </SettingsCard>
 
       <SettingsCard>
-        <span className="block text-[15px] font-semibold">
-          {t("languagePref")}
-        </span>
+        <span className="block font-medium">{t("languagePref")}</span>
         <div className="grid grid-cols-2 gap-2">
           {(
             [
@@ -142,10 +140,10 @@ export default function AppearanceSettingsPage() {
                   flashSaved();
                 }}
                 aria-pressed={active}
-                className={`min-h-12 rounded-[1.15rem] px-3 text-base font-bold transition active:scale-[0.99] ${
+                className={`min-h-12 rounded-2xl px-3 text-base font-bold transition ${
                   active
                     ? "bg-[var(--cta-bg)] text-[var(--cta-fg)]"
-                    : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
+                    : "bg-[var(--panel-soft)] text-[var(--foreground)]"
                 }`}
               >
                 {opt.label}

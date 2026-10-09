@@ -172,100 +172,50 @@ function monthLabel(key: string, locale: string) {
   });
 }
 
-function TrendChip({
+function CompareChip({
   current,
   previous,
   kind,
+  label,
   t,
 }: {
   current: number;
   previous: number;
-  /** in/saved: up is good. out: up is bad. */
-  kind: "in" | "out" | "saved";
+  kind: "in" | "out";
+  label: string;
   t: (key: "vsNew" | "vsFlat") => string;
 }) {
   const diff = current - previous;
   const flat = Math.abs(diff) < 0.001;
   const up = diff > 0.001;
-  const good =
-    kind === "out" ? !up && !flat : up;
-  const bad =
-    kind === "out" ? up : !up && !flat;
+  // Income up is good; expense up is bad.
+  const good = kind === "in" ? up : !up && !flat;
+  const bad = kind === "in" ? !up && !flat : up;
   const pct =
-    Math.abs(previous) > 0.001
-      ? Math.round((diff / Math.abs(previous)) * 100)
-      : null;
+    previous > 0.001 ? Math.round((diff / previous) * 100) : null;
 
   let text: string;
   if (flat) text = t("vsFlat");
-  else if (Math.abs(previous) < 0.001 && Math.abs(current) > 0.001)
-    text = t("vsNew");
-  else if (pct != null) text = `${up ? "+" : "−"} ${Math.abs(pct)}%`;
-  else text = up ? "+" : "−";
+  else if (previous < 0.001 && current > 0.001) text = t("vsNew");
+  else if (pct != null) text = `${up ? "↑" : "↓"} ${Math.abs(pct)}%`;
+  else text = `${up ? "↑" : "↓"}`;
 
   return (
     <span
-      className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums leading-none ${
+      className={`mt-1 inline-flex max-w-full items-center rounded-full px-2 py-0.5 text-[11px] font-semibold leading-snug ${
         flat
-          ? "bg-[color-mix(in_srgb,var(--foreground)_8%,transparent)] text-[var(--muted)]"
+          ? "bg-stone-100 text-stone-600"
           : good
-            ? "bg-[color-mix(in_srgb,#10b981_18%,transparent)] text-emerald-800"
+            ? "bg-emerald-50 text-emerald-800"
             : bad
-              ? "bg-[color-mix(in_srgb,#ef4444_18%,transparent)] text-red-700"
-              : "bg-[color-mix(in_srgb,var(--foreground)_8%,transparent)] text-[var(--muted)]"
+              ? "bg-red-50 text-red-800"
+              : "bg-stone-100 text-stone-600"
       }`}
     >
-      {text}
+      <span className="truncate">
+        {text} · {label}
+      </span>
     </span>
-  );
-}
-
-function ShareRing({
-  pct,
-  label,
-}: {
-  pct: number;
-  label: string;
-}) {
-  const clamped = Math.max(0, Math.min(100, pct));
-  const r = 18;
-  const c = 2 * Math.PI * r;
-  const dash = (clamped / 100) * c;
-  return (
-    <div className="relative flex h-[4.25rem] w-[4.25rem] shrink-0 items-center justify-center">
-      <svg
-        viewBox="0 0 44 44"
-        className="absolute inset-0 h-full w-full -rotate-90"
-        aria-hidden
-      >
-        <circle
-          cx="22"
-          cy="22"
-          r={r}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="4"
-          className="text-[color-mix(in_srgb,var(--foreground)_10%,transparent)]"
-        />
-        <circle
-          cx="22"
-          cy="22"
-          r={r}
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="4"
-          strokeLinecap="round"
-          strokeDasharray={`${dash} ${c - dash}`}
-          className="text-red-600 transition-[stroke-dasharray] duration-300"
-        />
-      </svg>
-      <div className="relative z-[1] px-1 text-center leading-none">
-        <p className="text-sm font-bold tabular-nums text-red-700">{clamped}%</p>
-        <p className="mt-0.5 text-[9px] font-medium text-[var(--muted)]">
-          {label}
-        </p>
-      </div>
-    </div>
   );
 }
 
@@ -341,12 +291,8 @@ export default function AnalyticsPage() {
     ])
       .then(([d, c, m, s]) => {
         setDays(d);
-        const expense = c.filter((x) => x.type === "EXPENSE");
-        setCats(expense);
-        // Match Charts UX: start with Top 3 so the explorer has a clear story.
-        setSelectedGroups(
-          expense.slice(0, 3).map((x) => x.categoryId ?? x.name),
-        );
+        setCats(c.filter((x) => x.type === "EXPENSE"));
+        setSelectedGroups([]);
         setExpandedSubs([]);
         setMembers(m);
         setSavingsOpening(s.opening);
@@ -411,6 +357,8 @@ export default function AnalyticsPage() {
     [selectedCats],
   );
 
+  const maxCat = Math.max(1, ...cats.map((c) => c.total));
+
   function toggleGroup(key: string) {
     setSelectedGroups((prev) =>
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
@@ -443,71 +391,16 @@ export default function AnalyticsPage() {
   // When commitment payments are excluded, category totals are the period base.
   const totalOut = excludeCommitments ? catOut : dayOut || catOut;
 
-  const prevCursor =
-    period === "range" ? null : shift(period, cursor, -1, startDay);
-
-  const navWeek =
-    period === "week" ? budgetWeekForDate(cursor, startDay) : null;
-
-  const periodTitle = useMemo(() => {
-    const loc = locale === "ar" ? "ar" : "en";
-    if (period === "day") {
-      return cursor.toLocaleDateString(loc, {
-        weekday: "short",
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      });
-    }
-    if (period === "week" && navWeek) {
-      return fill(t("weekOfMonth"), { n: String(navWeek.index) });
-    }
-    if (period === "month") {
-      return monthLabel(budgetMonthKey(cursor, startDay), locale);
-    }
-    if (period === "year") {
-      return String(cursor.getFullYear());
-    }
-    return `${rangeFrom} → ${rangeTo}`;
-  }, [period, cursor, locale, startDay, t, rangeFrom, rangeTo, navWeek]);
-
-  const vsSubtitle = useMemo(() => {
-    if (period === "range" || !prevCursor) return "";
-    const loc = locale === "ar" ? "ar" : "en";
-    if (period === "month") {
-      const prevKey = budgetMonthKey(prevCursor, startDay);
-      const [y, m] = prevKey.split("-").map(Number);
-      const name = new Date(y, m - 1, 1).toLocaleDateString(loc, {
-        month: "long",
-      });
-      return fill(t("vsNamed"), { name });
-    }
-    if (period === "year") {
-      return fill(t("vsNamed"), { name: String(prevCursor.getFullYear()) });
-    }
-    if (period === "day") {
-      const name = prevCursor.toLocaleDateString(loc, {
-        day: "numeric",
-        month: "short",
-      });
-      return fill(t("vsNamed"), { name });
-    }
-    if (period === "week") {
-      return t("vsLastWeek");
-    }
-    return "";
-  }, [period, prevCursor, locale, startDay, t]);
-
-  const savedLabel =
+  const compareLabel =
     period === "month"
-      ? t("savedThisMonth")
+      ? t("vsLastMonth")
       : period === "week"
-        ? t("savedThisWeek")
+        ? t("vsLastWeek")
         : period === "day"
-          ? t("savedThisDay")
+          ? t("vsYesterday")
           : period === "year"
-            ? t("savedThisYear")
-            : t("savedThisRange");
+            ? t("vsLastYear")
+            : "";
 
   type ChartBar = {
     key: string;
@@ -618,6 +511,11 @@ export default function AnalyticsPage() {
 
   const selectedBar =
     chartBars.find((b) => b.key === selectedBarKey) ?? peakBar ?? null;
+  const chartTotal = chartBars.reduce((s, b) => s + b.expense, 0);
+  const selectedShare =
+    selectedBar && chartTotal > 0.001
+      ? Math.round((selectedBar.expense / chartTotal) * 100)
+      : 0;
   const todayIso = isoLocal(new Date());
   const selectedIndex = selectedBar
     ? chartBars.findIndex((b) => b.key === selectedBar.key)
@@ -677,60 +575,35 @@ export default function AnalyticsPage() {
     ...yearSavings.map((m) => Math.abs(m.saved)),
   );
 
-  const periodSaved =
-    period === "month" ? monthSavings.saved : totalIn - totalOut;
-  const prevSaved =
-    prevIn != null && prevOut != null ? prevIn - prevOut : null;
-
   return (
     <PageShell>
-      <div>
-        <h1 className="text-[1.65rem] font-bold leading-tight tracking-tight text-[var(--foreground)]">
-          {t("navCharts")}
-        </h1>
-        <p className="mt-1 text-sm text-[var(--muted)]">{t("chartsHint")}</p>
+      <h1 className="page-title">📊 {t("navCharts")}</h1>
+      <Hint>{t("chartsHint")}</Hint>
+      <div className="seg mt-3 grid w-full min-w-0 grid-cols-5">
+        {(["day", "week", "month", "year", "range"] as Period[]).map((p) => (
+          <button
+            key={p}
+            type="button"
+            onClick={() => setPeriodMode(p)}
+            className={`seg-item min-w-0 px-0.5 text-[11px] sm:px-1 sm:text-sm ${
+              period === p ? "seg-active" : ""
+            }`}
+            aria-pressed={period === p}
+          >
+            {p === "day"
+              ? t("periodDay")
+              : p === "week"
+                ? t("periodWeek")
+                : p === "month"
+                  ? t("periodMonth")
+                  : p === "year"
+                    ? t("periodYear")
+                    : t("customRange")}
+          </button>
+        ))}
       </div>
-
-      <div className="seg mt-4 grid w-full min-w-0 grid-cols-4">
-        {(["day", "week", "month", "year"] as Exclude<Period, "range">[]).map(
-          (p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() => setPeriodMode(p)}
-              className={`seg-item min-w-0 px-0.5 text-[11px] sm:px-1 sm:text-sm ${
-                period === p ? "seg-active" : ""
-              }`}
-              aria-pressed={period === p}
-            >
-              {p === "day"
-                ? t("periodDay")
-                : p === "week"
-                  ? t("periodWeek")
-                  : p === "month"
-                    ? t("periodMonth")
-                    : t("periodYear")}
-            </button>
-          ),
-        )}
-      </div>
-      <div className="mt-2 flex justify-end">
-        <button
-          type="button"
-          onClick={() => setPeriodMode("range")}
-          className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
-            period === "range"
-              ? "bg-[var(--accent-b-soft)] text-[var(--accent-b-text)]"
-              : "text-[var(--muted)] hover:text-[var(--foreground)]"
-          }`}
-          aria-pressed={period === "range"}
-        >
-          {t("customRange")}
-        </button>
-      </div>
-
       {period === "range" ? (
-        <div className="period-range mt-2 space-y-2">
+        <div className="period-range mt-3 space-y-2">
           <DateField
             label={t("fromDate")}
             value={rangeFrom}
@@ -748,38 +621,76 @@ export default function AnalyticsPage() {
           />
         </div>
       ) : (
-        <div className="mt-2 flex items-center gap-2">
+        <div className="mt-3 flex items-center gap-2">
           <button
             type="button"
             className="icon-btn shrink-0 !min-h-11 !min-w-11 px-3 text-xl sm:px-4"
             onClick={() => setCursor((c) => shift(period, c, -1, startDay))}
-            aria-label="prev"
           >
             ‹
           </button>
-          <div className="min-w-0 flex-1 text-center">
-            <p className="truncate text-base font-semibold leading-tight sm:text-lg">
-              {periodTitle}
-            </p>
-            {vsSubtitle ? (
-              <p className="mt-0.5 text-xs font-medium text-[var(--muted)]">
-                {vsSubtitle}
-              </p>
-            ) : null}
-            {period === "week" && activeWeek ? (
-              <p
-                className="mt-0.5 text-[11px] font-medium tabular-nums text-[var(--muted)]"
-                dir="ltr"
-              >
-                {weekRangeLabel(activeWeek.from, activeWeek.to, locale)}
-              </p>
-            ) : null}
+          <div className="min-w-0 flex-1">
+            {period === "day" ? (
+              <DateField
+                align="center"
+                value={iso(cursor)}
+                onChange={(v) => setCursor(new Date(`${v}T12:00:00`))}
+              />
+            ) : period === "week" && activeWeek ? (
+              <div className="field flex min-h-[2.75rem] w-full flex-col items-center justify-center gap-0.5 !py-1">
+                <span className="text-sm font-semibold leading-tight sm:text-base">
+                  {fill(t("weekOfMonth"), { n: String(activeWeek.index) })}
+                </span>
+                <span
+                  className="text-[11px] font-medium tabular-nums text-[var(--muted)] sm:text-xs"
+                  dir="ltr"
+                >
+                  {weekRangeLabel(activeWeek.from, activeWeek.to, locale)}
+                </span>
+              </div>
+            ) : period === "month" ? (
+              <DateField
+                type="month"
+                align="center"
+                value={budgetMonthKey(cursor, startDay)}
+                onChange={(v) => {
+                  if (startDay === 1) {
+                    setCursor(new Date(`${v}-01T12:00:00`));
+                    return;
+                  }
+                  const [y, m] = v.split("-").map(Number);
+                  setCursor(new Date(y, m - 1, startDay));
+                }}
+              />
+            ) : (
+              <label className="block min-w-0">
+                <span className="field relative flex min-h-[2.75rem] w-full items-center justify-center overflow-hidden !py-0">
+                  <span
+                    className="px-2 text-center text-base font-semibold tabular-nums sm:text-lg"
+                    dir="ltr"
+                  >
+                    {cursor.getFullYear()}
+                  </span>
+                  <input
+                    type="number"
+                    value={cursor.getFullYear()}
+                    min={2000}
+                    max={2100}
+                    onChange={(e) => {
+                      const y = Number(e.target.value);
+                      if (y) setCursor(new Date(y, 0, 1));
+                    }}
+                    className="absolute inset-0 z-10 cursor-pointer opacity-0"
+                    aria-label={t("periodYear")}
+                  />
+                </span>
+              </label>
+            )}
           </div>
           <button
             type="button"
             className="icon-btn shrink-0 !min-h-11 !min-w-11 px-3 text-xl sm:px-4"
             onClick={() => setCursor((c) => shift(period, c, 1, startDay))}
-            aria-label="next"
           >
             ›
           </button>
@@ -797,102 +708,93 @@ export default function AnalyticsPage() {
       ) : null}
       {error ? <p className="mt-2 text-red-700">{error}</p> : null}
 
-      <section className="surface mt-4 overflow-hidden rounded-[1.5rem] p-4">
+      <section className="surface mt-3 overflow-hidden rounded-2xl">
         {hideAggregates ? (
-          <p className="text-sm text-stone-500">{t("aggregatesAdminOnly")}</p>
+          <p className="px-3.5 py-3 text-sm text-stone-500">
+            {t("aggregatesAdminOnly")}
+          </p>
         ) : (
           <>
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm text-[var(--muted)]">{savedLabel}</p>
-                <p
-                  className={`mt-1 text-[1.85rem] font-bold leading-none tracking-tight tabular-nums ${
-                    periodSaved < 0 ? "text-red-700" : "text-[var(--foreground)]"
-                  }`}
-                >
-                  <Money
-                    amount={periodSaved}
-                    currency={currency}
-                    locale={locale}
-                  />
-                </p>
-                {period === "month" && periodSaved < 0 ? (
-                  <p className="mt-1.5 text-xs text-[var(--muted)]">
-                    {t("usedFromSavings")}
-                  </p>
-                ) : null}
-              </div>
-              {prevSaved != null ? (
-                <TrendChip
-                  current={periodSaved}
-                  previous={prevSaved}
-                  kind="saved"
-                  t={t}
-                />
-              ) : null}
-            </div>
-
-            <div className="mt-4 grid grid-cols-2 gap-2.5">
-              <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-2.5">
-                <p className="text-xs text-[var(--muted)]">{t("chartsInShort")}</p>
-                <p className="mt-0.5 text-lg font-semibold leading-tight tabular-nums text-emerald-800">
+            <div className="grid grid-cols-2 divide-x divide-[var(--surface-border)] rtl:divide-x-reverse">
+              <div className="flex flex-col px-3.5 py-3">
+                <p className="text-xs text-[var(--muted)]">{t("periodTotalIn")}</p>
+                <p className="mt-0.5 text-lg font-semibold leading-tight text-emerald-800 sm:text-xl">
                   <Money amount={totalIn} currency={currency} locale={locale} />
                 </p>
-                {prevIn != null ? (
-                  <div className="mt-1.5">
-                    <TrendChip
-                      current={totalIn}
-                      previous={prevIn}
-                      kind="in"
-                      t={t}
-                    />
-                  </div>
+                {prevIn != null && compareLabel ? (
+                  <CompareChip
+                    current={totalIn}
+                    previous={prevIn}
+                    kind="in"
+                    label={compareLabel}
+                    t={t}
+                  />
                 ) : null}
               </div>
-              <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-2.5">
-                <p className="text-xs text-[var(--muted)]">{t("chartsOutShort")}</p>
-                <p className="mt-0.5 text-lg font-semibold leading-tight tabular-nums text-red-700">
+              <div className="flex flex-col px-3.5 py-3">
+                <p className="text-xs text-[var(--muted)]">{t("periodTotalOut")}</p>
+                <p className="mt-0.5 text-lg font-semibold leading-tight text-red-800 sm:text-xl">
                   <Money amount={totalOut} currency={currency} locale={locale} />
                 </p>
-                {prevOut != null ? (
-                  <div className="mt-1.5">
-                    <TrendChip
-                      current={totalOut}
-                      previous={prevOut}
-                      kind="out"
-                      t={t}
-                    />
-                  </div>
+                {prevOut != null && compareLabel ? (
+                  <CompareChip
+                    current={totalOut}
+                    previous={prevOut}
+                    kind="out"
+                    label={compareLabel}
+                    t={t}
+                  />
                 ) : null}
               </div>
             </div>
 
             {period === "month" ? (
-              <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 border-t border-[var(--surface-border)] pt-3 text-xs">
-                <p className="flex min-w-0 items-baseline justify-between gap-2">
-                  <span className="truncate text-[var(--muted)]" dir="auto">
-                    {t("broughtFromBefore")}
-                  </span>
-                  <span className="shrink-0 font-medium tabular-nums">
+              <div className="border-t border-[var(--surface-border)] px-3.5 py-3">
+                <div className="flex items-baseline justify-between gap-2">
+                  <h2 className="text-sm font-semibold">{t("savingsTitle")}</h2>
+                  <span
+                    className={`text-sm font-semibold tabular-nums ${
+                      monthSavings.saved < 0 ? "text-red-800" : "text-emerald-800"
+                    }`}
+                  >
                     <Money
-                      amount={monthSavings.broughtForward}
+                      amount={monthSavings.saved}
                       currency={currency}
                       locale={locale}
                     />
                   </span>
+                </div>
+                <p className="mt-0.5 text-[11px] text-[var(--muted)]">
+                  {monthSavings.saved < 0
+                    ? t("usedFromSavings")
+                    : t("savedInMonth")}
                 </p>
-                <p className="flex min-w-0 items-baseline justify-between gap-2">
-                  <span className="truncate text-[var(--muted)]" dir="auto">
-                    {t("goesToNextMonth")}
-                  </span>
-                  <span className="shrink-0 font-medium tabular-nums">
-                    <Money
-                      amount={monthSavings.remaining}
-                      currency={currency}
-                      locale={locale}
-                    />
-                  </span>
-                </p>
+                <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                  <p className="flex min-w-0 items-baseline justify-between gap-2">
+                    <span className="truncate text-[var(--muted)]" dir="auto">
+                      {t("broughtFromBefore")}
+                    </span>
+                    <span className="shrink-0 font-medium tabular-nums">
+                      <Money
+                        amount={monthSavings.broughtForward}
+                        currency={currency}
+                        locale={locale}
+                      />
+                    </span>
+                  </p>
+                  <p className="flex min-w-0 items-baseline justify-between gap-2">
+                    <span className="truncate text-[var(--muted)]" dir="auto">
+                      {t("goesToNextMonth")}
+                    </span>
+                    <span className="shrink-0 font-medium tabular-nums">
+                      <Money
+                        amount={monthSavings.remaining}
+                        currency={currency}
+                        locale={locale}
+                      />
+                    </span>
+                  </p>
+                </div>
               </div>
             ) : null}
           </>
@@ -964,7 +866,11 @@ export default function AnalyticsPage() {
       ) : null}
 
       {period !== "day" ? (
-        <section className="surface spend-chart mt-4 overflow-hidden rounded-[1.5rem] p-4">
+        <>
+          <h2 className="mt-8 text-xl font-semibold">
+            {chartByMonth ? t("spendByMonth") : t("spendByDay")}
+          </h2>
+          <section className="surface spend-chart mt-3 overflow-hidden rounded-[1.75rem] p-4">
             {chartBars.length === 0 ? (
               <p className="text-[var(--muted)]">{t("noPeriodData")}</p>
             ) : (
@@ -972,20 +878,11 @@ export default function AnalyticsPage() {
                 <div className="flex items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate text-sm font-semibold text-[var(--foreground)]">
-                        {selectedBar
-                          ? (() => {
-                              const loc = locale === "ar" ? "ar" : "en";
-                              if (chartByMonth) return selectedBar.detailLabel;
-                              const d = parseIso(selectedBar.key);
-                              return d.toLocaleDateString(loc, {
-                                day: "numeric",
-                                month: "short",
-                              });
-                            })()
-                          : chartByMonth
+                      <p className="truncate text-sm text-[var(--muted)]">
+                        {selectedBar?.detailLabel ??
+                          (chartByMonth
                             ? t("spendByMonth")
-                            : t("spendByDay")}
+                            : t("spendByDay"))}
                       </p>
                       {selectedBar?.key === todayIso ? (
                         <span className="rounded-full bg-[var(--accent-b-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--accent-b-text)]">
@@ -995,15 +892,15 @@ export default function AnalyticsPage() {
                       {selectedBar &&
                       peakBar?.key === selectedBar.key &&
                       selectedBar.expense > 0.001 ? (
-                        <span className="rounded-full bg-[var(--accent-b-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--accent-b-text)]">
-                          {t("peakBadge")}
+                        <span className="rounded-full bg-[var(--soft-amber)] px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                          {chartByMonth ? t("peakMonth") : t("peakSpend")}
                         </span>
                       ) : null}
                     </div>
                     <p
-                      className={`mt-1.5 text-[1.75rem] font-bold leading-none tracking-tight tabular-nums ${
+                      className={`mt-1 text-[1.75rem] font-bold leading-none tracking-tight tabular-nums ${
                         (selectedBar?.expense ?? 0) > 0.001
-                          ? "text-red-700"
+                          ? "text-red-800"
                           : "text-[var(--foreground)]"
                       }`}
                     >
@@ -1017,6 +914,14 @@ export default function AnalyticsPage() {
                         />
                       )}
                     </p>
+                    {!hideAggregates &&
+                    selectedBar &&
+                    selectedBar.expense > 0.001 &&
+                    selectedShare > 0 ? (
+                      <p className="mt-1.5 text-xs text-[var(--muted)]">
+                        {t("ofPeriod", { pct: String(selectedShare) })}
+                      </p>
+                    ) : null}
                   </div>
 
                   {!hideAggregates ? (
@@ -1164,114 +1069,114 @@ export default function AnalyticsPage() {
                   </div>
                 </div>
 
-                <div className="mt-3 flex items-center justify-between gap-2 px-0.5 text-center text-xs">
+                <div className="mt-3 grid grid-cols-3 gap-1.5">
                   <button
                     type="button"
-                    className="min-w-0 flex-1 rounded-xl py-1.5 transition active:scale-[0.98]"
+                    className="rounded-2xl bg-[var(--panel-soft)] px-2 py-2.5 text-center transition active:scale-[0.98]"
                     onClick={() => {
                       if (peakBar) onChartBarClick(peakBar.key);
                     }}
                   >
-                    <span className="text-[var(--muted)]">{t("peakStat")}: </span>
-                    <span className="font-semibold tabular-nums">
-                      {hideAggregates
-                        ? "••••"
-                        : peakBar
-                          ? Math.round(peakBar.expense).toLocaleString(
-                              locale === "ar" ? "ar" : "en",
-                            )
-                          : "—"}
-                    </span>
+                    <p className="text-[10px] text-[var(--muted)]">
+                      {chartByMonth ? t("peakMonth") : t("peakSpend")}
+                    </p>
+                    <p className="mt-0.5 text-sm font-semibold tabular-nums">
+                      {hideAggregates ? (
+                        "••••"
+                      ) : peakBar ? (
+                        <Money
+                          amount={peakBar.expense}
+                          currency={currency}
+                          locale={locale}
+                        />
+                      ) : (
+                        "—"
+                      )}
+                    </p>
                   </button>
-                  <span className="text-[var(--muted)]" aria-hidden>
-                    ·
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <span className="text-[var(--muted)]">{t("avgStat")}: </span>
-                    <span className="font-semibold tabular-nums">
-                      {hideAggregates
-                        ? "••••"
-                        : Math.round(avgSpend).toLocaleString(
-                            locale === "ar" ? "ar" : "en",
-                          )}
-                    </span>
+                  <div className="rounded-2xl bg-[var(--panel-soft)] px-2 py-2.5 text-center">
+                    <p className="text-[10px] text-[var(--muted)]">
+                      {t("avgSpend")}
+                    </p>
+                    <p className="mt-0.5 text-sm font-semibold tabular-nums">
+                      {hideAggregates ? (
+                        "••••"
+                      ) : (
+                        <Money
+                          amount={avgSpend}
+                          currency={currency}
+                          locale={locale}
+                        />
+                      )}
+                    </p>
                   </div>
-                  <span className="text-[var(--muted)]" aria-hidden>
-                    ·
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <span className="text-[var(--muted)]">
-                      {chartByMonth ? t("monthsStat") : t("daysStat")}:{" "}
-                    </span>
-                    <span className="font-semibold tabular-nums">
+                  <div className="rounded-2xl bg-[var(--panel-soft)] px-2 py-2.5 text-center">
+                    <p className="text-[10px] text-[var(--muted)]">
+                      {chartByMonth
+                        ? t("monthsWithSpend")
+                        : t("daysWithSpend")}
+                    </p>
+                    <p className="mt-0.5 text-sm font-semibold tabular-nums">
                       {hideAggregates ? "••••" : activeBars.length}
-                    </span>
+                    </p>
                   </div>
                 </div>
               </>
             )}
-        </section>
+          </section>
+        </>
       ) : null}
 
-      <div className="mt-6">
-        <h2 className="text-lg font-bold tracking-tight">{t("spendExplorer")}</h2>
-        <p className="mt-0.5 text-sm text-[var(--muted)]">{t("pickGroupsHint")}</p>
-      </div>
+      <h2 className="mt-8 text-xl font-semibold">{t("spendExplorer")}</h2>
+      <Hint>{t("pickGroupsHint")}</Hint>
 
       {cats.length > 0 ? (
-        <section className="surface mt-3 overflow-hidden rounded-[1.5rem]">
+        <section className="surface mt-3 overflow-hidden rounded-[1.75rem]">
           <div className="border-b border-[var(--surface-border)] px-4 py-3">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => pickTop(3)}
-                disabled={cats.length === 0}
-                className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
-                  selectionActive &&
-                  selectedGroups.length === Math.min(3, cats.length) &&
-                  cats.slice(0, 3).every((c) => selectedSet.has(catKey(c)))
-                    ? "bg-[var(--accent-b)] text-[var(--accent-b-fg)]"
-                    : "bg-[var(--panel-soft)] text-[var(--foreground)]"
-                }`}
-              >
-                {t("topThreeGroups")}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedGroups(cats.map(catKey));
-                }}
-                disabled={cats.length === 0}
-                className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
-                  selectionActive && selectedGroups.length === cats.length
-                    ? "bg-[var(--accent-b)] text-[var(--accent-b-fg)]"
-                    : "bg-[var(--panel-soft)] text-[var(--foreground)]"
-                }`}
-              >
-                {t("selectAllGroups")}
-              </button>
-              <button
-                type="button"
-                aria-pressed={excludeCommitments}
-                onClick={() => setExcludeCommitments((v) => !v)}
-                className={`rounded-full px-3 py-1.5 text-sm font-semibold transition ${
-                  excludeCommitments
-                    ? "bg-[var(--accent-b)] text-[var(--accent-b-fg)]"
-                    : "bg-[var(--panel-soft)] text-[var(--foreground)]"
-                }`}
-                title={t("withoutCommitmentsHint")}
-              >
-                {t("withoutCommitments")}
-              </button>
-              {selectionActive ? (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="font-semibold">{t("pickGroups")}</p>
+              <div className="flex flex-wrap gap-1.5">
                 <button
                   type="button"
-                  onClick={() => setSelectedGroups([])}
-                  className="ms-auto rounded-full px-3 py-1.5 text-sm font-semibold text-red-700"
+                  onClick={() => pickTop(3)}
+                  disabled={cats.length === 0}
+                  className="rounded-full bg-[var(--panel-soft)] px-3 py-1.5 text-sm font-semibold"
                 >
-                  {t("clearSelection")}
+                  {t("topThreeGroups")}
                 </button>
-              ) : null}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedGroups(cats.map(catKey));
+                  }}
+                  disabled={cats.length === 0}
+                  className="rounded-full bg-[var(--panel-soft)] px-3 py-1.5 text-sm font-semibold"
+                >
+                  {t("selectAllGroups")}
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={excludeCommitments}
+                  onClick={() => setExcludeCommitments((v) => !v)}
+                  className={`rounded-full px-3 py-1.5 text-sm font-semibold ${
+                    excludeCommitments
+                      ? "bg-[var(--accent-b)] text-[var(--accent-b-fg)]"
+                      : "bg-[var(--panel-soft)]"
+                  }`}
+                  title={t("withoutCommitmentsHint")}
+                >
+                  {t("withoutCommitments")}
+                </button>
+                {selectionActive ? (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedGroups([])}
+                    className="rounded-full bg-[var(--panel-soft)] px-3 py-1.5 text-sm font-semibold text-red-800"
+                  >
+                    {t("clearSelection")}
+                  </button>
+                ) : null}
+              </div>
             </div>
             {excludeCommitments ? (
               <p className="mt-2 text-xs leading-snug text-[var(--muted)]">
@@ -1279,73 +1184,89 @@ export default function AnalyticsPage() {
               </p>
             ) : null}
 
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              {cats.map((c) => {
-                const key = catKey(c);
-                const on = selectedSet.has(key);
-                const shareBase =
-                  selectionActive && on && selectedTotal > 0
-                    ? selectedTotal
-                    : totalOut;
-                const pct =
-                  shareBase > 0 ? Math.round((c.total / shareBase) * 100) : 0;
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => toggleGroup(key)}
-                    aria-pressed={on}
-                    className={`relative flex min-h-[5.25rem] flex-col rounded-2xl border p-3 text-start transition ${
-                      on
-                        ? "border-transparent bg-[var(--panel-soft)]"
-                        : "border-[var(--input-border)] bg-[var(--surface-bg)]"
-                    }`}
-                    style={
-                      on
-                        ? { boxShadow: `0 0 0 2px ${c.color}` }
-                        : undefined
-                    }
-                  >
-                    <span className="flex items-start justify-between gap-1.5">
-                      <span className="line-clamp-2 min-w-0 text-sm font-bold leading-snug">
-                        {c.emoji ? `${c.emoji} ` : ""}
-                        {categoryLabel(c, locale, t)}
-                      </span>
+            <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {cats.length === 0 ? (
+                <p className="col-span-full text-sm text-[var(--muted)]">
+                  {t("noPeriodData")}
+                </p>
+              ) : (
+                cats.map((c) => {
+                  const key = catKey(c);
+                  const on = selectedSet.has(key);
+                  const shareBase =
+                    selectionActive && on && selectedTotal > 0
+                      ? selectedTotal
+                      : totalOut;
+                  const pct =
+                    shareBase > 0 ? Math.round((c.total / shareBase) * 100) : 0;
+                  const barPct = hideAggregates
+                    ? 0
+                    : Math.max(8, Math.round((c.total / maxCat) * 100));
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => toggleGroup(key)}
+                      aria-pressed={on}
+                      className={`relative flex min-h-[5.5rem] flex-col overflow-hidden rounded-2xl border p-2.5 text-start transition ${
+                        on
+                          ? "border-transparent bg-[var(--panel-soft)]"
+                          : "border-[var(--input-border)] bg-[var(--surface-bg)]"
+                      }`}
+                      style={
+                        on
+                          ? { boxShadow: `0 0 0 2px ${c.color}` }
+                          : undefined
+                      }
+                    >
                       <span
-                        className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
-                          on
-                            ? "text-white"
-                            : "border border-[var(--input-border)] text-transparent"
-                        }`}
-                        style={on ? { background: c.color } : undefined}
+                        className="absolute inset-x-0 top-0 h-1.5"
+                        style={{
+                          background: `linear-gradient(90deg, ${c.color} ${barPct}%, rgb(0 0 0 / 0.06) ${barPct}%)`,
+                          opacity: on ? 1 : 0.7,
+                        }}
                         aria-hidden
-                      >
-                        ✓
-                      </span>
-                    </span>
-                    <span className="mt-auto pt-2">
-                      <span className="block text-sm font-semibold tabular-nums">
-                        {hideAggregates ? (
-                          "••••"
-                        ) : (
-                          <Money
-                            amount={c.total}
-                            currency={currency}
-                            locale={locale}
-                          />
-                        )}
-                      </span>
-                      {!hideAggregates && pct > 0 ? (
-                        <span className="mt-0.5 block text-[11px] text-[var(--muted)]">
-                          {selectionActive && on
-                            ? t("ofSelection", { pct: String(pct) })
-                            : t("ofPeriod", { pct: String(pct) })}
+                      />
+                      <span className="mt-1.5 flex items-start justify-between gap-1.5">
+                        <span className="line-clamp-2 min-w-0 text-sm font-bold leading-snug">
+                          {categoryLabel(c, locale, t)}
                         </span>
-                      ) : null}
-                    </span>
-                  </button>
-                );
-              })}
+                        <span
+                          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                            on
+                              ? "text-white"
+                              : "border border-[var(--input-border)] text-transparent"
+                          }`}
+                          style={on ? { background: c.color } : undefined}
+                          aria-hidden
+                        >
+                          ✓
+                        </span>
+                      </span>
+                      <span className="mt-auto pt-2">
+                        <span className="block text-sm font-semibold tabular-nums">
+                          {hideAggregates ? (
+                            "••••"
+                          ) : (
+                            <Money
+                              amount={c.total}
+                              currency={currency}
+                              locale={locale}
+                            />
+                          )}
+                        </span>
+                        {!hideAggregates && pct > 0 ? (
+                          <span className="mt-0.5 block text-[11px] text-[var(--muted)]">
+                            {selectionActive && on
+                              ? t("ofSelection", { pct: String(pct) })
+                              : t("ofPeriod", { pct: String(pct) })}
+                          </span>
+                        ) : null}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
             </div>
           </div>
 
@@ -1353,7 +1274,7 @@ export default function AnalyticsPage() {
             {selectionActive ? (
               <div className="rounded-2xl bg-[var(--panel-soft)] px-4 py-3">
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    <div>
                       <p className="text-sm text-[var(--muted)]">
                         {t("nGroupsSelected", {
                           n: String(selectedGroups.length),
@@ -1362,7 +1283,7 @@ export default function AnalyticsPage() {
                       <p className="mt-0.5 text-sm font-medium">
                         {t("selectedSpend")}
                       </p>
-                      <p className="mt-1 text-3xl font-bold tracking-tight text-red-700">
+                      <p className="mt-1 text-3xl font-bold tracking-tight text-red-800">
                         {hideAggregates ? (
                           "••••"
                         ) : (
@@ -1375,16 +1296,23 @@ export default function AnalyticsPage() {
                       </p>
                     </div>
                     {!hideAggregates && totalOut > 0 ? (
-                      <ShareRing
-                        pct={Math.round((selectedTotal / totalOut) * 100)}
-                        label={t("periodShareLabel")}
-                      />
+                      <div className="rounded-2xl bg-[var(--surface-bg)] px-3 py-2 text-center">
+                        <p className="text-2xl font-bold text-red-800">
+                          {Math.round((selectedTotal / totalOut) * 100)}%
+                        </p>
+                        <p className="text-xs text-[var(--muted)]">
+                          {t("periodShareLabel")}
+                        </p>
+                      </div>
                     ) : null}
                   </div>
 
                   {!hideAggregates && selectedTotal > 0 ? (
                     <div className="mt-3">
-                      <div className="flex h-2.5 overflow-hidden rounded-full bg-[var(--surface-bg)]">
+                      <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">
+                        {t("spendComposition")}
+                      </p>
+                      <div className="flex h-3 overflow-hidden rounded-full bg-[var(--surface-bg)]">
                         {selectedCats.map((c) => (
                           <div
                             key={catKey(c)}
@@ -1396,24 +1324,33 @@ export default function AnalyticsPage() {
                           />
                         ))}
                       </div>
-                      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                      <div className="mt-2 flex flex-wrap gap-1.5">
                         {selectedCats.map((c) => (
                           <button
                             key={catKey(c)}
                             type="button"
                             onClick={() => unselectGroup(catKey(c))}
-                            className="inline-flex max-w-full items-center gap-1.5 text-xs font-medium"
+                            className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-[var(--surface-bg)] px-2.5 py-1 text-xs font-medium"
                           >
                             <span
-                              className="inline-block h-2 w-2 shrink-0 rounded-full"
-                              style={{ background: c.color }}
+                              className="inline-flex h-4 w-4 shrink-0 items-center justify-center text-[10px] leading-none"
+                              style={
+                                c.emoji
+                                  ? undefined
+                                  : { background: c.color, borderRadius: 999 }
+                              }
                               aria-hidden
-                            />
+                            >
+                              {c.emoji || null}
+                            </span>
                             <span className="min-w-0 truncate">
                               {categoryLabel(c, locale, t)}
                             </span>
                             <span className="shrink-0 text-[var(--muted)]">
                               {Math.round((c.total / selectedTotal) * 100)}%
+                            </span>
+                            <span className="shrink-0 text-[var(--muted)]" aria-hidden>
+                              ×
                             </span>
                           </button>
                         ))}

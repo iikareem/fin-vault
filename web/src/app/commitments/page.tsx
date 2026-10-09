@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { api, parseAmount, todayISO } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
@@ -111,19 +110,19 @@ function ProgressRing({
   paid,
   total,
   color,
-  caption,
+  label,
 }: {
   paid: number;
   total: number;
   color: string;
-  caption: string;
+  label: string;
 }) {
   const pct = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
   const r = 36;
   const c = 2 * Math.PI * r;
   const offset = c - (pct / 100) * c;
   return (
-    <div className="relative h-[5.5rem] w-[5.5rem] shrink-0">
+    <div className="relative h-24 w-24 shrink-0">
       <svg viewBox="0 0 88 88" className="h-full w-full -rotate-90">
         <circle
           cx="44"
@@ -146,13 +145,31 @@ function ProgressRing({
           className="transition-[stroke-dashoffset] duration-700 ease-out"
         />
       </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center px-2 text-center">
-        <span className="text-[13px] font-bold leading-tight tabular-nums">
-          {caption}
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="text-lg font-bold tabular-nums leading-none">
+          {paid}/{total}
+        </span>
+        <span className="mt-0.5 text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
+          {label}
         </span>
       </div>
     </div>
   );
+}
+
+function statusTone(status: SubStatus) {
+  switch (status) {
+    case "paid":
+      return "bg-emerald-500/15 text-emerald-800 dark:text-emerald-300";
+    case "overdue":
+      return "bg-red-500/15 text-red-800 dark:text-red-300";
+    case "due":
+      return "bg-amber-500/15 text-amber-900 dark:text-amber-300";
+    case "scheduled":
+      return "bg-sky-500/15 text-sky-900 dark:text-sky-300";
+    default:
+      return "bg-[var(--panel-soft)] text-[var(--muted)]";
+  }
 }
 
 function kindLabel(kind: SubKind, t: (key: MessageKey) => string) {
@@ -754,19 +771,8 @@ export default function SubscriptionsPage() {
 
   return (
     <PageShell>
-      <Link
-        href="/tools"
-        className="inline-flex min-h-10 items-center gap-1 text-sm font-semibold text-[var(--accent-b-text)]"
-      >
-        ← {t("toolsTitle")}
-      </Link>
-
-      <header className="mt-1">
-        <h1 className="page-title">{t("navSubs")}</h1>
-        <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">
-          {t("subsPageHint")}
-        </p>
-      </header>
+      <p className="page-title">📌 {t("navSubs")}</p>
+      <Hint>{t("subsPageHint")}</Hint>
 
       <div className="mt-4">
         <PeriodMonthPicker
@@ -779,6 +785,7 @@ export default function SubscriptionsPage() {
           thisPeriodLabel={t("subsThisPeriod")}
         />
       </div>
+      <Hint>{t("subsMonthNavHint")}</Hint>
 
       {error ? (
         <p className="mt-3 rounded-2xl bg-red-500/10 px-4 py-3 text-sm text-red-800">
@@ -787,40 +794,58 @@ export default function SubscriptionsPage() {
       ) : null}
 
       {data ? (
-        <section className="surface mt-4 overflow-hidden rounded-[1.5rem] p-4">
-          <div className="flex justify-center">
+        <section
+          className="surface mt-4 overflow-hidden rounded-[1.75rem] p-4"
+          style={{
+            background: `linear-gradient(145deg, color-mix(in srgb, ${accent} 12%, var(--panel)), var(--panel))`,
+          }}
+        >
+          <div className="flex items-center gap-4">
             <ProgressRing
               paid={paidN}
               total={total}
               color={accent}
-              caption={fill(t("subsPaidOf"), {
-                paid: String(paidN),
-                total: String(total),
-              })}
+              label={t("subsStatusPaid")}
             />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-medium uppercase tracking-wide text-[var(--muted)]">
+                {t("subsThisPeriod")}
+              </p>
+              <p className="mt-0.5 text-sm text-[var(--muted)]">
+                <ItemDate value={data.periodFrom} locale={locale} />
+                {" – "}
+                <ItemDate value={data.periodTo} locale={locale} />
+              </p>
+              <p className="mt-2 text-lg font-semibold tabular-nums">
+                {fill(t("subsPaidOf"), {
+                  paid: String(paidN),
+                  total: String(total),
+                })}
+              </p>
+            </div>
           </div>
           <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-            <div className="rounded-2xl bg-[var(--panel-soft)] px-2 py-2.5">
+            <div className="rounded-2xl bg-[var(--panel)]/70 px-2 py-2.5">
               <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
                 {t("subsMonthly")}
               </p>
-              <p className="mt-0.5 text-sm font-semibold tabular-nums text-[var(--foreground)]">
+              <p className="mt-0.5 text-sm font-semibold tabular-nums">
                 <Money amount={data.monthlyTotal} currency={currency} locale={locale} />
               </p>
             </div>
-            <div className="rounded-2xl bg-[var(--soft-emerald)] px-2 py-2.5">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-emerald-800/80 dark:text-emerald-300/80">
+            <div className="rounded-2xl bg-[var(--panel)]/70 px-2 py-2.5">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
                 {t("subsPaidAmount")}
               </p>
-              <p className="mt-0.5 text-sm font-semibold tabular-nums text-emerald-800 dark:text-emerald-300">
+              <p className="mt-0.5 text-sm font-semibold tabular-nums text-emerald-800">
                 <Money amount={data.paidAmount} currency={currency} locale={locale} />
               </p>
             </div>
-            <div className="rounded-2xl bg-[var(--soft-amber)] px-2 py-2.5">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-amber-900/80 dark:text-amber-200/80">
+            <div className="rounded-2xl bg-[var(--panel)]/70 px-2 py-2.5">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
                 {t("subsStillDue")}
               </p>
-              <p className="mt-0.5 text-sm font-semibold tabular-nums text-amber-900 dark:text-amber-200">
+              <p className="mt-0.5 text-sm font-semibold tabular-nums text-amber-900">
                 <Money amount={data.dueAmount} currency={currency} locale={locale} />
               </p>
             </div>
@@ -838,7 +863,7 @@ export default function SubscriptionsPage() {
             return !v;
           });
         }}
-        className="mt-4 flex min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--cta-bg)] text-base font-semibold text-[var(--cta-fg)] shadow-sm"
+        className="mt-4 flex min-h-12 w-full items-center justify-center rounded-3xl bg-stone-900 text-base font-semibold text-white shadow-md"
       >
         {showAdd ? t("subsCancel") : `＋ ${t("subsAdd")}`}
       </button>
@@ -992,35 +1017,51 @@ export default function SubscriptionsPage() {
             {unpaid.map((sub) => (
               <li
                 key={sub.id}
-                className="surface overflow-hidden rounded-[1.35rem]"
+                className="surface overflow-hidden rounded-[1.5rem]"
               >
-                <div className="min-w-0 flex-1 p-3.5">
-                    <div className="flex items-start gap-3">
-                      <span
-                        className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-amber-500"
-                        aria-hidden
-                      />
-                      <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="truncate text-[15px] font-semibold">
-                            {sub.name}
-                          </p>
-                          <p className="mt-0.5 text-xs text-[var(--muted)]">
-                            {statusLabel(sub.status)} ·{" "}
-                            {sub.kind === "INSTALLMENT" &&
-                            installmentProgress(sub)
-                              ? installmentProgress(sub)
-                              : kindLabel(sub.kind ?? "SUBSCRIPTION", t)}
-                          </p>
-                        </div>
-                        <p className="shrink-0 text-base font-bold tabular-nums text-amber-800 dark:text-amber-300">
-                          <Money
-                            amount={sub.amount}
-                            currency={currency}
-                            locale={locale}
-                          />
+                <div className="flex items-stretch gap-0">
+                  <div
+                    className="w-1.5 shrink-0"
+                    style={{ backgroundColor: sub.color }}
+                  />
+                  <div className="min-w-0 flex-1 p-3.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-base font-semibold">
+                          {sub.category.emoji ? `${sub.category.emoji} ` : ""}
+                          {sub.name}
                         </p>
+                        <p className="mt-0.5 text-sm text-[var(--muted)]">
+                          {kindLabel(sub.kind ?? "SUBSCRIPTION", t)} ·{" "}
+                          {categoryLabel(sub.category, locale, t)} ·{" "}
+                          {fill(t("subsBillsOn"), {
+                            n: String(sub.billingDay),
+                          })}
+                        </p>
+                        {sub.kind === "INSTALLMENT" ? (
+                          <p className="mt-1 text-xs font-medium text-[var(--muted)]">
+                            {installmentProgress(sub)}
+                          </p>
+                        ) : null}
                       </div>
+                      <p className="shrink-0 text-base font-semibold tabular-nums">
+                        <Money
+                          amount={sub.amount}
+                          currency={currency}
+                          locale={locale}
+                        />
+                      </p>
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusTone(sub.status)}`}
+                      >
+                        {statusLabel(sub.status)}
+                      </span>
+                      <span className="text-xs text-[var(--muted)]">
+                        {t("subsDueOn")}{" "}
+                        <ItemDate value={sub.dueOn} locale={locale} />
+                      </span>
                     </div>
 
                     {confirmPayId === sub.id ? (
@@ -1239,6 +1280,7 @@ export default function SubscriptionsPage() {
                         </div>
                       </form>
                     ) : null}
+                  </div>
                 </div>
               </li>
             ))}
@@ -1317,35 +1359,44 @@ export default function SubscriptionsPage() {
             {paid.map((sub) => (
               <li
                 key={sub.id}
-                className="surface overflow-hidden rounded-[1.35rem]"
+                className="surface flex items-stretch overflow-hidden rounded-[1.5rem] opacity-90"
               >
+                <div
+                  className="w-1.5 shrink-0 bg-emerald-500"
+                  aria-hidden
+                />
                 <div className="min-w-0 flex-1 p-3.5">
-                  <div className="flex items-start gap-3">
-                    <span
-                      className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-sky-600"
-                      aria-hidden
-                    />
-                    <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-[15px] font-semibold">
-                          {sub.name}
-                        </p>
-                        <p className="mt-0.5 text-xs text-[var(--muted)]">
-                          {t("subsStatusPaid")}
-                          {sub.kind === "INSTALLMENT" &&
-                          installmentProgress(sub)
-                            ? ` · ${installmentProgress(sub)}`
-                            : ""}
-                        </p>
-                      </div>
-                      <p className="shrink-0 text-base font-bold tabular-nums text-emerald-800 dark:text-emerald-300">
-                        <Money
-                          amount={sub.amount}
-                          currency={currency}
-                          locale={locale}
-                        />
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-semibold">
+                        ✓ {sub.name}
                       </p>
+                      <p className="mt-0.5 text-sm text-[var(--muted)]">
+                        {kindLabel(sub.kind ?? "SUBSCRIPTION", t)} ·{" "}
+                        {categoryLabel(sub.category, locale, t)}
+                        {sub.payment ? (
+                          <>
+                            {" · "}
+                            <ItemDate
+                              value={sub.payment.paidOn}
+                              locale={locale}
+                            />
+                          </>
+                        ) : null}
+                      </p>
+                      {sub.kind === "INSTALLMENT" ? (
+                        <p className="mt-1 text-xs font-medium text-[var(--muted)]">
+                          {installmentProgress(sub)}
+                        </p>
+                      ) : null}
                     </div>
+                    <p className="shrink-0 text-base font-semibold tabular-nums text-emerald-800">
+                      <Money
+                        amount={sub.amount}
+                        currency={currency}
+                        locale={locale}
+                      />
+                    </p>
                   </div>
                   {confirmUnpayId === sub.id ? (
                     <div className="mt-3 space-y-2 rounded-2xl bg-[var(--panel-soft)] p-3">

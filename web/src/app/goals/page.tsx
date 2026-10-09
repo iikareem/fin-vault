@@ -1,7 +1,6 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import Link from "next/link";
 import { api, parseAmount, money } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
@@ -64,7 +63,6 @@ export default function GoalsPage() {
   const currency = personal?.currency ?? "EGP";
 
   const [data, setData] = useState<GoalsSummary | null>(null);
-  const [showAdd, setShowAdd] = useState(false);
   const [name, setName] = useState("");
   const [target, setTarget] = useState("");
   const [note, setNote] = useState("");
@@ -177,7 +175,6 @@ export default function GoalsPage() {
       setName("");
       setTarget("");
       setNote("");
-      setShowAdd(false);
       setColor(ACCENT_COLORS[(next.goals.length || 0) % ACCENT_COLORS.length]);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
@@ -309,23 +306,13 @@ export default function GoalsPage() {
 
   return (
     <PageShell>
-      <Link
-        href="/tools"
-        className="inline-flex min-h-10 items-center gap-1 text-sm font-semibold text-[var(--accent-b-text)]"
-      >
-        ← {t("toolsTitle")}
-      </Link>
-
-      <header className="mt-1">
-        <h1 className="page-title">{t("goalsTitle")}</h1>
-        <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">
-          {t("goalsHint")}
-        </p>
-      </header>
+      <h1 className="page-title">🎯 {t("goalsTitle")}</h1>
+      <Hint>{t("goalsHint")}</Hint>
       {error ? <p className="mt-3 text-red-700">{error}</p> : null}
 
       <section className="mt-4 overflow-hidden rounded-[1.75rem] bg-gradient-to-br from-teal-900 via-teal-800 to-emerald-950 p-5 text-white shadow-lg">
-        <p className="mt-0.5 text-[clamp(1.5rem,7.5vw,2.35rem)] font-bold leading-tight tracking-tight">
+        <p className="text-base opacity-90">{t("goalsHeroTitle")}</p>
+        <p className="mt-1 text-[clamp(1.4rem,7.2vw,2.25rem)] font-bold leading-tight">
           {data ? (
             <Money
               amount={data.savingsBalance}
@@ -337,132 +324,130 @@ export default function GoalsPage() {
           )}
         </p>
 
-        <div className="mt-4 h-2 overflow-hidden rounded-full bg-white/15">
+        <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-white/15">
           <div
             className="h-full rounded-full bg-emerald-300/90 transition-[width] duration-500"
             style={{ width: `${allocatedPct}%` }}
           />
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-2.5">
+        <div className="mt-4 grid grid-cols-2 gap-3">
           <div className="rounded-2xl bg-white/12 px-3 py-2.5">
-            <p className="text-xs opacity-80">
-              {t("goalsAllocated")}:{" "}
-              <span className="font-semibold opacity-100">
-                {data ? (
-                  <Money
-                    amount={data.allocated}
-                    currency={currency}
-                    locale={locale}
-                  />
-                ) : (
-                  "…"
-                )}
-              </span>
+            <p className="text-xs opacity-80">{t("goalsAllocated")}</p>
+            <p className="mt-0.5 text-lg font-semibold">
+              {data ? (
+                <Money
+                  amount={data.allocated}
+                  currency={currency}
+                  locale={locale}
+                />
+              ) : (
+                "…"
+              )}
             </p>
           </div>
           <div className="rounded-2xl bg-white/12 px-3 py-2.5">
-            <p className="text-xs opacity-80">
-              {t("goalsFree")}:{" "}
-              <span className="font-semibold opacity-100">
-                {data ? (
-                  <Money amount={data.free} currency={currency} locale={locale} />
-                ) : (
-                  "…"
-                )}
-              </span>
+            <p className="text-xs opacity-80">{t("goalsFree")}</p>
+            <p className="mt-0.5 text-lg font-semibold">
+              {data ? (
+                <Money amount={data.free} currency={currency} locale={locale} />
+              ) : (
+                "…"
+              )}
             </p>
           </div>
         </div>
+        <p className="mt-3 text-sm opacity-80">{t("goalsFreeHint")}</p>
       </section>
 
-      <button
-        type="button"
-        onClick={() => setShowAdd((v) => !v)}
-        className="mt-4 flex min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--cta-bg)] text-base font-semibold text-[var(--cta-fg)] shadow-sm"
+      <form
+        onSubmit={onAdd}
+        className="surface mt-5 space-y-3 rounded-[1.75rem] p-4"
       >
-        {showAdd ? t("goalsCancel") : `＋ ${t("goalsAdd")}`}
-      </button>
-
-      {showAdd ? (
-        <form
-          onSubmit={onAdd}
-          className="surface mt-3 space-y-3 rounded-[1.75rem] p-4"
-        >
-          <label className="block">
-            <span className="mb-1 block font-medium">{t("goalsName")}</span>
-            <input
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="field w-full rounded-2xl px-4 py-3 text-lg"
-              placeholder={t("goalsNamePlaceholder")}
-              dir="auto"
-            />
-            <Hint>{t("goalsNameHint")}</Hint>
-          </label>
-          <label className="block">
-            <span className="mb-1 block font-medium">{t("goalsTarget")}</span>
-            <input
-              inputMode="decimal"
-              dir="ltr"
-              required
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-              className="field amount-input w-full rounded-2xl px-4 py-4 text-2xl"
-              placeholder="50000"
-            />
-            <Hint>{t("goalsTargetHint")}</Hint>
-          </label>
-          <div>
-            <p className="mb-2 text-sm font-medium text-[var(--muted)]">
-              {t("goalsColor")}
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {ACCENT_COLORS.map((c) => (
-                <button
-                  key={c}
-                  type="button"
-                  aria-label={c}
-                  onClick={() => setColor(c)}
-                  className={`h-9 w-9 rounded-full transition ${
-                    color === c
-                      ? "ring-2 ring-[var(--foreground)] ring-offset-2 ring-offset-[var(--surface-bg)]"
-                      : "opacity-80"
-                  }`}
-                  style={{ background: c }}
-                />
-              ))}
-            </div>
+        <h2 className="text-xl font-semibold">➕ {t("goalsAdd")}</h2>
+        <label className="block">
+          <span className="mb-1 block font-medium">{t("goalsName")}</span>
+          <input
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="field w-full rounded-2xl px-4 py-3 text-lg"
+            placeholder={t("goalsNamePlaceholder")}
+            dir="auto"
+          />
+          <Hint>{t("goalsNameHint")}</Hint>
+        </label>
+        <label className="block">
+          <span className="mb-1 block font-medium">{t("goalsTarget")}</span>
+          <input
+            inputMode="decimal"
+            dir="ltr"
+            required
+            value={target}
+            onChange={(e) => setTarget(e.target.value)}
+            className="field amount-input w-full rounded-2xl px-4 py-4 text-2xl"
+            placeholder="50000"
+          />
+          <Hint>{t("goalsTargetHint")}</Hint>
+        </label>
+        <div>
+          <p className="mb-2 text-sm font-medium text-[var(--muted)]">
+            {t("goalsColor")}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {ACCENT_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                aria-label={c}
+                onClick={() => setColor(c)}
+                className={`h-9 w-9 rounded-full transition ${
+                  color === c
+                    ? "ring-2 ring-[var(--foreground)] ring-offset-2 ring-offset-[var(--surface-bg)]"
+                    : "opacity-80"
+                }`}
+                style={{ background: c }}
+              />
+            ))}
           </div>
-          <label className="block">
-            <span className="mb-1 block font-medium">{t("noteOptional")}</span>
-            <input
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              className="field w-full rounded-2xl px-4 py-3 text-lg"
-              dir="auto"
-            />
-          </label>
-          <button
-            type="submit"
-            disabled={busy || !personal}
-            className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-teal-800 text-base font-semibold text-white disabled:opacity-60"
-          >
-            {busy ? t("saving") : t("save")}
-          </button>
-        </form>
-      ) : null}
+        </div>
+        <label className="block">
+          <span className="mb-1 block font-medium">{t("noteOptional")}</span>
+          <input
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            className="field w-full rounded-2xl px-4 py-3 text-lg"
+            dir="auto"
+          />
+        </label>
+        <button
+          type="submit"
+          disabled={busy || !personal}
+          className="flex min-h-14 w-full items-center justify-center rounded-2xl bg-teal-800 text-lg font-semibold text-white disabled:opacity-60"
+        >
+          {busy ? t("saving") : t("save")}
+        </button>
+      </form>
 
       <section className="mt-6">
-        <h2 className="text-base font-semibold text-[var(--foreground)]">
-          {t("goalsList")}
-        </h2>
+        <div className="mb-3 flex items-baseline justify-between gap-3">
+          <h2 className="text-xl font-semibold">{t("goalsList")}</h2>
+          {data && data.goals.length > 0 ? (
+            <span className="text-sm font-medium text-[var(--muted)]">
+              {data.goals.length === 1
+                ? t("goalsCountOne")
+                : fill(t("goalsCount"), {
+                    n: String(data.goals.length),
+                  })}
+            </span>
+          ) : null}
+        </div>
+        <Hint>{t("goalsListHint")}</Hint>
 
         {!data ? (
           <p className="mt-3 text-[var(--muted)]">…</p>
         ) : data.goals.length === 0 ? (
-          <p className="mt-3 text-sm text-[var(--muted)]">{t("goalsEmpty")}</p>
+          <p className="mt-3 text-[var(--muted)]">{t("goalsEmpty")}</p>
         ) : (
           <ul className="mt-3 grid grid-cols-2 gap-3">
             {data.goals.map((g) => {
@@ -471,7 +456,7 @@ export default function GoalsPage() {
               return (
                 <li
                   key={g.id}
-                  className={`surface overflow-hidden rounded-[1.35rem] ${
+                  className={`surface overflow-hidden rounded-[1.5rem] ${
                     isOpen || confirmBuyId === g.id ? "col-span-2" : ""
                   }`}
                 >
@@ -494,17 +479,22 @@ export default function GoalsPage() {
                     }}
                     className="flex w-full flex-col p-3.5 text-start transition hover:bg-[var(--panel-soft)]"
                   >
-                    <div className="flex min-w-0 items-center gap-2">
-                      <span
-                        className="h-2.5 w-2.5 shrink-0 rounded-full"
-                        style={{ background: g.color }}
-                        aria-hidden
-                      />
-                      <p
-                        className="truncate text-sm font-semibold"
-                        dir="auto"
-                      >
-                        {g.name}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ background: g.color }}
+                          aria-hidden
+                        />
+                        <p
+                          className="truncate text-sm font-semibold"
+                          dir="auto"
+                        >
+                          {g.name}
+                        </p>
+                      </div>
+                      <p className="shrink-0 text-sm font-bold text-[var(--accent-a-text)]">
+                        {fill(t("goalsProgress"), { pct: String(g.pct) })}
                       </p>
                     </div>
                     <div className="mt-3">
