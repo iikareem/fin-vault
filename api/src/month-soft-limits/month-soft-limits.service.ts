@@ -10,6 +10,7 @@ import {
   clampBudgetStartDay,
   dateOnlyUtc,
   isoLocal,
+  shiftBudgetMonthKey,
 } from '../common/calendar';
 import { nonSpendCategoryFilter } from '../categories/non-spend-categories';
 import {
@@ -206,7 +207,8 @@ export class MonthSoftLimitsService {
   }
 
   /**
-   * Move this period's organic surplus into Savings (idempotent top-up).
+   * Once the plan month starts: move the *previous* month's organic surplus
+   * Current → Savings (one shot). No mid-month top-ups — wallets stay separate.
    * Wallet transfers do not change savedThisMonth / analytics.
    */
   private async syncAutoSaveToSavings(
@@ -215,56 +217,83 @@ export class MonthSoftLimitsService {
     rowId: string,
     periodKey: string,
     periodFrom: string,
-    periodTo: string,
-    saved: number,
+    startDay: number,
     recordedSwept: number,
+    alreadyDone: boolean,
   ): Promise<number> {
     const today = isoLocal(new Date());
+    // Only on/after the first day of the picked month — never before.
     if (today < periodFrom) {
       return recordedSwept;
     }
 
-    const target = this.roundMoney(Math.max(0, saved));
     const byNotes = await this.sweptByTransferNotes(householdId, periodKey);
-    let already = this.roundMoney(Math.max(recordedSwept, byNotes));
-    if (already > recordedSwept + 0.001) {
-      await this.prisma.monthSoftLimit.update({
-        where: { id: rowId },
-        data: { autoSweptAmount: new Prisma.Decimal(already) },
-      });
+    const already = this.roundMoney(Math.max(recordedSwept, byNotes));
+
+    // Already ran the start-of-month sweep — do not keep draining Current.
+    if (alreadyDone || already > 0.001) {
+      if (!alreadyDone || already > recordedSwept + 0.001) {
+        await this.prisma.monthSoftLimit.update({
+          where: { id: rowId },
+          data: {
+            autoSweptAmount: new Prisma.Decimal(already),
+            autoSweepDone: true,
+          },
+        });
+      }
+      return already;
     }
 
-    const need = this.roundMoney(target - already);
-    if (need < 0.01) return already;
+    const prevKey = shiftBudgetMonthKey(periodKey, -1);
+    const prevRange = budgetMonthRange(prevKey, startDay);
+    const prevFlow = await this.cashFlow(
+      householdId,
+      prevRange.from,
+      prevRange.to,
+    );
+    const target = this.roundMoney(Math.max(0, prevFlow.saved));
+
+    const markDone = async (amount: number) => {
+      await this.prisma.monthSoftLimit.update({
+        where: { id: rowId },
+        data: {
+          autoSweptAmount: new Prisma.Decimal(amount),
+          autoSweepDone: true,
+        },
+      });
+      return amount;
+    };
+
+    if (target < 0.01) {
+      return markDone(0);
+    }
 
     const balances = await this.accounts.list(householdId);
     const current = balances.find((a) => a.name === 'Current' && !a.archived);
     const savings = balances.find((a) => a.name === 'Savings' && !a.archived);
-    if (!current || !savings) return already;
+    if (!current || !savings) {
+      return markDone(0);
+    }
 
     const amount = this.roundMoney(
-      Math.min(need, Math.max(0, current.balance)),
+      Math.min(target, Math.max(0, current.balance)),
     );
-    if (amount < 0.01) return already;
-
-    const occurredOn = today > periodTo ? periodTo : today;
+    if (amount < 0.01) {
+      // Surplus already sitting in Savings / Current empty — count as done.
+      return markDone(0);
+    }
 
     try {
       await this.accounts.transfer(householdId, 'PERSONAL', userId, {
         fromAccountId: current.id,
         toAccountId: savings.id,
         amount,
-        occurredOn,
+        occurredOn: periodFrom,
         note: this.planTransferNote(periodKey),
       });
-      already = this.roundMoney(already + amount);
-      await this.prisma.monthSoftLimit.update({
-        where: { id: rowId },
-        data: { autoSweptAmount: new Prisma.Decimal(already) },
-      });
-      return already;
+      return markDone(amount);
     } catch {
-      return already;
+      return recordedSwept;
     }
   }
 
@@ -333,9 +362,9 @@ export class MonthSoftLimitsService {
         row.id,
         range.key,
         range.from,
-        range.to,
-        flow.saved,
+        startDay,
         autoMoved,
+        row.autoSweepDone,
       );
     }
 

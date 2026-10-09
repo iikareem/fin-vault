@@ -279,8 +279,10 @@ model MonthSoftLimit {
   periodKey   String
   /** Net cash to save this period (income − cash outflow). Null = unset. */
   saveTargetAmount Decimal? @db.Decimal(14, 2)
-  /** Cumulative surplus auto-moved Current → Savings for this plan (wallet transfers). */
+  /** Amount auto-moved Current → Savings on plan-month start (wallet transfers). */
   autoSweptAmount Decimal @default(0) @db.Decimal(14, 2)
+  /** True after the one-shot start-of-month sweep was attempted (even if amount was 0). */
+  autoSweepDone Boolean @default(false)
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 

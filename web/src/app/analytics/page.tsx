@@ -496,16 +496,16 @@ export default function AnalyticsPage() {
     return "";
   }, [period, prevCursor, locale, startDay, t]);
 
-  const savedLabel =
-    period === "month"
+  const heroIsSpend = period === "day" || period === "week";
+  const heroLabel = heroIsSpend
+    ? period === "day"
+      ? t("spentThisDay")
+      : t("spentThisWeek")
+    : period === "month"
       ? t("savedThisMonth")
-      : period === "week"
-        ? t("savedThisWeek")
-        : period === "day"
-          ? t("savedThisDay")
-          : period === "year"
-            ? t("savedThisYear")
-            : t("savedThisRange");
+      : period === "year"
+        ? t("savedThisYear")
+        : t("savedThisRange");
 
   type ChartBar = {
     key: string;
@@ -679,6 +679,8 @@ export default function AnalyticsPage() {
     period === "month" ? monthSavings.saved : totalIn - totalOut;
   const prevSaved =
     prevIn != null && prevOut != null ? prevIn - prevOut : null;
+  const heroAmount = heroIsSpend ? totalOut : periodSaved;
+  const heroPrev = heroIsSpend ? prevOut : prevSaved;
 
   return (
     <PageShell>
@@ -802,16 +804,19 @@ export default function AnalyticsPage() {
           <>
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-sm text-[var(--muted)]">{savedLabel}</p>
+                <p className="text-sm text-[var(--muted)]">{heroLabel}</p>
                 <p
                   className={`mt-1 text-[1.85rem] font-bold leading-none tracking-tight tabular-nums ${
-                    periodSaved < 0 ? "text-red-700" : "text-[var(--foreground)]"
+                    heroIsSpend || periodSaved < 0
+                      ? "text-red-700"
+                      : "text-[var(--foreground)]"
                   }`}
                 >
                   <Money
-                    amount={periodSaved}
+                    amount={heroAmount}
                     currency={currency}
                     locale={locale}
+                    extraSign={heroIsSpend ? "−" : undefined}
                   />
                 </p>
                 {period === "month" && periodSaved < 0 ? (
@@ -819,18 +824,27 @@ export default function AnalyticsPage() {
                     {t("usedFromSavings")}
                   </p>
                 ) : null}
+                {heroIsSpend && vsSubtitle ? (
+                  <p className="mt-1.5 text-xs text-[var(--muted)]">
+                    {vsSubtitle}
+                  </p>
+                ) : null}
               </div>
-              {prevSaved != null ? (
+              {heroPrev != null ? (
                 <TrendChip
-                  current={periodSaved}
-                  previous={prevSaved}
-                  kind="saved"
+                  current={heroAmount}
+                  previous={heroPrev}
+                  kind={heroIsSpend ? "out" : "saved"}
                   t={t}
                 />
               ) : null}
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-2.5">
+            <div
+              className={`mt-4 grid gap-2.5 ${
+                heroIsSpend ? "grid-cols-1" : "grid-cols-2"
+              }`}
+            >
               <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-2.5">
                 <p className="text-xs text-[var(--muted)]">{t("chartsInShort")}</p>
                 <p className="mt-0.5 text-lg font-semibold leading-tight tabular-nums text-emerald-800">
@@ -847,22 +861,30 @@ export default function AnalyticsPage() {
                   </div>
                 ) : null}
               </div>
-              <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-2.5">
-                <p className="text-xs text-[var(--muted)]">{t("chartsOutShort")}</p>
-                <p className="mt-0.5 text-lg font-semibold leading-tight tabular-nums text-red-700">
-                  <Money amount={totalOut} currency={currency} locale={locale} />
-                </p>
-                {prevOut != null ? (
-                  <div className="mt-1.5">
-                    <TrendChip
-                      current={totalOut}
-                      previous={prevOut}
-                      kind="out"
-                      t={t}
+              {!heroIsSpend ? (
+                <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-2.5">
+                  <p className="text-xs text-[var(--muted)]">
+                    {t("chartsOutShort")}
+                  </p>
+                  <p className="mt-0.5 text-lg font-semibold leading-tight tabular-nums text-red-700">
+                    <Money
+                      amount={totalOut}
+                      currency={currency}
+                      locale={locale}
                     />
-                  </div>
-                ) : null}
-              </div>
+                  </p>
+                  {prevOut != null ? (
+                    <div className="mt-1.5">
+                      <TrendChip
+                        current={totalOut}
+                        previous={prevOut}
+                        kind="out"
+                        t={t}
+                      />
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
 
             {period === "month" ? (
