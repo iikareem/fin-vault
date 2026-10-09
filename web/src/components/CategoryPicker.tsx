@@ -16,19 +16,19 @@ export type CategoryItem = {
 function ColorDot({
   color,
   active = false,
+  size = "sm",
 }: {
   color?: string | null;
   active?: boolean;
+  size?: "sm" | "md";
 }) {
+  const dim = size === "md" ? "h-3 w-3" : "h-2.5 w-2.5";
   return (
     <span
-      className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-        active ? "ring-2 ring-white/80 ring-offset-1 ring-offset-transparent" : ""
+      className={`${dim} shrink-0 rounded-full ${
+        active ? "ring-2 ring-white/75" : ""
       }`}
-      style={{
-        backgroundColor: color || "var(--muted)",
-        ...(active ? { boxShadow: "0 0 0 1px rgba(255,255,255,0.35)" } : {}),
-      }}
+      style={{ backgroundColor: color || "var(--muted)" }}
       aria-hidden
     />
   );
@@ -39,15 +39,20 @@ export function CategoryPicker({
   value,
   onChange,
   groupLabel,
+  /** When true, skip the collapsed summary and show the picker open. */
+  forceOpen = false,
 }: {
   categories: CategoryItem[];
   value: string;
   onChange: (id: string) => void;
   groupLabel?: string;
+  forceOpen?: boolean;
 }) {
   const { t, locale } = useI18n();
   const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(forceOpen);
   const activeGroupRef = useRef<HTMLButtonElement | null>(null);
+  const searchRef = useRef<HTMLInputElement | null>(null);
 
   const parents = useMemo(
     () => categories.filter((c) => !c.parentId),
@@ -75,7 +80,7 @@ export function CategoryPicker({
   const catText = (c: CategoryItem) => categoryLabel(c, locale, t);
 
   const breadcrumb = useMemo(() => {
-    if (!selected) return "";
+    if (!selected) return t("catPickGroup");
     if (hasSubs && selected.parentId && group) {
       return fill(t("categoryBreadcrumb"), {
         group: catText(group),
@@ -153,11 +158,29 @@ export function CategoryPicker({
   }, [groupChildren, hasSubs, q, locale, t]);
 
   useEffect(() => {
+    if (forceOpen) setOpen(true);
+  }, [forceOpen]);
+
+  useEffect(() => {
+    if (!open) return;
     activeGroupRef.current?.scrollIntoView({
+      inline: "center",
       block: "nearest",
       behavior: "smooth",
     });
-  }, [groupId]);
+  }, [groupId, open]);
+
+  useEffect(() => {
+    if (!open || forceOpen) return;
+    const id = window.setTimeout(() => searchRef.current?.focus(), 40);
+    return () => window.clearTimeout(id);
+  }, [open, forceOpen]);
+
+  function closePicker() {
+    if (forceOpen) return;
+    setOpen(false);
+    setQuery("");
+  }
 
   function pickGroup(id: string) {
     const kids = childrenByParent.get(id);
@@ -175,35 +198,23 @@ export function CategoryPicker({
               );
             })?.id ?? kids[0].id;
       onChange(keep);
+      setQuery("");
       return;
     }
     onChange(id);
-    setQuery("");
+    closePicker();
   }
 
   function pickLeaf(id: string) {
     onChange(id);
-    setQuery("");
+    closePicker();
   }
 
   const showSearchHits = q.length >= 1 && searchHits.length > 0;
+  const selectedColor = selected?.color || group?.color;
 
-  return (
-    <section className="surface space-y-3 overflow-hidden rounded-[1.5rem] p-3.5">
-      <div className="flex items-baseline justify-between gap-2">
-        <p className="shrink-0 text-sm font-semibold text-[var(--foreground)]">
-          {groupLabel ?? t("forWhat")}
-        </p>
-        {breadcrumb ? (
-          <p
-            className="min-w-0 truncate text-sm font-semibold text-[var(--accent-b-text)]"
-            dir="auto"
-          >
-            {breadcrumb}
-          </p>
-        ) : null}
-      </div>
-
+  const pickerBody = (
+    <div className="space-y-3">
       <div className="relative">
         <span
           className="pointer-events-none absolute inset-y-0 start-3 flex items-center text-[var(--muted)]"
@@ -224,6 +235,7 @@ export function CategoryPicker({
           </svg>
         </span>
         <input
+          ref={searchRef}
           type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -236,10 +248,10 @@ export function CategoryPicker({
 
       {showSearchHits ? (
         <div className="space-y-1.5">
-          <p className="px-0.5 text-xs font-semibold text-[var(--muted)]">
+          <p className="text-xs font-semibold text-[var(--muted)]">
             {t("catQuickResults")}
           </p>
-          <div className="grid max-h-48 grid-cols-1 gap-1.5 overflow-y-auto">
+          <div className="grid max-h-52 grid-cols-1 gap-1.5 overflow-y-auto">
             {searchHits.map((c) => {
               const parent = c.parentId
                 ? parents.find((p) => p.id === c.parentId)
@@ -278,34 +290,37 @@ export function CategoryPicker({
               {t("catNoMatch")}
             </p>
           ) : (
-            <div
-              className="grid max-h-[11.5rem] grid-cols-2 gap-2 overflow-y-auto pe-0.5"
-              role="listbox"
-              aria-label={groupLabel ?? t("forWhat")}
-            >
-              {filteredParents.map((p) => {
-                const active = groupId === p.id;
-                return (
-                  <button
-                    key={p.id}
-                    ref={active ? activeGroupRef : undefined}
-                    type="button"
-                    role="option"
-                    aria-selected={active}
-                    onClick={() => pickGroup(p.id)}
-                    className={`flex min-h-11 items-center gap-2 rounded-2xl px-3 py-2.5 text-start transition active:scale-[0.99] ${
-                      active
-                        ? "bg-[var(--cta-bg)] text-[var(--cta-fg)] shadow-sm"
-                        : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
-                    }`}
-                  >
-                    <ColorDot color={p.color} active={active} />
-                    <span className="line-clamp-1 min-w-0 flex-1 text-sm font-bold leading-snug">
-                      {catText(p)}
-                    </span>
-                  </button>
-                );
-              })}
+            <div>
+              <p className="mb-1.5 text-xs font-semibold text-[var(--muted)]">
+                {groupLabel ?? t("forWhat")}
+              </p>
+              <div
+                className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1"
+                role="listbox"
+                aria-label={groupLabel ?? t("forWhat")}
+              >
+                {filteredParents.map((p) => {
+                  const active = groupId === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      ref={active ? activeGroupRef : undefined}
+                      type="button"
+                      role="option"
+                      aria-selected={active}
+                      onClick={() => pickGroup(p.id)}
+                      className={`flex shrink-0 items-center gap-2 rounded-full px-3.5 py-2.5 text-sm font-bold transition active:scale-[0.98] ${
+                        active
+                          ? "bg-[var(--cta-bg)] text-[var(--cta-fg)] shadow-sm"
+                          : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
+                      }`}
+                    >
+                      <ColorDot color={p.color} active={active} />
+                      <span className="whitespace-nowrap">{catText(p)}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -322,7 +337,9 @@ export function CategoryPicker({
                 aria-label={t("pickSubCategory")}
               >
                 {filteredChildren.map((c) => {
-                  const active = selected?.parentId ? value === c.id : false;
+                  const active = selected?.parentId
+                    ? value === c.id
+                    : false;
                   return (
                     <button
                       key={c.id}
@@ -330,7 +347,7 @@ export function CategoryPicker({
                       role="option"
                       aria-selected={active}
                       onClick={() => pickLeaf(c.id)}
-                      className={`rounded-full px-3.5 py-1.5 text-sm font-semibold transition active:scale-[0.99] ${
+                      className={`rounded-full px-3.5 py-2 text-sm font-semibold transition active:scale-[0.98] ${
                         active
                           ? "bg-[var(--accent-b-soft)] text-[var(--accent-b-text)] ring-2 ring-[var(--accent-b)]"
                           : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"
@@ -345,6 +362,60 @@ export function CategoryPicker({
           ) : null}
         </>
       )}
-    </section>
+    </div>
+  );
+
+  if (forceOpen) {
+    return (
+      <section className="surface space-y-3 overflow-hidden rounded-[1.5rem] p-3.5">
+        {pickerBody}
+      </section>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs font-medium text-[var(--muted)]">
+          {groupLabel ?? t("forWhat")}
+        </p>
+        {selected ? (
+          <p
+            className="min-w-0 truncate text-xs font-semibold text-[var(--accent-b-text)]"
+            dir="auto"
+          >
+            {breadcrumb}
+          </p>
+        ) : null}
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        className={`flex w-full min-h-12 items-center gap-3 rounded-[1.25rem] px-3.5 py-3 text-start transition active:scale-[0.99] ${
+          open
+            ? "bg-[var(--panel-soft)] ring-2 ring-[var(--accent-b)]"
+            : "surface ring-1 ring-[var(--input-border)]"
+        }`}
+      >
+        <ColorDot color={selectedColor} size="md" />
+        <span
+          className="min-w-0 flex-1 truncate text-[15px] font-semibold text-[var(--foreground)]"
+          dir="auto"
+        >
+          {selected ? breadcrumb : t("catPickGroup")}
+        </span>
+        <span className="shrink-0 text-sm font-bold text-[var(--accent-b-text)]">
+          {open ? t("catDone") : t("catChange")}
+        </span>
+      </button>
+
+      {open ? (
+        <section className="surface space-y-3 overflow-hidden rounded-[1.5rem] p-3.5">
+          {pickerBody}
+        </section>
+      ) : null}
+    </div>
   );
 }

@@ -152,7 +152,6 @@ function HistoryInner() {
   const [note, setNote] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [confirmId, setConfirmId] = useState("");
-  const [catPickerOpen, setCatPickerOpen] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -221,7 +220,6 @@ function HistoryInner() {
     setDay(next);
     setOpenId("");
     setConfirmId("");
-    setCatPickerOpen(false);
     setDatePickerOpen(false);
     const params = new URLSearchParams();
     params.set("on", next);
@@ -238,12 +236,10 @@ function HistoryInner() {
     if (openId === id) {
       setOpenId("");
       setConfirmId("");
-      setCatPickerOpen(false);
       return;
     }
     setOpenId(id);
     setConfirmId("");
-    setCatPickerOpen(false);
     setAmount(String(amt));
     setNote(n);
     setCategoryId(cat ?? "");
@@ -263,7 +259,6 @@ function HistoryInner() {
         }),
       });
       setOpenId("");
-      setCatPickerOpen(false);
       await loadDay(active.householdId, day);
     } catch (e) {
       setError(e instanceof Error ? e.message : t("couldNotSave"));
@@ -286,7 +281,6 @@ function HistoryInner() {
         }),
       });
       setOpenId("");
-      setCatPickerOpen(false);
       await loadDay(active.householdId, day);
     } catch (e) {
       setError(e instanceof Error ? e.message : t("couldNotSave"));
@@ -305,7 +299,6 @@ function HistoryInner() {
         body: JSON.stringify({ amount: parseAmount(amount), note }),
       });
       setOpenId("");
-      setCatPickerOpen(false);
       await loadDay(active.householdId, day);
     } catch (e) {
       setError(e instanceof Error ? e.message : t("couldNotSave"));
@@ -322,7 +315,6 @@ function HistoryInner() {
       await api(householdPath(active.householdId, path), { method: "DELETE" });
       setOpenId("");
       setConfirmId("");
-      setCatPickerOpen(false);
       await loadDay(active.householdId, day);
     } catch (e) {
       setError(e instanceof Error ? e.message : t("couldNotSave"));
@@ -589,12 +581,9 @@ function HistoryInner() {
                           : expenseCats
                       }
                       t={t}
-                      locale={locale}
                       setAmount={setAmount}
                       setNote={setNote}
                       setCategoryId={setCategoryId}
-                      catPickerOpen={catPickerOpen}
-                      setCatPickerOpen={setCatPickerOpen}
                       busy={busy}
                       confirm={confirmId === tx.id}
                       ctaStyle={ctaStyle}
@@ -679,12 +668,9 @@ function HistoryInner() {
                       categoryId={categoryId}
                       categories={expenseCats}
                       t={t}
-                      locale={locale}
                       setAmount={setAmount}
                       setNote={setNote}
                       setCategoryId={setCategoryId}
-                      catPickerOpen={catPickerOpen}
-                      setCatPickerOpen={setCatPickerOpen}
                       busy={busy}
                       confirm={confirmId === c.id}
                       ctaStyle={ctaStyle}
@@ -766,12 +752,9 @@ function HistoryInner() {
                       categoryId=""
                       categories={[]}
                       t={t}
-                      locale={locale}
                       setAmount={setAmount}
                       setNote={setNote}
                       setCategoryId={setCategoryId}
-                      catPickerOpen={false}
-                      setCatPickerOpen={setCatPickerOpen}
                       busy={busy}
                       confirm={confirmId === g.id}
                       ctaStyle={ctaStyle}
@@ -808,12 +791,9 @@ function EditFields({
   categoryId,
   categories,
   t,
-  locale,
   setAmount,
   setNote,
   setCategoryId,
-  catPickerOpen,
-  setCatPickerOpen,
   busy,
   confirm,
   ctaStyle,
@@ -825,31 +805,15 @@ function EditFields({
   categoryId: string;
   categories: Category[];
   t: (key: MessageKey) => string;
-  locale: "ar" | "en";
   setAmount: (v: string) => void;
   setNote: (v: string) => void;
   setCategoryId: (v: string) => void;
-  catPickerOpen: boolean;
-  setCatPickerOpen: (v: boolean) => void;
   busy: boolean;
   confirm: boolean;
   ctaStyle: { background: string; color: string };
   onSave: () => void;
   onDelete: () => void;
 }) {
-  const selected = categories.find((c) => c.id === categoryId);
-  const parent = selected?.parentId
-    ? categories.find((c) => c.id === selected.parentId)
-    : null;
-  const breadcrumb = selected
-    ? parent
-      ? fill(t("categoryBreadcrumb"), {
-          group: categoryLabel(parent, locale, t),
-          sub: categoryLabel(selected, locale, t),
-        })
-      : categoryLabel(selected, locale, t)
-    : "";
-
   return (
     <div className="mt-3 space-y-3 pt-3">
       <label className="block">
@@ -867,40 +831,11 @@ function EditFields({
       </label>
 
       {categories.length > 0 ? (
-        <div>
-          <div className="mb-1.5 flex items-center justify-between gap-2">
-            <span className="text-xs font-medium text-[var(--muted)]">
-              {t("forWhat")}
-            </span>
-            <button
-              type="button"
-              onClick={() => setCatPickerOpen(!catPickerOpen)}
-              className="text-sm font-semibold text-[var(--accent-b-text)]"
-            >
-              {t("catChange")}
-            </button>
-          </div>
-          {!catPickerOpen ? (
-            <button
-              type="button"
-              onClick={() => setCatPickerOpen(true)}
-              className="field flex min-h-12 w-full items-center !rounded-2xl text-start text-sm font-semibold"
-            >
-              <span className="min-w-0 truncate" dir="auto">
-                {breadcrumb || t("forWhat")}
-              </span>
-            </button>
-          ) : (
-            <CategoryPicker
-              categories={categories}
-              value={categoryId}
-              onChange={(id) => {
-                setCategoryId(id);
-                setCatPickerOpen(false);
-              }}
-            />
-          )}
-        </div>
+        <CategoryPicker
+          categories={categories}
+          value={categoryId}
+          onChange={setCategoryId}
+        />
       ) : null}
 
       <label className="block">
