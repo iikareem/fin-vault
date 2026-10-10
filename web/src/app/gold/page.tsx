@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { api, parseAmount } from "@/lib/api";
+import { api, parseAmount, todayISO, yesterdayISO } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
 import { Money } from "@/components/Money";
@@ -12,6 +12,7 @@ import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 import { fill } from "@/lib/i18n";
 import { formatItemDate } from "@/lib/calendar";
+import { DateField } from "@/components/DateField";
 
 type Karat = 18 | 21 | 24;
 
@@ -75,10 +76,13 @@ export default function GoldPage() {
   const [grams, setGrams] = useState("");
   const [paidAmount, setPaidAmount] = useState("");
   const [karat, setKarat] = useState<Karat>(21);
+  const [acquiredOn, setAcquiredOn] = useState(todayISO());
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [deletingId, setDeletingId] = useState("");
+  const today = todayISO();
+  const yesterday = yesterdayISO();
 
   function load(hid: string) {
     return api<GoldSummary>(householdPath(hid, "/gold")).then(setData);
@@ -115,6 +119,7 @@ export default function GoldPage() {
             grams: value,
             karat,
             paidAmount: paid ?? undefined,
+            acquiredOn,
             note: note.trim() || undefined,
           }),
         },
@@ -122,6 +127,7 @@ export default function GoldPage() {
       setData(next);
       setGrams("");
       setPaidAmount("");
+      setAcquiredOn(todayISO());
       setNote("");
       setShowAdd(false);
     } catch (err) {
@@ -319,6 +325,32 @@ export default function GoldPage() {
             />
             <Hint>{t("goldPaidAmountHint")}</Hint>
           </label>
+          <div>
+            <p className="mb-1 font-medium">{t("goldAcquiredOn")}</p>
+            <div className="flex gap-1.5">
+              <button
+                type="button"
+                onClick={() => setAcquiredOn(today)}
+                className={`chip flex-1 ${acquiredOn === today ? "chip-active" : ""}`}
+              >
+                {t("today")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setAcquiredOn(yesterday)}
+                className={`chip flex-1 ${
+                  acquiredOn === yesterday ? "chip-active" : ""
+                }`}
+              >
+                {t("yesterday")}
+              </button>
+            </div>
+            <DateField
+              className="mt-2"
+              value={acquiredOn}
+              onChange={setAcquiredOn}
+            />
+          </div>
           <label className="block">
             <span className="mb-1 block font-medium">{t("noteOptional")}</span>
             <input

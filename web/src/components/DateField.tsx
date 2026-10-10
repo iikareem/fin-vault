@@ -23,6 +23,18 @@ function relativeDayLabel(value: string, todayLabel: string, yesterdayLabel: str
   return "";
 }
 
+/** Open native date/month UI. Needed on Windows Chromium where transparent
+ *  overlays often focus the field but never open the calendar. */
+function openNativePicker(input: HTMLInputElement) {
+  try {
+    if (typeof input.showPicker === "function") {
+      void input.showPicker();
+    }
+  } catch {
+    // NotAllowedError / unsupported — ignore; click may still hit the indicator.
+  }
+}
+
 /** Full-width date/month control that never overflows on mobile (native min-width). */
 export function DateField({
   label,
@@ -65,14 +77,14 @@ export function DateField({
         }`}
       >
         <span
-          className={`min-w-0 truncate text-base font-semibold tabular-nums ${
+          className={`pointer-events-none min-w-0 truncate text-base font-semibold tabular-nums ${
             centered ? "px-2 text-center text-lg" : "flex-1"
           }`}
         >
           {display}
         </span>
         {relative ? (
-          <span className="shrink-0 rounded-full bg-[var(--panel-soft)] px-2 py-0.5 text-xs font-semibold text-[var(--muted)]">
+          <span className="pointer-events-none shrink-0 rounded-full bg-[var(--panel-soft)] px-2 py-0.5 text-xs font-semibold text-[var(--muted)]">
             {relative}
           </span>
         ) : null}
@@ -84,7 +96,16 @@ export function DateField({
           onChange={(e) => {
             if (e.target.value) onChange(e.target.value);
           }}
-          className="absolute inset-0 z-10 cursor-pointer opacity-0"
+          onClick={(e) => {
+            openNativePicker(e.currentTarget);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              openNativePicker(e.currentTarget);
+            }
+          }}
+          className="date-field-input absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
           aria-label={label || (type === "month" ? t("periodMonth") : t("day"))}
         />
       </span>
