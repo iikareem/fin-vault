@@ -134,7 +134,11 @@ export default function NetPage() {
   const savings = accounts.find(isSavingsWallet)?.balance ?? 0;
   const goldValue = gold?.totalValue ?? 0;
   const cash = current + savings;
-  const net = cash + goldValue;
+  // Gold is always EGP; only sum into one total when the book currency matches.
+  const splitCurrencies = currency !== goldCurrency;
+  const net = splitCurrencies ? cash : cash + goldValue;
+  const hasGold = goldValue > 0.001;
+  const hasCash = cash > 0.001;
   const allocated = Math.min(
     goals?.allocated ?? 0,
     Math.max(0, savings),
@@ -171,9 +175,10 @@ export default function NetPage() {
     [current, savings, goldValue, t],
   );
 
-  const cashPct = pctOf(cash, net);
-  const goldPct = pctOf(goldValue, net);
-  const empty = ready && !(net > 0.001);
+  const mixWhole = splitCurrencies ? 0 : net;
+  const cashPct = pctOf(cash, mixWhole);
+  const goldPct = pctOf(goldValue, mixWhole);
+  const empty = ready && !hasCash && !hasGold;
 
   return (
     <PageShell>
@@ -187,7 +192,7 @@ export default function NetPage() {
       <header className="mt-1">
         <h1 className="page-title">{t("netTitle")}</h1>
         <p className="mt-1 text-sm leading-relaxed text-[var(--muted)]">
-          {t("netHint")}
+          {splitCurrencies ? t("netHintSplit") : t("netHint")}
         </p>
       </header>
       {error ? <p className="mt-2 text-red-700">{error}</p> : null}
@@ -225,63 +230,100 @@ export default function NetPage() {
 
         <div className="relative">
           <p className="text-base font-medium opacity-90">{t("netTotal")}</p>
-          <p className="mt-1 text-[clamp(1.75rem,8vw,2.55rem)] font-bold leading-tight tracking-tight">
-            {ready ? (
-              <PrivateMoney
-                amount={net}
-                currency={currency}
-                locale={locale}
-                visible={moneyVisible}
-              />
-            ) : (
-              "…"
-            )}
-          </p>
-
-          <div className="mt-4 space-y-2.5">
-            <p className="text-xs font-semibold uppercase tracking-wide opacity-80">
-              {t("netMix")}
+          {ready && splitCurrencies ? (
+            <div className="mt-1 space-y-2">
+              {hasCash || !hasGold ? (
+                <div>
+                  <p className="text-xs font-medium opacity-80">{t("netCash")}</p>
+                  <p className="text-[clamp(1.5rem,7vw,2.35rem)] font-bold leading-tight tracking-tight">
+                    <PrivateMoney
+                      amount={cash}
+                      currency={currency}
+                      locale={locale}
+                      visible={moneyVisible}
+                    />
+                  </p>
+                </div>
+              ) : null}
+              {hasGold ? (
+                <div>
+                  <p className="text-xs font-medium opacity-80">{t("netGold")}</p>
+                  <p className="text-[clamp(1.35rem,6vw,2rem)] font-bold leading-tight tracking-tight">
+                    <PrivateMoney
+                      amount={goldValue}
+                      currency={goldCurrency}
+                      locale={locale}
+                      visible={moneyVisible}
+                    />
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <p className="mt-1 text-[clamp(1.75rem,8vw,2.55rem)] font-bold leading-tight tracking-tight">
+              {ready ? (
+                <PrivateMoney
+                  amount={net}
+                  currency={currency}
+                  locale={locale}
+                  visible={moneyVisible}
+                />
+              ) : (
+                "…"
+              )}
             </p>
-            <MixBar slices={slices} ready={ready} />
-            <div className="flex flex-wrap gap-2 pt-0.5">
-              {ready
-                ? slices
-                    .filter((s) => s.amount > 0.001)
-                    .map((s) => {
-                      const p = pctOf(s.amount, net);
-                      return (
-                        <span
-                          key={s.key}
-                          className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold backdrop-blur-sm"
-                        >
-                          <span
-                            className="h-2 w-2 shrink-0 rounded-full"
-                            style={{ background: s.color }}
-                            aria-hidden
-                          />
-                          {s.label}
-                          <span className="opacity-80 tabular-nums">{p}%</span>
-                        </span>
-                      );
-                    })
-                : null}
-            </div>
-          </div>
+          )}
 
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            <div className="rounded-2xl bg-white/15 px-3 py-2.5 backdrop-blur-sm">
-              <p className="text-xs opacity-85">{t("netCashShare")}</p>
-              <p className="mt-0.5 text-lg font-bold tabular-nums">
-                {ready ? `${cashPct}%` : "…"}
-              </p>
-            </div>
-            <div className="rounded-2xl bg-white/15 px-3 py-2.5 backdrop-blur-sm">
-              <p className="text-xs opacity-85">{t("netGoldShare")}</p>
-              <p className="mt-0.5 text-lg font-bold tabular-nums">
-                {ready ? `${goldPct}%` : "…"}
-              </p>
-            </div>
-          </div>
+          {!splitCurrencies ? (
+            <>
+              <div className="mt-4 space-y-2.5">
+                <p className="text-xs font-semibold uppercase tracking-wide opacity-80">
+                  {t("netMix")}
+                </p>
+                <MixBar slices={slices} ready={ready} />
+                <div className="flex flex-wrap gap-2 pt-0.5">
+                  {ready
+                    ? slices
+                        .filter((s) => s.amount > 0.001)
+                        .map((s) => {
+                          const p = pctOf(s.amount, net);
+                          return (
+                            <span
+                              key={s.key}
+                              className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold backdrop-blur-sm"
+                            >
+                              <span
+                                className="h-2 w-2 shrink-0 rounded-full"
+                                style={{ background: s.color }}
+                                aria-hidden
+                              />
+                              {s.label}
+                              <span className="opacity-80 tabular-nums">
+                                {p}%
+                              </span>
+                            </span>
+                          );
+                        })
+                    : null}
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <div className="rounded-2xl bg-white/15 px-3 py-2.5 backdrop-blur-sm">
+                  <p className="text-xs opacity-85">{t("netCashShare")}</p>
+                  <p className="mt-0.5 text-lg font-bold tabular-nums">
+                    {ready ? `${cashPct}%` : "…"}
+                  </p>
+                </div>
+                <div className="rounded-2xl bg-white/15 px-3 py-2.5 backdrop-blur-sm">
+                  <p className="text-xs opacity-85">{t("netGoldShare")}</p>
+                  <p className="mt-0.5 text-lg font-bold tabular-nums">
+                    {ready ? `${goldPct}%` : "…"}
+                  </p>
+                </div>
+              </div>
+            </>
+          ) : null}
 
           <p className="mt-3 text-sm opacity-90">
             {moneyVisible ? t("tapToHideMoney") : t("tapToShowMoney")}
@@ -301,7 +343,7 @@ export default function NetPage() {
 
       <section className="mt-4 space-y-3">
         {slices.map((s) => {
-          const share = pctOf(s.amount, net);
+          const share = splitCurrencies ? 0 : pctOf(s.amount, net);
           const body = (
             <>
               <div className="flex items-start justify-between gap-3">
@@ -314,7 +356,7 @@ export default function NetPage() {
                     />
                     <p className="text-sm font-semibold">{s.label}</p>
                   </div>
-                  {net > 0.001 ? (
+                  {!splitCurrencies && net > 0.001 ? (
                     <p className="mt-1 text-xs text-[var(--muted)]">
                       {fill(t("netShare"), { pct: String(share) })}
                     </p>
@@ -340,15 +382,17 @@ export default function NetPage() {
                   ) : null}
                 </div>
               </div>
-              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--panel-soft)]">
-                <div
-                  className="h-full rounded-full transition-[width] duration-700 ease-out"
-                  style={{
-                    width: ready ? `${Math.min(100, share)}%` : "0%",
-                    background: `linear-gradient(90deg, ${s.color}99, ${s.color})`,
-                  }}
-                />
-              </div>
+              {!splitCurrencies ? (
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--panel-soft)]">
+                  <div
+                    className="h-full rounded-full transition-[width] duration-700 ease-out"
+                    style={{
+                      width: ready ? `${Math.min(100, share)}%` : "0%",
+                      background: `linear-gradient(90deg, ${s.color}99, ${s.color})`,
+                    }}
+                  />
+                </div>
+              ) : null}
             </>
           );
 
