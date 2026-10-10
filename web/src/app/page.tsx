@@ -687,6 +687,44 @@ export default function HomePage() {
               </p>
             </div>
           </div>
+          <div
+            className="mt-3.5 rounded-2xl px-3.5 py-3"
+            style={{ background: "rgba(255,255,255,0.22)" }}
+          >
+            <p className="text-xs font-medium opacity-95">
+              📉 {t("spentThisMonth")}
+            </p>
+            <p className="mt-1 text-[clamp(1.35rem,6vw,1.85rem)] font-bold leading-tight tracking-tight">
+              {summary ? (
+                <PrivateMoney
+                  amount={summary.monthExpense}
+                  currency={currency}
+                  locale={locale}
+                  visible={moneyVisible}
+                />
+              ) : (
+                "…"
+              )}
+            </p>
+            <div className="mt-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-white/25 pt-2.5">
+              <p className="text-xs opacity-90">
+                <span className="opacity-80">📈 {t("monthIn")}: </span>
+                <span className="font-semibold">
+                  {summary ? (
+                    <PrivateMoney
+                      amount={summary.monthIncome}
+                      currency={currency}
+                      locale={locale}
+                      visible={moneyVisible}
+                    />
+                  ) : (
+                    "…"
+                  )}
+                </span>
+              </p>
+              <p className="text-xs opacity-80">{daysLeftShort}</p>
+            </div>
+          </div>
           <Link
             href="/net"
             className="mt-3 flex min-h-11 items-center justify-between gap-3 rounded-2xl px-3 py-2.5 transition hover:opacity-95 active:scale-[0.99]"
