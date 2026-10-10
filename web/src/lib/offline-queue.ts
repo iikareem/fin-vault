@@ -40,6 +40,11 @@ export type SessionCache = {
   preferredCurrency?: string;
   theme?: string;
   budgetMonthStartDay?: number;
+  showPersonalMonthSpend?: boolean;
+  hideBalances?: boolean;
+  reduceMotion?: boolean;
+  compactUi?: boolean;
+  locale?: string;
   spaces: Space[];
   space: Space | null;
   personalOnly?: boolean;

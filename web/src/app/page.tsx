@@ -27,6 +27,7 @@ import {
   type MonthSoftLimitStatus,
 } from "@/components/MonthSoftLimitCard";
 import { MoneyToolsHomeCard } from "@/components/MoneyToolsHomeCard";
+import { BottomSheet } from "@/components/BottomSheet";
 import {
   isLikelyOffline,
   isOfflineNetworkError,
@@ -126,6 +127,7 @@ export default function HomePage() {
     setKind,
     personalOnly,
     budgetMonthStartDay,
+    showPersonalMonthSpend,
   } = useBooks();
   const personalStartDay =
     active?.kind === "PERSONAL" ? budgetMonthStartDay : 1;
@@ -153,6 +155,11 @@ export default function HomePage() {
   const [offlineMode, setOfflineMode] = useState(false);
   const [busyEdit, setBusyEdit] = useState(false);
   const [personalMoneyVisible, setPersonalMoneyVisible] = useMoneyVisible();
+  const [monthCashflowOpen, setMonthCashflowOpen] = useState(false);
+
+  useEffect(() => {
+    if (!showPersonalMonthSpend) setMonthCashflowOpen(false);
+  }, [showPersonalMonthSpend]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -372,6 +379,9 @@ export default function HomePage() {
   const moveHint = suggestTransferToCurrent
     ? t("currentWallet")
     : t("savingsWallet");
+  const monthIncome = summary?.monthIncome ?? 0;
+  const monthExpense = summary?.monthExpense ?? 0;
+  const monthNet = monthIncome - monthExpense;
 
   async function refreshHouseLists() {
     if (!active) return;
@@ -686,42 +696,54 @@ export default function HomePage() {
                 )}
               </p>
             </div>
-            <div
-              className="rounded-2xl px-3 py-2.5"
-              style={{ background: "rgba(255,255,255,0.18)" }}
-            >
-              <p className="text-xs opacity-90">{t("spentThisMonth")}</p>
-              <p className="mt-0.5 text-lg font-semibold leading-tight">
-                {summary ? (
-                  <PrivateMoney
-                    amount={summary.monthExpense}
-                    currency={currency}
-                    locale={locale}
-                    visible={moneyVisible}
-                  />
-                ) : (
-                  "…"
-                )}
-              </p>
-            </div>
-            <div
-              className="rounded-2xl px-3 py-2.5"
-              style={{ background: "rgba(255,255,255,0.18)" }}
-            >
-              <p className="text-xs opacity-90">{t("monthIn")}</p>
-              <p className="mt-0.5 text-lg font-semibold leading-tight">
-                {summary ? (
-                  <PrivateMoney
-                    amount={summary.monthIncome}
-                    currency={currency}
-                    locale={locale}
-                    visible={moneyVisible}
-                  />
-                ) : (
-                  "…"
-                )}
-              </p>
-            </div>
+            {showPersonalMonthSpend ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setMonthCashflowOpen(true)}
+                  className="rounded-2xl px-3 py-2.5 text-start transition hover:opacity-95 active:scale-[0.98]"
+                  style={{ background: "rgba(255,255,255,0.18)" }}
+                  aria-haspopup="dialog"
+                  aria-expanded={monthCashflowOpen}
+                >
+                  <p className="text-xs opacity-90">{t("spentThisMonth")}</p>
+                  <p className="mt-0.5 text-lg font-semibold leading-tight">
+                    {summary ? (
+                      <PrivateMoney
+                        amount={summary.monthExpense}
+                        currency={currency}
+                        locale={locale}
+                        visible={moneyVisible}
+                      />
+                    ) : (
+                      "…"
+                    )}
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMonthCashflowOpen(true)}
+                  className="rounded-2xl px-3 py-2.5 text-start transition hover:opacity-95 active:scale-[0.98]"
+                  style={{ background: "rgba(255,255,255,0.18)" }}
+                  aria-haspopup="dialog"
+                  aria-expanded={monthCashflowOpen}
+                >
+                  <p className="text-xs opacity-90">{t("monthIn")}</p>
+                  <p className="mt-0.5 text-lg font-semibold leading-tight">
+                    {summary ? (
+                      <PrivateMoney
+                        amount={summary.monthIncome}
+                        currency={currency}
+                        locale={locale}
+                        visible={moneyVisible}
+                      />
+                    ) : (
+                      "…"
+                    )}
+                  </p>
+                </button>
+              </>
+            ) : null}
           </div>
           <Link
             href="/net"
@@ -1960,6 +1982,84 @@ export default function HomePage() {
             </ul>
           </section>
         )
+      ) : null}
+      {showPersonalMonthSpend ? (
+        <BottomSheet
+          open={monthCashflowOpen && !isHouse}
+          onClose={() => setMonthCashflowOpen(false)}
+          title={t("homeMonthCashflowTitle")}
+          hint={t("homeMonthCashflowHint")}
+          footer={
+            <Link
+              href="/analytics"
+              onClick={() => setMonthCashflowOpen(false)}
+              className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--accent-b)] text-base font-semibold text-[var(--accent-b-fg)]"
+            >
+              {t("homeMonthOpenCharts")}
+            </Link>
+          }
+        >
+          <div className="rounded-2xl bg-[var(--panel-soft)] px-4 py-4 text-center">
+            <p className="text-xs font-medium text-[var(--muted)]">
+              {t("homeMonthNet")}
+            </p>
+            <p
+              className={`mt-1.5 text-[clamp(1.5rem,6.5vw,2rem)] font-bold leading-none tabular-nums ${
+                monthNet >= 0
+                  ? "text-[var(--accent-a-text)]"
+                  : "text-red-700 dark:text-red-300"
+              }`}
+            >
+              <PrivateMoney
+                amount={Math.abs(monthNet)}
+                currency={currency}
+                locale={locale}
+                visible={moneyVisible}
+                extraSign={monthNet >= 0 ? "+" : "−"}
+              />
+            </p>
+            <p className="mt-2 text-xs leading-snug text-[var(--muted)]">
+              {t("homeMonthNetHint")}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-bg)] px-3 py-3">
+              <p className="text-xs text-[var(--muted)]">{t("monthIn")}</p>
+              <p className="mt-1 text-lg font-semibold leading-tight text-[var(--accent-a-text)]">
+                <PrivateMoney
+                  amount={monthIncome}
+                  currency={currency}
+                  locale={locale}
+                  visible={moneyVisible}
+                />
+              </p>
+            </div>
+            <div className="rounded-2xl border border-[var(--surface-border)] bg-[var(--surface-bg)] px-3 py-3">
+              <p className="text-xs text-[var(--muted)]">{t("spentThisMonth")}</p>
+              <p className="mt-1 text-lg font-semibold leading-tight text-red-700 dark:text-red-300">
+                <PrivateMoney
+                  amount={monthExpense}
+                  currency={currency}
+                  locale={locale}
+                  visible={moneyVisible}
+                />
+              </p>
+            </div>
+          </div>
+          {summary && Math.abs(summary.savedThisMonth) > 0.001 ? (
+            <div className="flex items-center justify-between gap-3 rounded-2xl bg-[var(--panel-soft)] px-3.5 py-3">
+              <p className="text-sm text-[var(--muted)]">{t("savedThisMonth")}</p>
+              <p className="text-sm font-semibold tabular-nums">
+                <PrivateMoney
+                  amount={summary.savedThisMonth}
+                  currency={currency}
+                  locale={locale}
+                  visible={moneyVisible}
+                />
+              </p>
+            </div>
+          ) : null}
+        </BottomSheet>
       ) : null}
       <BottomNav />
     </PageShell>

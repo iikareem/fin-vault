@@ -117,6 +117,16 @@ model User {
   theme               String          @default("light")
   /** Day of month (1–28) when the personal budget period starts. 1 = calendar month. */
   budgetMonthStartDay Int             @default(1)
+  /** Show this-month income/spend tiles in the personal Home money box. */
+  showPersonalMonthSpend Boolean      @default(false)
+  /** Start Home with balances hidden until revealed. */
+  hideBalances        Boolean         @default(false)
+  /** Soften animations and transitions. */
+  reduceMotion        Boolean         @default(false)
+  /** Tighter spacing across the app shell. */
+  compactUi           Boolean         @default(false)
+  /** UI language: en | ar. */
+  locale              String          @default("en")
   createdAt           DateTime        @default(now())
   memberships       Membership[]
   txs               Transaction[]

@@ -26,9 +26,10 @@ const THEME_LABEL: Record<ThemeId, MessageKey> = {
 };
 
 export default function AppearanceSettingsPage() {
-  const { t, locale, setLocale } = useI18n();
+  const { t, locale } = useI18n();
   const { theme, setPreferences } = useBooks();
   const [themeBusy, setThemeBusy] = useState(false);
+  const [localeBusy, setLocaleBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState("");
 
@@ -48,6 +49,21 @@ export default function AppearanceSettingsPage() {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
       setThemeBusy(false);
+    }
+  }
+
+  async function onLocale(next: "en" | "ar") {
+    if (localeBusy || next === locale) return;
+    setLocaleBusy(true);
+    setError("");
+    setSaved("");
+    try {
+      await setPreferences({ locale: next });
+      flashSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("couldNotSave"));
+    } finally {
+      setLocaleBusy(false);
     }
   }
 
@@ -137,12 +153,10 @@ export default function AppearanceSettingsPage() {
               <button
                 key={opt.id}
                 type="button"
-                onClick={() => {
-                  setLocale(opt.id);
-                  flashSaved();
-                }}
+                disabled={localeBusy}
+                onClick={() => void onLocale(opt.id)}
                 aria-pressed={active}
-                className={`min-h-12 rounded-[1.15rem] px-3 text-base font-bold transition active:scale-[0.99] ${
+                className={`min-h-12 rounded-[1.15rem] px-3 text-base font-bold transition active:scale-[0.99] disabled:opacity-60 ${
                   active
                     ? "bg-[var(--cta-bg)] text-[var(--cta-fg)]"
                     : "bg-[var(--panel-soft)] text-[var(--foreground)] ring-1 ring-[var(--input-border)]"

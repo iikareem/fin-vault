@@ -13,6 +13,28 @@ import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 import { normalizeLoginEmail, normalizeLoginPassword } from './login-text';
 import { seedPersonalSpace } from '../households/space-defaults';
 
+function userPrefs(user: {
+  preferredCurrency: string;
+  theme: string;
+  budgetMonthStartDay: number;
+  showPersonalMonthSpend: boolean;
+  hideBalances: boolean;
+  reduceMotion: boolean;
+  compactUi: boolean;
+  locale: string;
+}) {
+  return {
+    preferredCurrency: user.preferredCurrency,
+    theme: user.theme,
+    budgetMonthStartDay: user.budgetMonthStartDay,
+    showPersonalMonthSpend: user.showPersonalMonthSpend,
+    hideBalances: user.hideBalances,
+    reduceMotion: user.reduceMotion,
+    compactUi: user.compactUi,
+    locale: user.locale === 'ar' ? 'ar' : 'en',
+  };
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -47,6 +69,11 @@ export class AuthService {
           preferredCurrency: 'EGP',
           theme: 'light',
           budgetMonthStartDay: 1,
+          showPersonalMonthSpend: false,
+          hideBalances: false,
+          reduceMotion: false,
+          compactUi: false,
+          locale: 'en',
         },
       });
       await seedPersonalSpace(tx, created.id, name);
@@ -61,9 +88,7 @@ export class AuthService {
         name: user.name,
         nameAr: user.nameAr,
         email: user.email,
-        preferredCurrency: user.preferredCurrency,
-        theme: user.theme,
-        budgetMonthStartDay: user.budgetMonthStartDay,
+        ...userPrefs(user),
       },
     };
   }
@@ -85,9 +110,7 @@ export class AuthService {
         name: user.name,
         nameAr: user.nameAr,
         email: user.email,
-        preferredCurrency: user.preferredCurrency,
-        theme: user.theme,
-        budgetMonthStartDay: user.budgetMonthStartDay,
+        ...userPrefs(user),
       },
     };
   }
@@ -121,12 +144,24 @@ export class AuthService {
       preferredCurrency?: string;
       theme?: string;
       budgetMonthStartDay?: number;
+      showPersonalMonthSpend?: boolean;
+      hideBalances?: boolean;
+      reduceMotion?: boolean;
+      compactUi?: boolean;
+      locale?: string;
     } = {};
     if (dto.preferredCurrency) data.preferredCurrency = dto.preferredCurrency;
     if (dto.theme) data.theme = dto.theme;
     if (dto.budgetMonthStartDay != null) {
       data.budgetMonthStartDay = dto.budgetMonthStartDay;
     }
+    if (dto.showPersonalMonthSpend != null) {
+      data.showPersonalMonthSpend = dto.showPersonalMonthSpend;
+    }
+    if (dto.hideBalances != null) data.hideBalances = dto.hideBalances;
+    if (dto.reduceMotion != null) data.reduceMotion = dto.reduceMotion;
+    if (dto.compactUi != null) data.compactUi = dto.compactUi;
+    if (dto.locale) data.locale = dto.locale;
 
     const user = await this.prisma.user.update({
       where: { id: userId },
@@ -157,11 +192,7 @@ export class AuthService {
       }
     }
 
-    return {
-      preferredCurrency: user.preferredCurrency,
-      theme: user.theme,
-      budgetMonthStartDay: user.budgetMonthStartDay,
-    };
+    return userPrefs(user);
   }
 
   async me(userId: string) {
@@ -177,9 +208,7 @@ export class AuthService {
       name: user.name,
       nameAr: user.nameAr,
       email: user.email,
-      preferredCurrency: user.preferredCurrency,
-      theme: user.theme,
-      budgetMonthStartDay: user.budgetMonthStartDay,
+      ...userPrefs(user),
       spaces: user.memberships.map((m) => ({
         householdId: m.householdId,
         name: m.household.name,

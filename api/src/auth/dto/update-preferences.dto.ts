@@ -1,4 +1,12 @@
-import { IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 
 export const CURRENCIES = [
   'EGP',
@@ -28,6 +36,8 @@ export const THEMES = [
   'slate',
 ] as const;
 
+export const LOCALES = ['en', 'ar'] as const;
+
 export class UpdatePreferencesDto {
   @IsOptional()
   @IsString()
@@ -45,4 +55,26 @@ export class UpdatePreferencesDto {
   @Min(1)
   @Max(28)
   budgetMonthStartDay?: number;
+
+  /** Show this-month income/spend on the personal Home money box. Default false. */
+  @IsOptional()
+  @IsBoolean()
+  showPersonalMonthSpend?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  hideBalances?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  reduceMotion?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  compactUi?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @IsIn([...LOCALES])
+  locale?: (typeof LOCALES)[number];
 }

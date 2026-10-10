@@ -6,13 +6,14 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AUTH_REQUIRED, api } from "@/lib/api";
 import { HOUSE_BOOKS_ENABLED } from "@/lib/features";
-import { personLabel } from "@/lib/i18n";
+import { DEFAULT_LOCALE, LANG_KEY, personLabel, type Locale } from "@/lib/i18n";
 import {
   isOfflineNetworkError,
   isLikelyOffline,
@@ -32,10 +33,44 @@ import {
   themeMetaColor,
   type ThemeId,
 } from "@/lib/themes";
-import { applyUiPrefs, readUiPrefs } from "@/lib/uiPrefs";
+import {
+  applyUiPrefs,
+  readUiPrefs,
+  writeUiPrefs,
+  type UiPrefs,
+} from "@/lib/uiPrefs";
 import { useI18n } from "./I18nProvider";
 
 export type ThemeMode = ThemeId;
+
+type AccountUiPrefs = UiPrefs & {
+  showPersonalMonthSpend: boolean;
+  locale: Locale;
+};
+
+type PreferencePatch = {
+  preferredCurrency?: string;
+  theme?: ThemeMode;
+  budgetMonthStartDay?: number;
+  showPersonalMonthSpend?: boolean;
+  hideBalances?: boolean;
+  reduceMotion?: boolean;
+  compactUi?: boolean;
+  locale?: Locale;
+};
+
+type PreferenceResponse = {
+  preferredCurrency: string;
+  theme: string;
+  budgetMonthStartDay: number;
+  showPersonalMonthSpend: boolean;
+  hideBalances: boolean;
+  reduceMotion: boolean;
+  compactUi: boolean;
+  locale: string;
+};
+
+const PREFS_SEEDED_KEY = "fb_account_ui_prefs_seeded";
 
 function setMetaContent(name: string, content: string) {
   const nodes = document.querySelectorAll(`meta[name="${name}"]`);
@@ -51,6 +86,55 @@ function setMetaContent(name: string, content: string) {
       node.setAttribute("content", content);
     }
   });
+}
+
+function normalizeLocale(value?: string | null): Locale {
+  return value === "ar" ? "ar" : "en";
+}
+
+function readStoredLocale(): Locale {
+  if (typeof window === "undefined") return DEFAULT_LOCALE;
+  try {
+    const stored = localStorage.getItem(LANG_KEY);
+    if (stored === "ar" || stored === "en") return stored;
+  } catch {
+    /* ignore */
+  }
+  return DEFAULT_LOCALE;
+}
+
+function wasUiPrefsSeeded(userId: string): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    const raw = localStorage.getItem(PREFS_SEEDED_KEY);
+    if (!raw) return false;
+    const map = JSON.parse(raw) as Record<string, boolean>;
+    return Boolean(map[userId]);
+  } catch {
+    return false;
+  }
+}
+
+function markUiPrefsSeeded(userId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(PREFS_SEEDED_KEY);
+    const map = raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+    map[userId] = true;
+    localStorage.setItem(PREFS_SEEDED_KEY, JSON.stringify(map));
+  } catch {
+    /* ignore */
+  }
+}
+
+function isServerUiPrefsPristine(prefs: AccountUiPrefs): boolean {
+  return (
+    !prefs.hideBalances &&
+    !prefs.reduceMotion &&
+    !prefs.compactUi &&
+    !prefs.showPersonalMonthSpend &&
+    prefs.locale === "en"
+  );
 }
 
 type BooksValue = {
@@ -70,13 +154,14 @@ type BooksValue = {
   theme: ThemeMode;
   /** Personal budget period start day (1–28). Ignored for House books. */
   budgetMonthStartDay: number;
+  /** Show this-month income/spend tiles in the personal Home money box. */
+  showPersonalMonthSpend: boolean;
+  hideBalances: boolean;
+  reduceMotion: boolean;
+  compactUi: boolean;
   setKind: (kind: "HOUSE" | "PERSONAL") => void;
   refreshSpaces: () => Promise<void>;
-  setPreferences: (prefs: {
-    preferredCurrency?: string;
-    theme?: ThemeMode;
-    budgetMonthStartDay?: number;
-  }) => Promise<void>;
+  setPreferences: (prefs: PreferencePatch) => Promise<void>;
 };
 
 const BooksContext = createContext<BooksValue | null>(null);
@@ -118,10 +203,26 @@ function applyTheme(theme: ThemeMode) {
   );
 }
 
+function accountUiFromMe(me: {
+  showPersonalMonthSpend?: boolean;
+  hideBalances?: boolean;
+  reduceMotion?: boolean;
+  compactUi?: boolean;
+  locale?: string;
+}): AccountUiPrefs {
+  return {
+    showPersonalMonthSpend: Boolean(me.showPersonalMonthSpend),
+    hideBalances: Boolean(me.hideBalances),
+    reduceMotion: Boolean(me.reduceMotion),
+    compactUi: Boolean(me.compactUi),
+    locale: normalizeLocale(me.locale),
+  };
+}
+
 export function BooksProvider({ children }: { children: ReactNode }) {
   const path = usePathname();
   const router = useRouter();
-  const { locale } = useI18n();
+  const { locale, setLocale } = useI18n();
   const onAuthPage = path === "/login" || path === "/register";
   const [userId, setUserId] = useState("");
   const [name, setName] = useState("");
@@ -134,19 +235,52 @@ export function BooksProvider({ children }: { children: ReactNode }) {
   const [preferredCurrency, setPreferredCurrency] = useState("EGP");
   const [theme, setTheme] = useState<ThemeMode>(readStoredTheme);
   const [budgetMonthStartDay, setBudgetMonthStartDay] = useState(1);
+  const [showPersonalMonthSpend, setShowPersonalMonthSpend] = useState(false);
+  const [hideBalances, setHideBalances] = useState(
+    () => readUiPrefs().hideBalances,
+  );
+  const [reduceMotion, setReduceMotion] = useState(
+    () => readUiPrefs().reduceMotion,
+  );
+  const [compactUi, setCompactUi] = useState(() => readUiPrefs().compactUi);
+  const seedingRef = useRef(false);
+
+  const applyAccountUiPrefs = useCallback(
+    (prefs: AccountUiPrefs) => {
+      setShowPersonalMonthSpend(prefs.showPersonalMonthSpend);
+      setHideBalances(prefs.hideBalances);
+      setReduceMotion(prefs.reduceMotion);
+      setCompactUi(prefs.compactUi);
+      writeUiPrefs({
+        hideBalances: prefs.hideBalances,
+        reduceMotion: prefs.reduceMotion,
+        compactUi: prefs.compactUi,
+      });
+      setLocale(prefs.locale);
+    },
+    [setLocale],
+  );
 
   const applyMe = useCallback(
-    (me: {
-      id: string;
-      name: string;
-      nameAr?: string;
-      preferredCurrency?: string;
-      theme?: string;
-      budgetMonthStartDay?: number;
-      spaces: Space[];
-      space: Space | null;
-      personalOnly?: boolean;
-    }) => {
+    (
+      me: {
+        id: string;
+        name: string;
+        nameAr?: string;
+        preferredCurrency?: string;
+        theme?: string;
+        budgetMonthStartDay?: number;
+        showPersonalMonthSpend?: boolean;
+        hideBalances?: boolean;
+        reduceMotion?: boolean;
+        compactUi?: boolean;
+        locale?: string;
+        spaces: Space[];
+        space: Space | null;
+        personalOnly?: boolean;
+      },
+      opts?: { skipUiPrefs?: boolean },
+    ) => {
       setUserId(me.id);
       setName(me.name);
       setNameAr(me.nameAr?.trim() || "");
@@ -171,15 +305,100 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       setBudgetMonthStartDay(
         Math.min(28, Math.max(1, me.budgetMonthStartDay ?? 1)),
       );
+      if (!opts?.skipUiPrefs) {
+        applyAccountUiPrefs(accountUiFromMe(me));
+      } else {
+        setShowPersonalMonthSpend(Boolean(me.showPersonalMonthSpend));
+      }
     },
-    [],
+    [applyAccountUiPrefs],
+  );
+
+  const applyPreferenceResponse = useCallback(
+    (res: PreferenceResponse) => {
+      const nextTheme = normalizeTheme(res.theme);
+      setTheme(nextTheme);
+      applyTheme(nextTheme);
+      setPreferredCurrency(res.preferredCurrency);
+      setBudgetMonthStartDay(
+        Math.min(28, Math.max(1, res.budgetMonthStartDay ?? 1)),
+      );
+      applyAccountUiPrefs(accountUiFromMe(res));
+    },
+    [applyAccountUiPrefs],
+  );
+
+  const maybeSeedLocalUiPrefs = useCallback(
+    async (me: {
+      id: string;
+      showPersonalMonthSpend?: boolean;
+      hideBalances?: boolean;
+      reduceMotion?: boolean;
+      compactUi?: boolean;
+      locale?: string;
+    }): Promise<AccountUiPrefs> => {
+      const server = accountUiFromMe(me);
+      if (typeof window === "undefined" || seedingRef.current) {
+        applyAccountUiPrefs(server);
+        return server;
+      }
+      if (wasUiPrefsSeeded(me.id)) {
+        applyAccountUiPrefs(server);
+        return server;
+      }
+
+      const localUi = readUiPrefs();
+      const localLocale = readStoredLocale();
+      const localDiffers =
+        localUi.hideBalances ||
+        localUi.reduceMotion ||
+        localUi.compactUi ||
+        localLocale !== "en";
+
+      if (isServerUiPrefsPristine(server) && localDiffers) {
+        seedingRef.current = true;
+        try {
+          const res = await api<PreferenceResponse>("/auth/preferences", {
+            method: "PATCH",
+            body: JSON.stringify({
+              hideBalances: localUi.hideBalances,
+              reduceMotion: localUi.reduceMotion,
+              compactUi: localUi.compactUi,
+              locale: localLocale,
+            }),
+          });
+          const next = accountUiFromMe(res);
+          applyPreferenceResponse(res);
+          markUiPrefsSeeded(me.id);
+          return next;
+        } catch {
+          // Keep current device prefs; retry seed on a later session.
+          applyUiPrefs(localUi);
+          return {
+            showPersonalMonthSpend: server.showPersonalMonthSpend,
+            hideBalances: localUi.hideBalances,
+            reduceMotion: localUi.reduceMotion,
+            compactUi: localUi.compactUi,
+            locale: localLocale,
+          };
+        } finally {
+          seedingRef.current = false;
+        }
+      }
+
+      applyAccountUiPrefs(server);
+      markUiPrefsSeeded(me.id);
+      return server;
+    },
+    [applyAccountUiPrefs, applyPreferenceResponse],
   );
 
   const refreshSpaces = useCallback(async () => {
     try {
       const me = await loadSpace();
-      applyMe(me);
-      saveSessionCache(me);
+      applyMe(me, { skipUiPrefs: true });
+      const ui = await maybeSeedLocalUiPrefs(me);
+      saveSessionCache({ ...me, ...ui });
     } catch (err) {
       if (isOfflineNetworkError(err) || isLikelyOffline()) {
         const cached = loadSessionCache();
@@ -190,7 +409,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       }
       throw err;
     }
-  }, [applyMe]);
+  }, [applyMe, maybeSeedLocalUiPrefs]);
 
   useEffect(() => {
     applyUiPrefs(readUiPrefs());
@@ -218,10 +437,12 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       setLoading(true);
     }
     loadSpace()
-      .then((me) => {
+      .then(async (me) => {
         if (cancelled) return;
-        applyMe(me);
-        saveSessionCache(me);
+        applyMe(me, { skipUiPrefs: true });
+        const ui = await maybeSeedLocalUiPrefs(me);
+        if (cancelled) return;
+        saveSessionCache({ ...me, ...ui });
       })
       .catch((err) => {
         if (cancelled) return;
@@ -243,7 +464,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [onAuthPage, router, applyMe]);
+  }, [onAuthPage, router, applyMe, maybeSeedLocalUiPrefs]);
 
   useEffect(() => {
     if (loading || onAuthPage || !personalOnly) return;
@@ -270,29 +491,29 @@ export function BooksProvider({ children }: { children: ReactNode }) {
   );
 
   const setPreferences = useCallback(
-    async (prefs: {
-      preferredCurrency?: string;
-      theme?: ThemeMode;
-      budgetMonthStartDay?: number;
-    }) => {
-      const res = await api<{
-        preferredCurrency: string;
-        theme: string;
-        budgetMonthStartDay: number;
-      }>("/auth/preferences", {
+    async (prefs: PreferencePatch) => {
+      let payload: PreferencePatch = prefs;
+      // First account save after upgrade: keep other device-local UI prefs too.
+      if (userId && !wasUiPrefsSeeded(userId)) {
+        const localUi = readUiPrefs();
+        const localLocale = readStoredLocale();
+        payload = {
+          hideBalances: localUi.hideBalances,
+          reduceMotion: localUi.reduceMotion,
+          compactUi: localUi.compactUi,
+          locale: localLocale,
+          ...prefs,
+        };
+      }
+      const res = await api<PreferenceResponse>("/auth/preferences", {
         method: "PATCH",
-        body: JSON.stringify(prefs),
+        body: JSON.stringify(payload),
       });
-      const nextTheme = normalizeTheme(res.theme);
-      setTheme(nextTheme);
-      applyTheme(nextTheme);
-      setPreferredCurrency(res.preferredCurrency);
-      setBudgetMonthStartDay(
-        Math.min(28, Math.max(1, res.budgetMonthStartDay ?? 1)),
-      );
+      applyPreferenceResponse(res);
+      if (userId) markUiPrefsSeeded(userId);
       await refreshSpaces();
     },
-    [refreshSpaces],
+    [applyPreferenceResponse, refreshSpaces, userId],
   );
 
   const displayName = personLabel({ name, nameAr }, locale);
@@ -311,6 +532,10 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       preferredCurrency,
       theme,
       budgetMonthStartDay,
+      showPersonalMonthSpend,
+      hideBalances,
+      reduceMotion,
+      compactUi,
       setKind,
       refreshSpaces,
       setPreferences,
@@ -328,6 +553,10 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       preferredCurrency,
       theme,
       budgetMonthStartDay,
+      showPersonalMonthSpend,
+      hideBalances,
+      reduceMotion,
+      compactUi,
       setKind,
       refreshSpaces,
       setPreferences,

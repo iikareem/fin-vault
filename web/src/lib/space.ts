@@ -38,6 +38,11 @@ export async function loadSpace() {
     preferredCurrency?: string;
     theme?: string;
     budgetMonthStartDay?: number;
+    showPersonalMonthSpend?: boolean;
+    hideBalances?: boolean;
+    reduceMotion?: boolean;
+    compactUi?: boolean;
+    locale?: string;
     spaces: Space[];
   }>("/auth/me");
   const stored = localStorage.getItem(KEY);
@@ -65,6 +70,11 @@ export async function loadSpace() {
     preferredCurrency: me.preferredCurrency,
     theme: me.theme,
     budgetMonthStartDay: me.budgetMonthStartDay ?? 1,
+    showPersonalMonthSpend: Boolean(me.showPersonalMonthSpend),
+    hideBalances: Boolean(me.hideBalances),
+    reduceMotion: Boolean(me.reduceMotion),
+    compactUi: Boolean(me.compactUi),
+    locale: me.locale === "ar" ? "ar" : "en",
     spaces: me.spaces,
     space,
     personalOnly,
