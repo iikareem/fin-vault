@@ -42,9 +42,13 @@ import {
 import { useI18n } from "./I18nProvider";
 
 export type ThemeMode = ThemeId;
+export type AddTypePref = "EXPENSE" | "INCOME";
 
 type AccountUiPrefs = UiPrefs & {
   showPersonalMonthSpend: boolean;
+  showHomeTools: boolean;
+  defaultAddType: AddTypePref;
+  skipAddConfirm: boolean;
   locale: Locale;
 };
 
@@ -56,6 +60,10 @@ type PreferencePatch = {
   hideBalances?: boolean;
   reduceMotion?: boolean;
   compactUi?: boolean;
+  largeText?: boolean;
+  showHomeTools?: boolean;
+  defaultAddType?: AddTypePref;
+  skipAddConfirm?: boolean;
   locale?: Locale;
 };
 
@@ -67,6 +75,10 @@ type PreferenceResponse = {
   hideBalances: boolean;
   reduceMotion: boolean;
   compactUi: boolean;
+  largeText: boolean;
+  showHomeTools: boolean;
+  defaultAddType: string;
+  skipAddConfirm: boolean;
   locale: string;
 };
 
@@ -90,6 +102,10 @@ function setMetaContent(name: string, content: string) {
 
 function normalizeLocale(value?: string | null): Locale {
   return value === "ar" ? "ar" : "en";
+}
+
+function normalizeAddType(value?: string | null): AddTypePref {
+  return value === "INCOME" ? "INCOME" : "EXPENSE";
 }
 
 function readStoredLocale(): Locale {
@@ -132,7 +148,11 @@ function isServerUiPrefsPristine(prefs: AccountUiPrefs): boolean {
     !prefs.hideBalances &&
     !prefs.reduceMotion &&
     !prefs.compactUi &&
+    !prefs.largeText &&
     !prefs.showPersonalMonthSpend &&
+    prefs.showHomeTools &&
+    prefs.defaultAddType === "EXPENSE" &&
+    !prefs.skipAddConfirm &&
     prefs.locale === "en"
   );
 }
@@ -159,6 +179,13 @@ type BooksValue = {
   hideBalances: boolean;
   reduceMotion: boolean;
   compactUi: boolean;
+  largeText: boolean;
+  /** Show money-tools strip on personal Home. */
+  showHomeTools: boolean;
+  /** Default Add tab for personal/house wallet entry. */
+  defaultAddType: AddTypePref;
+  /** Skip the review step when saving a transaction. */
+  skipAddConfirm: boolean;
   setKind: (kind: "HOUSE" | "PERSONAL") => void;
   refreshSpaces: () => Promise<void>;
   setPreferences: (prefs: PreferencePatch) => Promise<void>;
@@ -208,6 +235,10 @@ function accountUiFromMe(me: {
   hideBalances?: boolean;
   reduceMotion?: boolean;
   compactUi?: boolean;
+  largeText?: boolean;
+  showHomeTools?: boolean;
+  defaultAddType?: string;
+  skipAddConfirm?: boolean;
   locale?: string;
 }): AccountUiPrefs {
   return {
@@ -215,6 +246,10 @@ function accountUiFromMe(me: {
     hideBalances: Boolean(me.hideBalances),
     reduceMotion: Boolean(me.reduceMotion),
     compactUi: Boolean(me.compactUi),
+    largeText: Boolean(me.largeText),
+    showHomeTools: me.showHomeTools !== false,
+    defaultAddType: normalizeAddType(me.defaultAddType),
+    skipAddConfirm: Boolean(me.skipAddConfirm),
     locale: normalizeLocale(me.locale),
   };
 }
@@ -243,6 +278,10 @@ export function BooksProvider({ children }: { children: ReactNode }) {
     () => readUiPrefs().reduceMotion,
   );
   const [compactUi, setCompactUi] = useState(() => readUiPrefs().compactUi);
+  const [largeText, setLargeText] = useState(() => readUiPrefs().largeText);
+  const [showHomeTools, setShowHomeTools] = useState(true);
+  const [defaultAddType, setDefaultAddType] = useState<AddTypePref>("EXPENSE");
+  const [skipAddConfirm, setSkipAddConfirm] = useState(false);
   const seedingRef = useRef(false);
 
   const applyAccountUiPrefs = useCallback(
@@ -251,10 +290,15 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       setHideBalances(prefs.hideBalances);
       setReduceMotion(prefs.reduceMotion);
       setCompactUi(prefs.compactUi);
+      setLargeText(prefs.largeText);
+      setShowHomeTools(prefs.showHomeTools);
+      setDefaultAddType(prefs.defaultAddType);
+      setSkipAddConfirm(prefs.skipAddConfirm);
       writeUiPrefs({
         hideBalances: prefs.hideBalances,
         reduceMotion: prefs.reduceMotion,
         compactUi: prefs.compactUi,
+        largeText: prefs.largeText,
       });
       setLocale(prefs.locale);
     },
@@ -274,6 +318,10 @@ export function BooksProvider({ children }: { children: ReactNode }) {
         hideBalances?: boolean;
         reduceMotion?: boolean;
         compactUi?: boolean;
+        largeText?: boolean;
+        showHomeTools?: boolean;
+        defaultAddType?: string;
+        skipAddConfirm?: boolean;
         locale?: string;
         spaces: Space[];
         space: Space | null;
@@ -308,7 +356,11 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       if (!opts?.skipUiPrefs) {
         applyAccountUiPrefs(accountUiFromMe(me));
       } else {
-        setShowPersonalMonthSpend(Boolean(me.showPersonalMonthSpend));
+        const ui = accountUiFromMe(me);
+        setShowPersonalMonthSpend(ui.showPersonalMonthSpend);
+        setShowHomeTools(ui.showHomeTools);
+        setDefaultAddType(ui.defaultAddType);
+        setSkipAddConfirm(ui.skipAddConfirm);
       }
     },
     [applyAccountUiPrefs],
@@ -335,6 +387,10 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       hideBalances?: boolean;
       reduceMotion?: boolean;
       compactUi?: boolean;
+      largeText?: boolean;
+      showHomeTools?: boolean;
+      defaultAddType?: string;
+      skipAddConfirm?: boolean;
       locale?: string;
     }): Promise<AccountUiPrefs> => {
       const server = accountUiFromMe(me);
@@ -353,6 +409,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
         localUi.hideBalances ||
         localUi.reduceMotion ||
         localUi.compactUi ||
+        localUi.largeText ||
         localLocale !== "en";
 
       if (isServerUiPrefsPristine(server) && localDiffers) {
@@ -364,6 +421,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
               hideBalances: localUi.hideBalances,
               reduceMotion: localUi.reduceMotion,
               compactUi: localUi.compactUi,
+              largeText: localUi.largeText,
               locale: localLocale,
             }),
           });
@@ -375,10 +433,11 @@ export function BooksProvider({ children }: { children: ReactNode }) {
           // Keep current device prefs; retry seed on a later session.
           applyUiPrefs(localUi);
           return {
-            showPersonalMonthSpend: server.showPersonalMonthSpend,
+            ...server,
             hideBalances: localUi.hideBalances,
             reduceMotion: localUi.reduceMotion,
             compactUi: localUi.compactUi,
+            largeText: localUi.largeText,
             locale: localLocale,
           };
         } finally {
@@ -501,6 +560,7 @@ export function BooksProvider({ children }: { children: ReactNode }) {
           hideBalances: localUi.hideBalances,
           reduceMotion: localUi.reduceMotion,
           compactUi: localUi.compactUi,
+          largeText: localUi.largeText,
           locale: localLocale,
           ...prefs,
         };
@@ -536,6 +596,10 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       hideBalances,
       reduceMotion,
       compactUi,
+      largeText,
+      showHomeTools,
+      defaultAddType,
+      skipAddConfirm,
       setKind,
       refreshSpaces,
       setPreferences,
@@ -557,6 +621,10 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       hideBalances,
       reduceMotion,
       compactUi,
+      largeText,
+      showHomeTools,
+      defaultAddType,
+      skipAddConfirm,
       setKind,
       refreshSpaces,
       setPreferences,

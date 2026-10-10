@@ -84,7 +84,8 @@ function AddForm() {
   const router = useRouter();
   const search = useSearchParams();
   const { t, locale } = useI18n();
-  const { active, preferredCurrency } = useBooks();
+  const { active, preferredCurrency, defaultAddType, skipAddConfirm } =
+    useBooks();
   const [space, setSpace] = useState<Space | null>(null);
   const [mode, setMode] = useState<
     "wallet" | "claim" | "cover" | "transfer" | "withdraw"
@@ -153,7 +154,7 @@ function AddForm() {
       } else if (wantType === "expense" || wantType === "spend") {
         setType("EXPENSE");
       } else {
-        setType("EXPENSE");
+        setType(defaultAddType);
       }
     }
     setUsingOfflineData(false);
@@ -234,7 +235,7 @@ function AddForm() {
         );
         applyAccountsAndCategories(a, snapshot.categories as Category[], true);
       });
-  }, [active?.householdId, active?.kind, active?.role, search]);
+  }, [active?.householdId, active?.kind, active?.role, search, defaultAddType]);
 
   const expenseCats = useMemo(
     () =>
@@ -338,6 +339,10 @@ function AddForm() {
     e.preventDefault();
     if (!space) return;
     if (!validateBeforeSave()) return;
+    if (skipAddConfirm) {
+      void confirmSave();
+      return;
+    }
     setConfirmOpen(true);
   }
 

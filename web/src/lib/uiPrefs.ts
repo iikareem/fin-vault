@@ -5,6 +5,8 @@ export type UiPrefs = {
   reduceMotion: boolean;
   /** Tighter spacing across the app shell. */
   compactUi: boolean;
+  /** Larger base text across the app shell. */
+  largeText: boolean;
 };
 
 export const UI_PREFS_KEY = "fb_ui_prefs";
@@ -14,6 +16,7 @@ export const DEFAULT_UI_PREFS: UiPrefs = {
   hideBalances: false,
   reduceMotion: false,
   compactUi: false,
+  largeText: false,
 };
 
 export function readUiPrefs(): UiPrefs {
@@ -26,6 +29,7 @@ export function readUiPrefs(): UiPrefs {
       hideBalances: Boolean(parsed.hideBalances),
       reduceMotion: Boolean(parsed.reduceMotion),
       compactUi: Boolean(parsed.compactUi),
+      largeText: Boolean(parsed.largeText),
     };
   } catch {
     return { ...DEFAULT_UI_PREFS };
@@ -53,6 +57,7 @@ export function applyUiPrefs(prefs: UiPrefs) {
   root.toggleAttribute("data-hide-balances", prefs.hideBalances);
   root.toggleAttribute("data-reduce-motion", prefs.reduceMotion);
   root.toggleAttribute("data-compact", prefs.compactUi);
+  root.toggleAttribute("data-large-text", prefs.largeText);
 }
 
 export function patchUiPrefs(patch: Partial<UiPrefs>): UiPrefs {

@@ -44,6 +44,10 @@ export type SessionCache = {
   hideBalances?: boolean;
   reduceMotion?: boolean;
   compactUi?: boolean;
+  largeText?: boolean;
+  showHomeTools?: boolean;
+  defaultAddType?: "EXPENSE" | "INCOME";
+  skipAddConfirm?: boolean;
   locale?: string;
   spaces: Space[];
   space: Space | null;

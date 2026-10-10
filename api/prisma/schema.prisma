@@ -125,6 +125,14 @@ model User {
   reduceMotion        Boolean         @default(false)
   /** Tighter spacing across the app shell. */
   compactUi           Boolean         @default(false)
+  /** Larger base text across the app shell. */
+  largeText           Boolean         @default(false)
+  /** Show money-tools strip on personal Home. */
+  showHomeTools       Boolean         @default(true)
+  /** Default Add tab: EXPENSE | INCOME. */
+  defaultAddType      String          @default("EXPENSE")
+  /** Skip the review step when saving a transaction. */
+  skipAddConfirm      Boolean         @default(false)
   /** UI language: en | ar. */
   locale              String          @default("en")
   createdAt           DateTime        @default(now())

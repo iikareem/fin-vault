@@ -15,6 +15,7 @@ export default function PrivacySettingsPage() {
     hideBalances,
     reduceMotion,
     compactUi,
+    largeText,
     showPersonalMonthSpend,
     setPreferences,
   } = useBooks();
@@ -32,6 +33,7 @@ export default function PrivacySettingsPage() {
       | "hideBalances"
       | "reduceMotion"
       | "compactUi"
+      | "largeText"
       | "showPersonalMonthSpend",
     value: boolean,
   ) {
@@ -86,6 +88,13 @@ export default function PrivacySettingsPage() {
             onChange={(v) => void onPref("compactUi", v)}
             label={t("compactUiPref")}
             hint={t("compactUiHint")}
+          />
+          <PrefToggle
+            checked={largeText}
+            disabled={Boolean(busyKey)}
+            onChange={(v) => void onPref("largeText", v)}
+            label={t("largeTextPref")}
+            hint={t("largeTextHint")}
           />
         </div>
       </SettingsCard>

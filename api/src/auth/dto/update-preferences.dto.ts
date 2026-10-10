@@ -19,7 +19,10 @@ export const CURRENCIES = [
   'KWD',
   'QAR',
   'BHD',
+  'TRY',
 ] as const;
+
+export const ADD_TYPES = ['EXPENSE', 'INCOME'] as const;
 
 export const THEMES = [
   'light',
@@ -72,6 +75,23 @@ export class UpdatePreferencesDto {
   @IsOptional()
   @IsBoolean()
   compactUi?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  largeText?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  showHomeTools?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @IsIn([...ADD_TYPES])
+  defaultAddType?: (typeof ADD_TYPES)[number];
+
+  @IsOptional()
+  @IsBoolean()
+  skipAddConfirm?: boolean;
 
   @IsOptional()
   @IsString()

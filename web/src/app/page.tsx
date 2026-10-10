@@ -128,6 +128,7 @@ export default function HomePage() {
     personalOnly,
     budgetMonthStartDay,
     showPersonalMonthSpend,
+    showHomeTools,
   } = useBooks();
   const personalStartDay =
     active?.kind === "PERSONAL" ? budgetMonthStartDay : 1;
@@ -1759,7 +1760,7 @@ export default function HomePage() {
             )}
           </span>
         </Link>
-      ) : !offlineMode && active ? (
+      ) : !offlineMode && active && showHomeTools ? (
         <MoneyToolsHomeCard
           householdId={active.householdId}
           currency={currency}

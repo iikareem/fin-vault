@@ -13,6 +13,10 @@ import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 import { normalizeLoginEmail, normalizeLoginPassword } from './login-text';
 import { seedPersonalSpace } from '../households/space-defaults';
 
+function normalizeAddType(value?: string | null): 'EXPENSE' | 'INCOME' {
+  return value === 'INCOME' ? 'INCOME' : 'EXPENSE';
+}
+
 function userPrefs(user: {
   preferredCurrency: string;
   theme: string;
@@ -21,6 +25,10 @@ function userPrefs(user: {
   hideBalances: boolean;
   reduceMotion: boolean;
   compactUi: boolean;
+  largeText: boolean;
+  showHomeTools: boolean;
+  defaultAddType: string;
+  skipAddConfirm: boolean;
   locale: string;
 }) {
   return {
@@ -31,6 +39,10 @@ function userPrefs(user: {
     hideBalances: user.hideBalances,
     reduceMotion: user.reduceMotion,
     compactUi: user.compactUi,
+    largeText: user.largeText,
+    showHomeTools: user.showHomeTools,
+    defaultAddType: normalizeAddType(user.defaultAddType),
+    skipAddConfirm: user.skipAddConfirm,
     locale: user.locale === 'ar' ? 'ar' : 'en',
   };
 }
@@ -73,6 +85,10 @@ export class AuthService {
           hideBalances: false,
           reduceMotion: false,
           compactUi: false,
+          largeText: false,
+          showHomeTools: true,
+          defaultAddType: 'EXPENSE',
+          skipAddConfirm: false,
           locale: 'en',
         },
       });
@@ -148,6 +164,10 @@ export class AuthService {
       hideBalances?: boolean;
       reduceMotion?: boolean;
       compactUi?: boolean;
+      largeText?: boolean;
+      showHomeTools?: boolean;
+      defaultAddType?: string;
+      skipAddConfirm?: boolean;
       locale?: string;
     } = {};
     if (dto.preferredCurrency) data.preferredCurrency = dto.preferredCurrency;
@@ -161,6 +181,10 @@ export class AuthService {
     if (dto.hideBalances != null) data.hideBalances = dto.hideBalances;
     if (dto.reduceMotion != null) data.reduceMotion = dto.reduceMotion;
     if (dto.compactUi != null) data.compactUi = dto.compactUi;
+    if (dto.largeText != null) data.largeText = dto.largeText;
+    if (dto.showHomeTools != null) data.showHomeTools = dto.showHomeTools;
+    if (dto.defaultAddType) data.defaultAddType = dto.defaultAddType;
+    if (dto.skipAddConfirm != null) data.skipAddConfirm = dto.skipAddConfirm;
     if (dto.locale) data.locale = dto.locale;
 
     const user = await this.prisma.user.update({

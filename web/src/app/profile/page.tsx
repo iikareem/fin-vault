@@ -84,6 +84,12 @@ export default function ProfilePage() {
       tone: "info",
     },
     {
+      href: "/profile/habits",
+      titleKey: "habitsSection",
+      hintKey: "habitsSectionHint",
+      tone: "good",
+    },
+    {
       href: "/profile/categories",
       titleKey: "myCategories",
       hintKey: "myCategoriesLinkHint",

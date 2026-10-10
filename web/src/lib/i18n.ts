@@ -657,7 +657,10 @@ const ar = {
   moneySectionHint: "العملة وبداية الشهر الشخصي.",
   privacySection: "الخصوصية وسهولة الاستخدام",
   privacySectionHint:
-    "إخفاء الأرصدة، مصروف الشهر في الصفحة الرئيسية، تقليل الحركة، والواجهة المضغوطة.",
+    "إخفاء الأرصدة، مصروف الشهر، تقليل الحركة، الواجهة المضغوطة، والنص الأكبر.",
+  habitsSection: "عادات التطبيق",
+  habitsSectionHint:
+    "نوع الإضافة الافتراضي، تخطي المراجعة، واختصارات الصفحة الرئيسية.",
   securitySection: "الأمان",
   securitySectionHint: "تغيير كلمة المرور.",
   accountSection: "الحساب",
@@ -677,6 +680,18 @@ const ar = {
   compactUiPref: "واجهة مضغوطة",
   compactUiHint:
     "مسافات أصغر لعرض مزيد من المحتوى على الشاشة. يُحفظ مع حسابك على كل الأجهزة.",
+  largeTextPref: "نص أكبر",
+  largeTextHint:
+    "يكبّر الكتابة والحقول لسهولة القراءة. يُحفظ مع حسابك على كل الأجهزة.",
+  defaultAddTypePref: "نوع الإضافة الافتراضي",
+  defaultAddTypeHint:
+    "يفتح شاشة الإضافة على مصروف أو دخل. يُحفظ مع حسابك على كل الأجهزة.",
+  skipAddConfirmPref: "حفظ سريع بدون مراجعة",
+  skipAddConfirmHint:
+    "يحفظ القيد مباشرة دون شاشة التأكيد. يُحفظ مع حسابك على كل الأجهزة.",
+  showHomeToolsPref: "اختصارات الأدوات في الرئيسية",
+  showHomeToolsHint:
+    "يعرض شريط الأهداف والذهب وغيرها في الصفحة الرئيسية. يُحفظ مع حسابك على كل الأجهزة.",
   settingsQuickLinks: "اختصارات",
   settingsBack: "الإعدادات",
   settingsCurrentTheme: "المحدّد: {name}",
@@ -1795,7 +1810,10 @@ const en = {
   moneySectionHint: "Currency and personal month start.",
   privacySection: "Privacy & comfort",
   privacySectionHint:
-    "Hide balances, month spend on Home, reduce motion, and compact layout.",
+    "Hide balances, month spend, reduce motion, compact layout, and larger text.",
+  habitsSection: "App habits",
+  habitsSectionHint:
+    "Default Add type, skip review, and Home tool shortcuts.",
   securitySection: "Security",
   securitySectionHint: "Change your password.",
   accountSection: "Account",
@@ -1814,6 +1832,18 @@ const en = {
   compactUiPref: "Compact layout",
   compactUiHint:
     "Tighter spacing so more fits on screen. Saved to your account across devices.",
+  largeTextPref: "Larger text",
+  largeTextHint:
+    "Enlarges text and fields for easier reading. Saved to your account across devices.",
+  defaultAddTypePref: "Default Add type",
+  defaultAddTypeHint:
+    "Open Add on expense or income. Saved to your account across devices.",
+  skipAddConfirmPref: "Save without review",
+  skipAddConfirmHint:
+    "Save entries immediately without the confirmation screen. Saved to your account across devices.",
+  showHomeToolsPref: "Home tool shortcuts",
+  showHomeToolsHint:
+    "Show the goals, gold, and tools strip on Home. Saved to your account across devices.",
   settingsQuickLinks: "Shortcuts",
   settingsBack: "Settings",
   settingsCurrentTheme: "Selected: {name}",
