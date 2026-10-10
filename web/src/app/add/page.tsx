@@ -2,7 +2,7 @@
 
 import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api, parseAmount, todayISO, yesterdayISO } from "@/lib/api";
+import { api, money, parseAmount, todayISO, yesterdayISO } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/components/I18nProvider";
@@ -32,7 +32,7 @@ import {
 } from "@/lib/offline-queue";
 import { offlineAwareReplace } from "@/lib/offline-nav";
 
-type Account = { id: string; name: string; type?: string };
+type Account = { id: string; name: string; type?: string; balance?: number };
 type Category = {
   id: string;
   name: string;
@@ -303,6 +303,12 @@ function AddForm() {
         setError(t("amountHint"));
         return false;
       }
+      const from = accounts.find((a) => a.id === accountId);
+      const fromBal = from?.balance ?? 0;
+      if (value > fromBal + 0.001) {
+        setError(t("transferNotEnough"));
+        return false;
+      }
       return true;
     }
     if (withdrawMode) {
@@ -566,10 +572,6 @@ function AddForm() {
     if (space) writeLastWalletId(space.householdId, wallet.id);
   }
 
-  function walletBtn(active: boolean) {
-    return `seg-item px-3 ${active ? "seg-active" : "ring-1 ring-[var(--input-border)]"}`;
-  }
-
   const modeChip = (active: boolean) =>
     `chip shrink-0 whitespace-nowrap ${active ? "chip-active" : ""}`;
 
@@ -577,11 +579,46 @@ function AddForm() {
   const selectedPerson = people.find((p) => p.id === toUserId);
   const fromWallet = accounts.find((a) => a.id === accountId);
   const toWallet = accounts.find((a) => a.id === toAccountId);
+  const fromBal = fromWallet?.balance ?? 0;
+  const toBal = toWallet?.balance ?? 0;
+  const transferValue = parseAmount(amount);
+  const transferOver =
+    transferMode && transferValue > 0 && transferValue > fromBal + 0.001;
+  const afterFrom = fromBal - transferValue;
+  const afterTo = toBal + transferValue;
   const intoCurrent = parseAmount(currentAmt);
   const intoSavings = parseAmount(savingsAmt);
   const confirmAmount = transferMode || withdrawMode || type !== "INCOME" || claimMode || coverMode
     ? parseAmount(amount)
     : intoCurrent + intoSavings;
+
+  function walletLabel(a: Account | undefined) {
+    if (!a) return "";
+    return isSavingsWallet(a) ? t("savingsWallet") : t("currentWallet");
+  }
+
+  function walletIcon(a: Account | undefined) {
+    if (!a) return "";
+    return isSavingsWallet(a) ? "💰" : "💵";
+  }
+
+  function walletToneBox(a: Account | undefined, role: "from" | "to") {
+    const savings = a && isSavingsWallet(a);
+    const strong = role === "from";
+    if (savings) {
+      return strong
+        ? "bg-amber-100 text-amber-950 ring-2 ring-amber-400/90 dark:bg-amber-950/50 dark:text-amber-100 dark:ring-amber-600/80"
+        : "bg-amber-50/80 text-amber-950 ring-1 ring-amber-200/80 dark:bg-amber-950/25 dark:text-amber-100 dark:ring-amber-800/50";
+    }
+    return strong
+      ? "bg-emerald-100 text-emerald-950 ring-2 ring-emerald-400/90 dark:bg-emerald-950/50 dark:text-emerald-100 dark:ring-emerald-600/80"
+      : "bg-emerald-50/80 text-emerald-950 ring-1 ring-emerald-200/80 dark:bg-emerald-950/25 dark:text-emerald-100 dark:ring-emerald-800/50";
+  }
+
+  function swapTransferDirection() {
+    setAccountId(toAccountId);
+    setToAccountId(accountId);
+  }
   const showWalletHighlight =
     personalPaid ||
     (!claimMode &&
@@ -702,6 +739,15 @@ function AddForm() {
                 onClick={() => {
                   setMode("transfer");
                   setTrackOnly(false);
+                  const current = accounts.find(isCurrentWallet) ?? accounts[0];
+                  const savings = accounts.find(isSavingsWallet);
+                  if (current) setAccountId(current.id);
+                  if (savings && savings.id !== current?.id) {
+                    setToAccountId(savings.id);
+                  } else {
+                    const other = accounts.find((x) => x.id !== current?.id);
+                    if (other) setToAccountId(other.id);
+                  }
                 }}
                 className={modeChip(transferMode)}
               >
@@ -726,56 +772,60 @@ function AddForm() {
       <form onSubmit={onSubmit} className="mt-4 space-y-3.5">
         {transferMode ? (
           <section className="surface space-y-3 rounded-[1.5rem] p-3.5">
-            <div>
-              <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">
-                {t("transferFrom")}
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {accounts.map((a) => (
-                  <button
-                    key={`from-${a.id}`}
-                    type="button"
-                    onClick={() => {
-                      setAccountId(a.id);
-                      if (a.id === toAccountId) {
-                        const other = accounts.find((x) => x.id !== a.id);
-                        if (other) setToAccountId(other.id);
-                      }
-                    }}
-                    className={walletBtn(accountId === a.id)}
-                  >
-                    {isSavingsWallet(a)
-                      ? "💰 " + t("savingsWallet")
-                      : "💵 " + t("currentWallet")}
-                  </button>
-                ))}
+            <div className="space-y-2">
+              <div
+                className={`rounded-2xl px-3.5 py-3 ${walletToneBox(fromWallet, "from")}`}
+              >
+                <p className="text-[11px] font-medium opacity-70">
+                  {t("transferFrom")}
+                </p>
+                <div className="mt-1 flex items-end justify-between gap-3">
+                  <p className="text-base font-bold leading-snug">
+                    {walletIcon(fromWallet)} {walletLabel(fromWallet)}
+                  </p>
+                  <p className="text-lg font-bold tabular-nums leading-none">
+                    <Money
+                      amount={fromBal}
+                      currency={preferredCurrency}
+                      locale={locale}
+                    />
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={swapTransferDirection}
+                  disabled={!accountId || !toAccountId}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[var(--panel-soft)] text-lg font-semibold text-[var(--foreground)] ring-1 ring-[var(--input-border)] transition hover:opacity-90 active:scale-95 disabled:opacity-40"
+                  aria-label={t("transferSwap")}
+                >
+                  ⇅
+                </button>
+              </div>
+
+              <div
+                className={`rounded-2xl px-3.5 py-3 ${walletToneBox(toWallet, "to")}`}
+              >
+                <p className="text-[11px] font-medium opacity-70">
+                  {t("transferTo")}
+                </p>
+                <div className="mt-1 flex items-end justify-between gap-3">
+                  <p className="text-base font-bold leading-snug">
+                    {walletIcon(toWallet)} {walletLabel(toWallet)}
+                  </p>
+                  <p className="text-lg font-bold tabular-nums leading-none">
+                    <Money
+                      amount={toBal}
+                      currency={preferredCurrency}
+                      locale={locale}
+                    />
+                  </p>
+                </div>
               </div>
             </div>
-            <div>
-              <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">
-                {t("transferTo")}
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                {accounts.map((a) => (
-                  <button
-                    key={`to-${a.id}`}
-                    type="button"
-                    onClick={() => {
-                      setToAccountId(a.id);
-                      if (a.id === accountId) {
-                        const other = accounts.find((x) => x.id !== a.id);
-                        if (other) setAccountId(other.id);
-                      }
-                    }}
-                    className={walletBtn(toAccountId === a.id)}
-                  >
-                    {isSavingsWallet(a)
-                      ? "💰 " + t("savingsWallet")
-                      : "💵 " + t("currentWallet")}
-                  </button>
-                ))}
-              </div>
-            </div>
+
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
                 {t("amount")}
@@ -788,8 +838,72 @@ function AddForm() {
                 onChange={(e) => setAmount(e.target.value)}
                 placeholder={t("payBackAmount")}
                 required
+                autoFocus
               />
+              <p
+                className={`mt-1.5 text-xs font-medium ${
+                  transferOver
+                    ? "text-red-700"
+                    : "text-[var(--muted)]"
+                }`}
+              >
+                {transferOver
+                  ? t("transferNotEnough")
+                  : t("transferAvailable", {
+                      amount: money(fromBal, preferredCurrency, locale),
+                    })}
+              </p>
             </label>
+
+            {transferValue > 0 && !transferOver ? (
+              <div className="rounded-2xl bg-[var(--panel-soft)] px-3.5 py-3 ring-1 ring-[var(--input-border)]">
+                <p className="text-[11px] font-medium text-[var(--muted)]">
+                  {t("transferAfterMove")}
+                </p>
+                <div className="mt-2 space-y-2">
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="font-semibold">
+                      {walletIcon(fromWallet)} {walletLabel(fromWallet)}
+                    </span>
+                    <span className="tabular-nums text-[var(--muted)]">
+                      <Money
+                        amount={fromBal}
+                        currency={preferredCurrency}
+                        locale={locale}
+                      />
+                      <span className="mx-1.5 opacity-50">→</span>
+                      <span className="font-semibold text-[var(--foreground)]">
+                        <Money
+                          amount={afterFrom}
+                          currency={preferredCurrency}
+                          locale={locale}
+                        />
+                      </span>
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3 text-sm">
+                    <span className="font-semibold">
+                      {walletIcon(toWallet)} {walletLabel(toWallet)}
+                    </span>
+                    <span className="tabular-nums text-[var(--muted)]">
+                      <Money
+                        amount={toBal}
+                        currency={preferredCurrency}
+                        locale={locale}
+                      />
+                      <span className="mx-1.5 opacity-50">→</span>
+                      <span className="font-semibold text-[var(--foreground)]">
+                        <Money
+                          amount={afterTo}
+                          currency={preferredCurrency}
+                          locale={locale}
+                        />
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </section>
         ) : null}
 
@@ -1129,19 +1243,66 @@ function AddForm() {
               ) : null}
 
               {transferMode ? (
-                <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-3 ring-1 ring-[var(--input-border)]">
-                  <p className="text-[11px] font-medium text-[var(--muted)]">
-                    {t("addConfirmMove")}
-                  </p>
-                  <p className="mt-1 text-sm font-bold leading-snug">
-                    {fromWallet && isSavingsWallet(fromWallet)
-                      ? "💰 " + t("savingsWallet")
-                      : "💵 " + t("currentWallet")}
-                    <span className="mx-2 opacity-50">→</span>
-                    {toWallet && isSavingsWallet(toWallet)
-                      ? "💰 " + t("savingsWallet")
-                      : "💵 " + t("currentWallet")}
-                  </p>
+                <div className="space-y-2">
+                  <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-3 ring-1 ring-[var(--input-border)]">
+                    <p className="text-[11px] font-medium text-[var(--muted)]">
+                      {t("addConfirmMove")}
+                    </p>
+                    <p className="mt-1 text-sm font-bold leading-snug">
+                      {walletIcon(fromWallet)} {walletLabel(fromWallet)}
+                      <span className="mx-2 opacity-50">→</span>
+                      {walletIcon(toWallet)} {walletLabel(toWallet)}
+                    </p>
+                  </div>
+                  {transferValue > 0 ? (
+                    <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-3 ring-1 ring-[var(--input-border)]">
+                      <p className="text-[11px] font-medium text-[var(--muted)]">
+                        {t("transferAfterMove")}
+                      </p>
+                      <div className="mt-2 space-y-2 text-sm">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-semibold">
+                            {walletIcon(fromWallet)} {walletLabel(fromWallet)}
+                          </span>
+                          <span className="tabular-nums text-[var(--muted)]">
+                            <Money
+                              amount={fromBal}
+                              currency={preferredCurrency}
+                              locale={locale}
+                            />
+                            <span className="mx-1.5 opacity-50">→</span>
+                            <span className="font-semibold text-[var(--foreground)]">
+                              <Money
+                                amount={afterFrom}
+                                currency={preferredCurrency}
+                                locale={locale}
+                              />
+                            </span>
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-semibold">
+                            {walletIcon(toWallet)} {walletLabel(toWallet)}
+                          </span>
+                          <span className="tabular-nums text-[var(--muted)]">
+                            <Money
+                              amount={toBal}
+                              currency={preferredCurrency}
+                              locale={locale}
+                            />
+                            <span className="mx-1.5 opacity-50">→</span>
+                            <span className="font-semibold text-[var(--foreground)]">
+                              <Money
+                                amount={afterTo}
+                                currency={preferredCurrency}
+                                locale={locale}
+                              />
+                            </span>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 
