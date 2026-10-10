@@ -8,6 +8,7 @@ export type UiPrefs = {
 };
 
 export const UI_PREFS_KEY = "fb_ui_prefs";
+export const UI_PREFS_EVENT = "fb-ui-prefs";
 
 export const DEFAULT_UI_PREFS: UiPrefs = {
   hideBalances: false,
@@ -39,6 +40,11 @@ export function writeUiPrefs(prefs: UiPrefs) {
     /* ignore */
   }
   applyUiPrefs(prefs);
+  try {
+    window.dispatchEvent(new CustomEvent(UI_PREFS_EVENT, { detail: prefs }));
+  } catch {
+    /* ignore */
+  }
 }
 
 export function applyUiPrefs(prefs: UiPrefs) {
@@ -53,4 +59,9 @@ export function patchUiPrefs(patch: Partial<UiPrefs>): UiPrefs {
   const next = { ...readUiPrefs(), ...patch };
   writeUiPrefs(next);
   return next;
+}
+
+/** Default money visibility from the hide-balances preference. */
+export function moneyVisibleFromPrefs(prefs: UiPrefs = readUiPrefs()) {
+  return !prefs.hideBalances;
 }

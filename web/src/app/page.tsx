@@ -21,7 +21,7 @@ import {
   isSavingsWallet,
   sortCashWallets,
 } from "@/lib/wallets";
-import { readUiPrefs } from "@/lib/uiPrefs";
+import { useMoneyVisible } from "@/hooks/useUiPrefs";
 import {
   MonthSoftLimitCard,
   type MonthSoftLimitStatus,
@@ -152,14 +152,7 @@ export default function HomePage() {
   const [flash, setFlash] = useState("");
   const [offlineMode, setOfflineMode] = useState(false);
   const [busyEdit, setBusyEdit] = useState(false);
-  const [personalMoneyVisible, setPersonalMoneyVisible] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return !readUiPrefs().hideBalances;
-  });
-
-  useEffect(() => {
-    setPersonalMoneyVisible(!readUiPrefs().hideBalances);
-  }, []);
+  const [personalMoneyVisible, setPersonalMoneyVisible] = useMoneyVisible();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -299,16 +292,6 @@ export default function HomePage() {
       cancelled = true;
     };
   }, [active?.householdId, active?.kind, cal.monthKey]);
-
-  useEffect(() => {
-    setPersonalMoneyVisible(false);
-  }, [active?.householdId, active?.kind]);
-
-  useEffect(() => {
-    if (!offlineMode) return;
-    // Offline: show last-known balances unless the user prefers them hidden.
-    setPersonalMoneyVisible(!readUiPrefs().hideBalances);
-  }, [offlineMode]);
 
   useEffect(() => {
     if (!personal?.householdId || active?.kind !== "HOUSE") {

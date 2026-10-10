@@ -1,22 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useI18n } from "@/components/I18nProvider";
 import {
   PrefToggle,
   SettingsCard,
   SettingsPage,
 } from "@/components/settings/SettingsChrome";
-import {
-  patchUiPrefs,
-  readUiPrefs,
-  type UiPrefs,
-} from "@/lib/uiPrefs";
+import { useUiPrefs } from "@/hooks/useUiPrefs";
+import { patchUiPrefs, type UiPrefs } from "@/lib/uiPrefs";
 
 export default function PrivacySettingsPage() {
   const { t } = useI18n();
-  const [uiPrefs, setUiPrefs] = useState<UiPrefs>(() => readUiPrefs());
+  const prefs = useUiPrefs();
+  const [uiPrefs, setUiPrefs] = useState<UiPrefs>(prefs);
   const [saved, setSaved] = useState("");
+
+  useEffect(() => {
+    setUiPrefs(prefs);
+  }, [prefs]);
 
   function onUiPref<K extends keyof UiPrefs>(key: K, value: UiPrefs[K]) {
     const next = patchUiPrefs({ [key]: value });

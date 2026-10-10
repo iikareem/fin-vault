@@ -16,7 +16,7 @@ import {
   isSavingsWallet,
   sortCashWallets,
 } from "@/lib/wallets";
-import { readUiPrefs } from "@/lib/uiPrefs";
+import { useMoneyVisible } from "@/hooks/useUiPrefs";
 import { fill } from "@/lib/i18n";
 
 type Account = { id: string; name: string; type?: string; balance: number };
@@ -99,9 +99,7 @@ export default function NetPage() {
   const [goals, setGoals] = useState<GoalsHome | null>(null);
   const [error, setError] = useState("");
   const [ready, setReady] = useState(false);
-  const [moneyVisible, setMoneyVisible] = useState(
-    () => !readUiPrefs().hideBalances,
-  );
+  const [moneyVisible, setMoneyVisible] = useMoneyVisible();
 
   useEffect(() => {
     if (loading) return;

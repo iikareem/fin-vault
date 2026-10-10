@@ -10,7 +10,7 @@ import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
 import { householdPath } from "@/lib/space";
 import { fill } from "@/lib/i18n";
-import { readUiPrefs } from "@/lib/uiPrefs";
+import { useMoneyVisible } from "@/hooks/useUiPrefs";
 
 type GoalsHome = {
   allocated: number;
@@ -85,18 +85,11 @@ export default function ToolsPage() {
   const [outside, setOutside] = useState<OutsideHome | null>(null);
   const [travels, setTravels] = useState<TravelsHome | null>(null);
   const [error, setError] = useState("");
-  const [moneyVisible, setMoneyVisible] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return !readUiPrefs().hideBalances;
-  });
+  const [moneyVisible, setMoneyVisible] = useMoneyVisible();
 
   useEffect(() => {
     setKind("PERSONAL");
   }, [setKind]);
-
-  useEffect(() => {
-    setMoneyVisible(!readUiPrefs().hideBalances);
-  }, []);
 
   useEffect(() => {
     if (!hid) return;

@@ -496,6 +496,16 @@ html[data-compact] .field {
   padding-bottom: 0.55rem;
 }
 
+html[data-compact] .page-shell {
+  padding-top: 0.75rem;
+  padding-bottom: 5.25rem;
+}
+
+html[data-compact] .chip {
+  min-height: 2.25rem;
+  padding: 0.3rem 0.75rem;
+}
+
 html {
   /* Solid only — background-image on html/body makes iOS frost the status bar. */
   background-color: var(--background);
