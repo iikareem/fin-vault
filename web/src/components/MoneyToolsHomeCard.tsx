@@ -152,7 +152,7 @@ export function MoneyToolsHomeCard({
             ? (
                 <PrivateMoney
                   amount={gold.totalValue}
-                  currency={currency}
+                  currency="EGP"
                   locale={locale}
                   visible={moneyVisible}
                 />

@@ -225,6 +225,8 @@ export default function ToolsPage() {
         title: t("navGold"),
         hint: goldHint,
         amount: gold?.totalValue,
+        // Gold price API is always EGP.
+        amountCurrency: "EGP",
         amountTone:
           gold?.totalGainLoss != null && gold.totalGainLoss < 0
             ? "warn"

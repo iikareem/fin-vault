@@ -70,7 +70,8 @@ function gainLossClass(value: number, onDark = false) {
 export default function GoldPage() {
   const { t, locale } = useI18n();
   const { personal, setKind, active } = useBooks();
-  const currency = personal?.currency ?? "EGP";
+  // Live gold quotes and holdings are always denominated in EGP.
+  const currency = "EGP";
   const [data, setData] = useState<GoldSummary | null>(null);
   const [showAdd, setShowAdd] = useState(false);
   const [grams, setGrams] = useState("");

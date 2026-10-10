@@ -39,6 +39,8 @@ type Slice = {
   color: string;
   soft: string;
   href?: string;
+  /** Override display currency (gold is always EGP). */
+  currency?: string;
 };
 
 function pctOf(part: number, whole: number) {
@@ -94,6 +96,8 @@ export default function NetPage() {
   const router = useRouter();
   const { personal, setKind, loading } = useBooks();
   const currency = personal?.currency ?? "EGP";
+  // Gold price API and holdings are always EGP, even if the book currency differs.
+  const goldCurrency = "EGP";
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [gold, setGold] = useState<GoldHome | null>(null);
   const [goals, setGoals] = useState<GoalsHome | null>(null);
@@ -161,6 +165,7 @@ export default function NetPage() {
         color: "#fbbf24",
         soft: "var(--soft-amber)",
         href: "/gold",
+        currency: goldCurrency,
       },
     ],
     [current, savings, goldValue, t],
@@ -320,7 +325,7 @@ export default function NetPage() {
                     {ready ? (
                       <PrivateMoney
                         amount={s.amount}
-                        currency={currency}
+                        currency={s.currency ?? currency}
                         locale={locale}
                         visible={moneyVisible}
                       />
@@ -452,7 +457,7 @@ export default function NetPage() {
               >
                 <PrivateMoney
                   amount={Math.abs(gold.totalGainLoss)}
-                  currency={currency}
+                  currency={goldCurrency}
                   locale={locale}
                   visible={moneyVisible}
                   extraSign={gold.totalGainLoss >= 0 ? "+" : "−"}
