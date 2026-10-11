@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthUser } from '../auth/auth-user';
@@ -11,7 +11,10 @@ export class AdminActivityController {
   constructor(private activity: AdminActivityService) {}
 
   @Get('members')
-  members(@CurrentUser() user: AuthUser) {
-    return this.activity.listMembers(user.id);
+  members(
+    @CurrentUser() user: AuthUser,
+    @Query('period') period?: string,
+  ) {
+    return this.activity.listMembers(user.id, period);
   }
 }
