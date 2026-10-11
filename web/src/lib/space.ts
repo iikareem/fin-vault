@@ -35,6 +35,8 @@ export async function loadSpace() {
     id: string;
     name: string;
     nameAr?: string;
+    email?: string;
+    isAppAdmin?: boolean;
     preferredCurrency?: string;
     theme?: string;
     budgetMonthStartDay?: number;
@@ -67,6 +69,8 @@ export async function loadSpace() {
     id: me.id,
     name: me.name,
     nameAr: me.nameAr ?? "",
+    email: me.email ?? "",
+    isAppAdmin: Boolean(me.isAppAdmin),
     preferredCurrency: me.preferredCurrency,
     theme: me.theme,
     budgetMonthStartDay: me.budgetMonthStartDay ?? 1,

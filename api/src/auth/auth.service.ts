@@ -12,6 +12,10 @@ import { ChangePasswordDto } from './dto/change-password.dto';
 import { UpdatePreferencesDto } from './dto/update-preferences.dto';
 import { normalizeLoginEmail, normalizeLoginPassword } from './login-text';
 import { seedPersonalSpace } from '../households/space-defaults';
+import { isAppAdminEmail } from '../admin/app-admin';
+
+/** Skip rewriting lastSeenAt when a ping landed within this window. */
+const SEEN_THROTTLE_MS = 2 * 60 * 1000;
 
 function normalizeAddType(value?: string | null): 'EXPENSE' | 'INCOME' {
   return value === 'INCOME' ? 'INCOME' : 'EXPENSE';
@@ -71,6 +75,7 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(password, 10);
     const nameAr = /[\u0600-\u06FF]/.test(name) ? name : '';
+    const now = new Date();
     const user = await this.prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
         data: {
@@ -90,6 +95,8 @@ export class AuthService {
           defaultAddType: 'EXPENSE',
           skipAddConfirm: false,
           locale: 'en',
+          lastLoginAt: now,
+          lastSeenAt: now,
         },
       });
       await seedPersonalSpace(tx, created.id, name);
@@ -104,6 +111,7 @@ export class AuthService {
         name: user.name,
         nameAr: user.nameAr,
         email: user.email,
+        isAppAdmin: isAppAdminEmail(user.email),
         ...userPrefs(user),
       },
     };
@@ -118,15 +126,21 @@ export class AuthService {
     if (!user) throw new UnauthorizedException('Wrong email or password');
     const ok = await bcrypt.compare(password, user.passwordHash);
     if (!ok) throw new UnauthorizedException('Wrong email or password');
-    const token = await this.issueToken(user.id);
+    const now = new Date();
+    const updated = await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: now, lastSeenAt: now },
+    });
+    const token = await this.issueToken(updated.id);
     return {
       token,
       user: {
-        id: user.id,
-        name: user.name,
-        nameAr: user.nameAr,
-        email: user.email,
-        ...userPrefs(user),
+        id: updated.id,
+        name: updated.name,
+        nameAr: updated.nameAr,
+        email: updated.email,
+        isAppAdmin: isAppAdminEmail(updated.email),
+        ...userPrefs(updated),
       },
     };
   }
@@ -227,11 +241,24 @@ export class AuthService {
       },
     });
     if (!user) throw new UnauthorizedException();
+
+    const now = new Date();
+    const stale =
+      !user.lastSeenAt ||
+      now.getTime() - user.lastSeenAt.getTime() >= SEEN_THROTTLE_MS;
+    if (stale) {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { lastSeenAt: now },
+      });
+    }
+
     return {
       id: user.id,
       name: user.name,
       nameAr: user.nameAr,
       email: user.email,
+      isAppAdmin: isAppAdminEmail(user.email),
       ...userPrefs(user),
       spaces: user.memberships.map((m) => ({
         householdId: m.householdId,

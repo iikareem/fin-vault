@@ -135,6 +135,10 @@ model User {
   skipAddConfirm      Boolean         @default(false)
   /** UI language: en | ar. */
   locale              String          @default("en")
+  /** Last successful password login. */
+  lastLoginAt         DateTime?
+  /** Last authenticated app ping (throttled on /auth/me). */
+  lastSeenAt          DateTime?
   createdAt           DateTime        @default(now())
   memberships       Membership[]
   txs               Transaction[]

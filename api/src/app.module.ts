@@ -20,6 +20,7 @@ import { SavingsGoalsModule } from './savings-goals/savings-goals.module';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
 import { TravelsModule } from './travels/travels.module';
 import { MonthSoftLimitsModule } from './month-soft-limits/month-soft-limits.module';
+import { AdminModule } from './admin/admin.module';
 import { HealthController } from './health.controller';
 
 @Module({
@@ -45,6 +46,7 @@ import { HealthController } from './health.controller';
     SubscriptionsModule,
     TravelsModule,
     MonthSoftLimitsModule,
+    AdminModule,
   ],
   controllers: [HealthController],
 })

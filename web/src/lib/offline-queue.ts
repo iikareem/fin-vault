@@ -37,6 +37,8 @@ export type SessionCache = {
   id: string;
   name: string;
   nameAr?: string;
+  email?: string;
+  isAppAdmin?: boolean;
   preferredCurrency?: string;
   theme?: string;
   budgetMonthStartDay?: number;

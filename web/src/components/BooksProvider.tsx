@@ -164,6 +164,10 @@ type BooksValue = {
   nameAr: string;
   /** Locale-aware display name for greetings and profile. */
   displayName: string;
+  /** Login email from /auth/me (empty until session loads). */
+  email: string;
+  /** App-owner flag from API — gates the activity dashboard. */
+  isAppAdmin: boolean;
   house: Space | null;
   personal: Space | null;
   active: Space | null;
@@ -262,6 +266,8 @@ export function BooksProvider({ children }: { children: ReactNode }) {
   const [userId, setUserId] = useState("");
   const [name, setName] = useState("");
   const [nameAr, setNameAr] = useState("");
+  const [email, setEmail] = useState("");
+  const [isAppAdmin, setIsAppAdmin] = useState(false);
   const [house, setHouse] = useState<Space | null>(null);
   const [personal, setPersonal] = useState<Space | null>(null);
   const [active, setActive] = useState<Space | null>(null);
@@ -311,6 +317,8 @@ export function BooksProvider({ children }: { children: ReactNode }) {
         id: string;
         name: string;
         nameAr?: string;
+        email?: string;
+        isAppAdmin?: boolean;
         preferredCurrency?: string;
         theme?: string;
         budgetMonthStartDay?: number;
@@ -332,6 +340,8 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       setUserId(me.id);
       setName(me.name);
       setNameAr(me.nameAr?.trim() || "");
+      setEmail(me.email?.trim() || "");
+      setIsAppAdmin(Boolean(me.isAppAdmin));
       const h = me.spaces.find((s) => s.kind === "HOUSE") ?? null;
       const p = me.spaces.find((s) => s.kind === "PERSONAL") ?? null;
       const only =
@@ -584,6 +594,8 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       name,
       nameAr,
       displayName,
+      email,
+      isAppAdmin,
       house,
       personal,
       active,
@@ -609,6 +621,8 @@ export function BooksProvider({ children }: { children: ReactNode }) {
       name,
       nameAr,
       displayName,
+      email,
+      isAppAdmin,
       house,
       personal,
       active,

@@ -49,8 +49,13 @@ function StatusDot({ tone }: { tone: Section["tone"] }) {
 
 export default function ProfilePage() {
   const { t, locale } = useI18n();
-  const { displayName, preferredCurrency, theme, budgetMonthStartDay } =
-    useBooks();
+  const {
+    displayName,
+    preferredCurrency,
+    theme,
+    budgetMonthStartDay,
+    isAppAdmin,
+  } = useBooks();
 
   const initial = (displayName?.trim()?.[0] || "?").toUpperCase();
   const currencyLabel =
@@ -108,6 +113,15 @@ export default function ProfilePage() {
       tone: "info",
     },
   ];
+
+  if (isAppAdmin) {
+    sections.splice(sections.length - 1, 0, {
+      href: "/profile/activity",
+      titleKey: "activitySection",
+      hintKey: "activitySectionHint",
+      tone: "good",
+    });
+  }
 
   return (
     <PageShell>

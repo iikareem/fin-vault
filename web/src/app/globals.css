@@ -1226,6 +1226,10 @@ html.dark .shadow-lg {
   }
 }
 
+.activity-card-in {
+  animation: cat-log-in 0.35s ease both;
+}
+
 /* Hide horizontal scrollbar on chip rails, keep scroll. */
 .chip-rail {
   display: flex;
