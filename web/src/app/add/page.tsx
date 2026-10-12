@@ -107,8 +107,8 @@ function AddForm() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [trackOnly, setTrackOnly] = useState(false);
-  /** When Current is short, move the shortfall from Savings in the same withdraw save. */
-  const [withdrawUseSavings, setWithdrawUseSavings] = useState(true);
+  /** Opt-in: move shortfall from Savings in the same withdraw save. Off until the user checks it. */
+  const [withdrawUseSavings, setWithdrawUseSavings] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [usingOfflineData, setUsingOfflineData] = useState(false);
 
@@ -300,7 +300,8 @@ function AddForm() {
 
   function withdrawShortfallFor(value: number) {
     const current = accounts.find(isCurrentWallet);
-    const currentBal = Math.max(0, current?.balance ?? 0);
+    // Keep negative Current in the math — need enough from Savings to cover the hole + withdraw.
+    const currentBal = current?.balance ?? 0;
     return Math.max(0, Math.round((value - currentBal) * 100) / 100);
   }
 
@@ -652,8 +653,7 @@ function AddForm() {
     withdrawMode && transferValue > 0
       ? Math.max(
           0,
-          Math.round((transferValue - Math.max(0, withdrawCurrentBal)) * 100) /
-            100,
+          Math.round((transferValue - withdrawCurrentBal) * 100) / 100,
         )
       : 0;
   const withdrawCanCoverFromSavings =
@@ -663,6 +663,11 @@ function AddForm() {
     withdrawMode &&
     withdrawSavingsBal > 0.001 &&
     (withdrawOver || withdrawCurrentBal <= 0.001);
+  const withdrawSaveBlocked =
+    withdrawMode &&
+    transferValue > 0 &&
+    transferValue > withdrawCurrentBal + 0.001 &&
+    !(withdrawUseSavings && withdrawCanCoverFromSavings);
   const intoCurrent = parseAmount(currentAmt);
   const intoSavings = parseAmount(savingsAmt);
   const confirmAmount = transferMode || withdrawMode || type !== "INCOME" || claimMode || coverMode
@@ -1005,7 +1010,7 @@ function AddForm() {
                   withdrawOver ? "text-red-700" : "text-[var(--muted)]"
                 }`}
               >
-                {withdrawOver
+                {withdrawSaveBlocked
                   ? t("cashWithdrawNotEnough")
                   : t("transferAvailable", {
                       amount: money(
@@ -1030,7 +1035,7 @@ function AddForm() {
                       })
                     : t("cashWithdrawSmartTip", {
                         current: money(
-                          Math.max(0, withdrawCurrentBal),
+                          withdrawCurrentBal,
                           preferredCurrency,
                           locale,
                         ),
@@ -1041,7 +1046,7 @@ function AddForm() {
                         ),
                       })}
                 </p>
-                {withdrawCanCoverFromSavings || withdrawShortfall <= 0.001 ? (
+                {withdrawCanCoverFromSavings ? (
                   <label className="mt-2.5 flex cursor-pointer items-start gap-2.5 rounded-xl bg-amber-100/80 px-3 py-2.5 ring-1 ring-amber-300/70 dark:bg-amber-950/50 dark:ring-amber-700/50">
                     <input
                       type="checkbox"
@@ -1052,14 +1057,7 @@ function AddForm() {
                     <span className="text-sm font-semibold leading-snug text-amber-950 dark:text-amber-100">
                       {t("cashWithdrawUseSavings", {
                         amount: money(
-                          withdrawShortfall > 0
-                            ? withdrawShortfall
-                            : Math.min(
-                                transferValue > 0
-                                  ? transferValue
-                                  : withdrawSavingsBal,
-                                withdrawSavingsBal,
-                              ),
+                          withdrawShortfall,
                           preferredCurrency,
                           locale,
                         ),
@@ -1304,7 +1302,7 @@ function AddForm() {
         {error ? <p className="text-sm text-red-700">{error}</p> : null}
 
         <button
-          disabled={busy}
+          disabled={busy || withdrawSaveBlocked}
           className="w-full rounded-3xl bg-emerald-800 px-4 py-3.5 text-base font-semibold text-white disabled:opacity-60"
         >
           {busy ? t("saving") : `✅ ${t("save")}`}
@@ -1560,7 +1558,7 @@ function AddForm() {
             <div className="flex gap-2 border-t border-[var(--surface-border)] px-4 py-3">
               <button
                 type="button"
-                disabled={busy}
+                disabled={busy || withdrawSaveBlocked}
                 onClick={() => confirmSave()}
                 className="flex min-h-12 flex-1 items-center justify-center rounded-3xl bg-emerald-800 text-base font-semibold text-white disabled:opacity-60"
               >
