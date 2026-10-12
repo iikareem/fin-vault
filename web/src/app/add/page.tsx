@@ -107,6 +107,8 @@ function AddForm() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [trackOnly, setTrackOnly] = useState(false);
+  /** When Current is short, move the shortfall from Savings in the same withdraw save. */
+  const [withdrawUseSavings, setWithdrawUseSavings] = useState(true);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [usingOfflineData, setUsingOfflineData] = useState(false);
 
@@ -296,6 +298,12 @@ function AddForm() {
     recentCategoryIds,
   ]);
 
+  function withdrawShortfallFor(value: number) {
+    const current = accounts.find(isCurrentWallet);
+    const currentBal = Math.max(0, current?.balance ?? 0);
+    return Math.max(0, Math.round((value - currentBal) * 100) / 100);
+  }
+
   function validateBeforeSave(): boolean {
     setError("");
     if (transferMode) {
@@ -313,11 +321,26 @@ function AddForm() {
       return true;
     }
     if (withdrawMode) {
-      if (!(parseAmount(amount) > 0)) {
+      const value = parseAmount(amount);
+      if (!(value > 0)) {
         setError(t("amountHint"));
         return false;
       }
-      return true;
+      const current = accounts.find(isCurrentWallet);
+      const savings = accounts.find(isSavingsWallet);
+      const currentBal = current?.balance ?? 0;
+      if (value <= currentBal + 0.001) return true;
+      const shortfall = withdrawShortfallFor(value);
+      const savingsBal = savings?.balance ?? 0;
+      if (withdrawUseSavings && shortfall > 0 && shortfall <= savingsBal + 0.001) {
+        return true;
+      }
+      if (withdrawUseSavings && shortfall > savingsBal + 0.001) {
+        setError(t("cashWithdrawNeedMoreSavings"));
+        return false;
+      }
+      setError(t("cashWithdrawNotEnough"));
+      return false;
     }
     if (type === "INCOME" && !claimMode && !coverMode) {
       const intoCurrent = parseAmount(currentAmt);
@@ -413,6 +436,26 @@ function AddForm() {
         }
       } else if (withdrawMode) {
         const value = parseAmount(amount);
+        const current = accounts.find(isCurrentWallet);
+        const savings = accounts.find(isSavingsWallet);
+        const shortfall = withdrawShortfallFor(value);
+        const toppedUp =
+          withdrawUseSavings &&
+          shortfall > 0.001 &&
+          !!current &&
+          !!savings;
+        if (toppedUp) {
+          await api(householdPath(space.householdId, "/accounts/transfer"), {
+            method: "POST",
+            body: JSON.stringify({
+              fromAccountId: savings.id,
+              toAccountId: current.id,
+              amount: shortfall,
+              occurredOn,
+              note: note.trim() || undefined,
+            }),
+          });
+        }
         await api(
           householdPath(space.householdId, "/accounts/cash-withdraw"),
           {
@@ -425,7 +468,10 @@ function AddForm() {
           },
         );
         if (typeof window !== "undefined") {
-          sessionStorage.setItem("fb_flash", "cashWithdrawSaved");
+          sessionStorage.setItem(
+            "fb_flash",
+            toppedUp ? "cashWithdrawWithTransferSaved" : "cashWithdrawSaved",
+          );
         }
       } else if (mode === "claim") {
         await api(householdPath(space.householdId, "/claims"), {
@@ -533,11 +579,16 @@ function AddForm() {
       setConfirmOpen(false);
       router.replace("/");
     } catch (e) {
-      setError(
-        e instanceof Error && e.message === t("offlineSpendOnly")
-          ? t("offlineSpendOnly")
-          : t("couldNotSave"),
-      );
+      const msg = e instanceof Error ? e.message : "";
+      if (msg === t("offlineSpendOnly")) {
+        setError(t("offlineSpendOnly"));
+      } else if (msg === "Not enough money in current") {
+        setError(t("cashWithdrawNotEnough"));
+      } else if (msg === "Not enough money in that wallet") {
+        setError(t("transferNotEnough"));
+      } else {
+        setError(t("couldNotSave"));
+      }
     } finally {
       setBusy(false);
     }
@@ -591,6 +642,27 @@ function AddForm() {
     transferMode && transferValue > 0 && transferValue > fromBal + 0.001;
   const afterFrom = fromBal - transferValue;
   const afterTo = toBal + transferValue;
+  const withdrawCurrentBal = currentWallet?.balance ?? 0;
+  const withdrawSavingsBal = savingsWallet?.balance ?? 0;
+  const withdrawOver =
+    withdrawMode &&
+    transferValue > 0 &&
+    transferValue > withdrawCurrentBal + 0.001;
+  const withdrawShortfall =
+    withdrawMode && transferValue > 0
+      ? Math.max(
+          0,
+          Math.round((transferValue - Math.max(0, withdrawCurrentBal)) * 100) /
+            100,
+        )
+      : 0;
+  const withdrawCanCoverFromSavings =
+    withdrawShortfall > 0.001 &&
+    withdrawShortfall <= withdrawSavingsBal + 0.001;
+  const withdrawNeedsTransfer =
+    withdrawMode &&
+    withdrawSavingsBal > 0.001 &&
+    (withdrawOver || withdrawCurrentBal <= 0.001);
   const intoCurrent = parseAmount(currentAmt);
   const intoSavings = parseAmount(savingsAmt);
   const confirmAmount = transferMode || withdrawMode || type !== "INCOME" || claimMode || coverMode
@@ -624,6 +696,7 @@ function AddForm() {
     setAccountId(toAccountId);
     setToAccountId(accountId);
   }
+
   const showWalletHighlight =
     personalPaid ||
     (!claimMode &&
@@ -913,20 +986,94 @@ function AddForm() {
         ) : null}
 
         {withdrawMode ? (
-          <label className="block">
-            <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
-              {t("amount")}
-            </span>
-            <input
-              inputMode="decimal"
-              dir="ltr"
-              className="amount-input field text-3xl font-bold"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0"
-              required
-            />
-          </label>
+          <div className="space-y-3">
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
+                {t("amount")}
+              </span>
+              <input
+                inputMode="decimal"
+                dir="ltr"
+                className="amount-input field text-3xl font-bold"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0"
+                required
+              />
+              <p
+                className={`mt-1.5 text-xs font-medium ${
+                  withdrawOver ? "text-red-700" : "text-[var(--muted)]"
+                }`}
+              >
+                {withdrawOver
+                  ? t("cashWithdrawNotEnough")
+                  : t("transferAvailable", {
+                      amount: money(
+                        withdrawCurrentBal,
+                        preferredCurrency,
+                        locale,
+                      ),
+                    })}
+              </p>
+            </label>
+
+            {withdrawNeedsTransfer ? (
+              <div className="rounded-2xl bg-amber-50 px-3.5 py-3 ring-1 ring-amber-300/80 dark:bg-amber-950/35 dark:ring-amber-700/60">
+                <p className="text-sm leading-snug text-amber-950 dark:text-amber-100">
+                  {withdrawCurrentBal <= 0.001
+                    ? t("cashWithdrawSmartTipEmpty", {
+                        savings: money(
+                          withdrawSavingsBal,
+                          preferredCurrency,
+                          locale,
+                        ),
+                      })
+                    : t("cashWithdrawSmartTip", {
+                        current: money(
+                          Math.max(0, withdrawCurrentBal),
+                          preferredCurrency,
+                          locale,
+                        ),
+                        savings: money(
+                          withdrawSavingsBal,
+                          preferredCurrency,
+                          locale,
+                        ),
+                      })}
+                </p>
+                {withdrawCanCoverFromSavings || withdrawShortfall <= 0.001 ? (
+                  <label className="mt-2.5 flex cursor-pointer items-start gap-2.5 rounded-xl bg-amber-100/80 px-3 py-2.5 ring-1 ring-amber-300/70 dark:bg-amber-950/50 dark:ring-amber-700/50">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-amber-700"
+                      checked={withdrawUseSavings}
+                      onChange={(e) => setWithdrawUseSavings(e.target.checked)}
+                    />
+                    <span className="text-sm font-semibold leading-snug text-amber-950 dark:text-amber-100">
+                      {t("cashWithdrawUseSavings", {
+                        amount: money(
+                          withdrawShortfall > 0
+                            ? withdrawShortfall
+                            : Math.min(
+                                transferValue > 0
+                                  ? transferValue
+                                  : withdrawSavingsBal,
+                                withdrawSavingsBal,
+                              ),
+                          preferredCurrency,
+                          locale,
+                        ),
+                      })}
+                    </span>
+                  </label>
+                ) : transferValue > 0 ? (
+                  <p className="mt-2 text-xs font-medium text-red-700 dark:text-red-300">
+                    {t("cashWithdrawNeedMoreSavings")}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
         ) : null}
 
         {!transferMode && !withdrawMode && (giveMode || coverMode) ? (
@@ -1312,16 +1459,34 @@ function AddForm() {
               ) : null}
 
               {withdrawMode ? (
-                <div className="rounded-2xl bg-emerald-100 px-3 py-3 ring-1 ring-emerald-300/80 dark:bg-emerald-950/40 dark:ring-emerald-700/60">
-                  <p className="text-[11px] font-medium text-emerald-900/70 dark:text-emerald-200/70">
-                    {t("addConfirmSource")}
-                  </p>
-                  <p className="mt-0.5 text-base font-bold text-emerald-950 dark:text-emerald-100">
-                    💵 {t("currentWallet")}
-                  </p>
-                  <p className="mt-1 text-xs leading-snug text-emerald-900/80 dark:text-emerald-200/80">
-                    {t("cashWithdrawHint")}
-                  </p>
+                <div className="space-y-2">
+                  <div className="rounded-2xl bg-emerald-100 px-3 py-3 ring-1 ring-emerald-300/80 dark:bg-emerald-950/40 dark:ring-emerald-700/60">
+                    <p className="text-[11px] font-medium text-emerald-900/70 dark:text-emerald-200/70">
+                      {t("addConfirmSource")}
+                    </p>
+                    <p className="mt-0.5 text-base font-bold text-emerald-950 dark:text-emerald-100">
+                      💵 {t("currentWallet")}
+                    </p>
+                    <p className="mt-1 text-xs leading-snug text-emerald-900/80 dark:text-emerald-200/80">
+                      {t("cashWithdrawHint")}
+                    </p>
+                  </div>
+                  {withdrawUseSavings &&
+                  withdrawCanCoverFromSavings &&
+                  withdrawShortfall > 0.001 ? (
+                    <div className="rounded-2xl bg-amber-50 px-3 py-3 ring-1 ring-amber-300/80 dark:bg-amber-950/35 dark:ring-amber-700/60">
+                      <p className="text-sm font-semibold text-amber-950 dark:text-amber-100">
+                        🔁{" "}
+                        {t("cashWithdrawUseSavings", {
+                          amount: money(
+                            withdrawShortfall,
+                            preferredCurrency,
+                            locale,
+                          ),
+                        })}
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 

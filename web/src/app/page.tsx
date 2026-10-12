@@ -183,6 +183,9 @@ export default function HomePage() {
     } else if (key === "cashWithdrawSaved") {
       sessionStorage.removeItem("fb_flash");
       setFlash(t("cashWithdrawSaved"));
+    } else if (key === "cashWithdrawWithTransferSaved") {
+      sessionStorage.removeItem("fb_flash");
+      setFlash(t("cashWithdrawWithTransferSaved"));
     } else if (key === "savedOffline") {
       sessionStorage.removeItem("fb_flash");
       setFlash(t("savedOffline"));

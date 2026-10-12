@@ -356,7 +356,16 @@ const ar = {
   cashWithdraw: "سحب نقدي",
   cashWithdrawHint:
     "يُخصم من الحساب الجاري مرة واحدة ويظهر في السجل. لا يُحتسب مصروفًا؛ عند الدفع نقدًا سجّله باستخدام «دون خصم».",
+  cashWithdrawNotEnough: "لا يوجد مبلغ كافٍ في الحساب الجاري",
+  cashWithdrawSmartTip:
+    "الحساب الجاري لا يكفي ({current}). المدخرات لديها {savings}.",
+  cashWithdrawSmartTipEmpty:
+    "الحساب الجاري فارغ. المدخرات لديها {savings}.",
+  cashWithdrawUseSavings:
+    "انقل {amount} من المدخرات إلى الجاري ثم اسحب في خطوة واحدة",
+  cashWithdrawNeedMoreSavings: "المدخرات لا تكفي لتغطية الفرق",
   cashWithdrawSaved: "تم السحب من الحساب الجاري",
+  cashWithdrawWithTransferSaved: "تم التحويل من المدخرات ثم السحب النقدي",
   cashWithdrawal: "سحب نقدي",
   currentHint: "للأموال اليومية: الطعام والفواتير والمصروف.",
   savingsHint: "أموال مخصّصة للادخار، وليست للمصروف اليومي.",
@@ -1543,7 +1552,16 @@ const en = {
   cashWithdraw: "Withdraw cash",
   cashWithdrawHint:
     "Takes from Current once and shows in history. Not counted as spend — real spend is when you pay with cash using Track only.",
+  cashWithdrawNotEnough: "Not enough money in Current",
+  cashWithdrawSmartTip:
+    "Current only has {current}. Savings has {savings}.",
+  cashWithdrawSmartTipEmpty:
+    "Current is empty. Savings has {savings}.",
+  cashWithdrawUseSavings:
+    "Move {amount} from Savings into Current, then withdraw — in one step",
+  cashWithdrawNeedMoreSavings: "Savings can’t cover the shortfall",
   cashWithdrawSaved: "Cash withdrawn from Current",
+  cashWithdrawWithTransferSaved: "Moved from Savings, then withdrew cash",
   cashWithdrawal: "Cash withdrawal",
   currentHint: "Everyday money: food, bills, allowance.",
   savingsHint: "Money set aside. Not for daily spending.",
