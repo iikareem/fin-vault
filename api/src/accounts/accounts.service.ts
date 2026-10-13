@@ -9,9 +9,17 @@ import { CreateAccountDto } from './dto/create-account.dto';
 import { TransferAccountsDto } from './dto/transfer-accounts.dto';
 import { CashWithdrawDto } from './dto/cash-withdraw.dto';
 import { nameArFor } from '../categories/category-labels';
+import {
+  budgetMonthRange,
+  clampBudgetStartDay,
+  dateOnlyUtc,
+  isoFromDbDate,
+} from '../common/calendar';
 
 export const WALLET_TRANSFER_CATEGORY = 'Wallet transfer';
 export const CASH_WITHDRAWAL_CATEGORY = 'Cash withdrawal';
+
+const PERIOD_KEY_RE = /^\d{4}-\d{2}$/;
 
 @Injectable()
 export class AccountsService {
@@ -266,5 +274,97 @@ export class AccountsService {
         },
       },
     });
+  }
+
+  private async resolveBudgetStartDay(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { budgetMonthStartDay: true },
+    });
+    return clampBudgetStartDay(user?.budgetMonthStartDay ?? 1);
+  }
+
+  /** Cash withdrawals in a payday budget period (personal books only). */
+  async listCashWithdrawals(
+    householdId: string,
+    kind: HouseholdKind,
+    userId: string,
+    periodKey?: string,
+  ) {
+    if (kind !== 'PERSONAL') {
+      throw new ForbiddenException('Cash withdraw is only for your own money');
+    }
+    const startDay = await this.resolveBudgetStartDay(userId);
+    if (periodKey && !PERIOD_KEY_RE.test(periodKey)) {
+      throw new BadRequestException('Pick a valid month (YYYY-MM)');
+    }
+    const range = budgetMonthRange(periodKey ?? new Date(), startDay);
+
+    const category = await this.prisma.category.findFirst({
+      where: {
+        householdId,
+        name: CASH_WITHDRAWAL_CATEGORY,
+        kind: 'EXPENSE',
+      },
+      select: { id: true },
+    });
+
+    if (!category) {
+      return {
+        periodKey: range.key,
+        periodFrom: range.from,
+        periodTo: range.to,
+        budgetMonthStartDay: startDay,
+        total: 0,
+        count: 0,
+        items: [] as {
+          id: string;
+          amount: number;
+          occurredOn: string;
+          note: string;
+          createdAt: string;
+        }[],
+      };
+    }
+
+    const rows = await this.prisma.transaction.findMany({
+      where: {
+        householdId,
+        categoryId: category.id,
+        type: 'EXPENSE',
+        occurredOn: {
+          gte: dateOnlyUtc(range.from),
+          lte: dateOnlyUtc(range.to),
+        },
+      },
+      orderBy: [{ occurredOn: 'desc' }, { createdAt: 'desc' }],
+      take: 500,
+      select: {
+        id: true,
+        amount: true,
+        occurredOn: true,
+        note: true,
+        createdAt: true,
+      },
+    });
+
+    const items = rows.map((row) => ({
+      id: row.id,
+      amount: Number(row.amount),
+      occurredOn: isoFromDbDate(row.occurredOn),
+      note: row.note,
+      createdAt: row.createdAt.toISOString(),
+    }));
+    const total = items.reduce((s, row) => s + row.amount, 0);
+
+    return {
+      periodKey: range.key,
+      periodFrom: range.from,
+      periodTo: range.to,
+      budgetMonthStartDay: startDay,
+      total,
+      count: items.length,
+      items,
+    };
   }
 }

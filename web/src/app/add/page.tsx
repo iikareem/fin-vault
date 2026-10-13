@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, Suspense, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api, money, parseAmount, todayISO, yesterdayISO } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
@@ -1071,6 +1072,13 @@ function AddForm() {
                 ) : null}
               </div>
             ) : null}
+
+            <Link
+              href="/cash-withdrawals"
+              className="inline-flex min-h-10 items-center text-sm font-semibold text-[var(--accent-b-text)]"
+            >
+              {t("cashWithdrawalsPastLink")} →
+            </Link>
           </div>
         ) : null}
 

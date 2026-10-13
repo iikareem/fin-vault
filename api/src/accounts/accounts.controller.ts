@@ -1,8 +1,16 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { AccountsService } from './accounts.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { HouseholdGuard } from '../households/household.guard';
 import { HouseholdAdminGuard } from '../households/household-admin.guard';
+import { PersonalKindGuard } from '../households/personal-kind.guard';
 import { CurrentMembership } from '../households/current-membership.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { AuthUser } from '../auth/auth-user';
@@ -19,6 +27,21 @@ export class AccountsController {
   @Get()
   list(@CurrentMembership() membership: MembershipContext) {
     return this.accounts.list(membership.householdId);
+  }
+
+  @Get('cash-withdrawals')
+  @UseGuards(PersonalKindGuard)
+  listCashWithdrawals(
+    @CurrentMembership() membership: MembershipContext,
+    @CurrentUser() user: AuthUser,
+    @Query('period') period?: string,
+  ) {
+    return this.accounts.listCashWithdrawals(
+      membership.householdId,
+      membership.kind,
+      user.id,
+      period,
+    );
   }
 
   @Post()
