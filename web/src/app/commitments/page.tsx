@@ -492,6 +492,22 @@ export default function SubscriptionsPage() {
     return t("subsStatusUpcoming");
   }
 
+  function dayChip(
+    value: string | null | undefined,
+    tone: "paid" | "due" | "overdue" | "default" = "default",
+  ) {
+    if (!value) return null;
+    return (
+      <ItemDate
+        value={value}
+        locale={locale}
+        todayLabel={t("today")}
+        yesterdayLabel={t("yesterday")}
+        tone={tone}
+      />
+    );
+  }
+
   function withPeriod(path: string) {
     const sep = path.includes("?") ? "&" : "?";
     return `${path}${sep}period=${encodeURIComponent(period)}&asOf=${encodeURIComponent(todayISO())}`;
@@ -1032,12 +1048,23 @@ export default function SubscriptionsPage() {
                           <p className="truncate text-[15px] font-semibold">
                             {sub.name}
                           </p>
-                          <p className="mt-0.5 text-xs text-[var(--muted)]">
-                            {statusLabel(sub.status)} ·{" "}
-                            {sub.kind === "INSTALLMENT" &&
-                            installmentProgress(sub)
-                              ? installmentProgress(sub)
-                              : kindLabel(sub.kind ?? "SUBSCRIPTION", t)}
+                          <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-[var(--muted)]">
+                            <span>{statusLabel(sub.status)}</span>
+                            {dayChip(
+                              sub.dueOn,
+                              sub.status === "overdue"
+                                ? "overdue"
+                                : sub.status === "due"
+                                  ? "due"
+                                  : "default",
+                            )}
+                            <span>
+                              ·{" "}
+                              {sub.kind === "INSTALLMENT" &&
+                              installmentProgress(sub)
+                                ? installmentProgress(sub)
+                                : kindLabel(sub.kind ?? "SUBSCRIPTION", t)}
+                            </span>
                           </p>
                         </div>
                         <p className="shrink-0 text-base font-bold tabular-nums text-amber-800 dark:text-amber-300">
@@ -1357,12 +1384,13 @@ export default function SubscriptionsPage() {
                         <p className="truncate text-[15px] font-semibold">
                           {sub.name}
                         </p>
-                        <p className="mt-0.5 text-xs text-[var(--muted)]">
-                          {t("subsStatusPaid")}
+                        <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-[var(--muted)]">
+                          <span>{t("subsStatusPaid")}</span>
+                          {dayChip(sub.payment?.paidOn, "paid")}
                           {sub.kind === "INSTALLMENT" &&
-                          installmentProgress(sub)
-                            ? ` · ${installmentProgress(sub)}`
-                            : ""}
+                          installmentProgress(sub) ? (
+                            <span>· {installmentProgress(sub)}</span>
+                          ) : null}
                         </p>
                       </div>
                       <p className="shrink-0 text-base font-bold tabular-nums text-emerald-800 dark:text-emerald-300">

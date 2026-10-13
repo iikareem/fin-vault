@@ -184,13 +184,31 @@ export function toDateKey(value: string | Date | null | undefined) {
   return m ? m[1] : "";
 }
 
-/** Friendly day + month label for list rows. */
+/** How close a calendar day is to “now” (local). */
+export function dateRelativeKind(
+  value: string | Date | null | undefined,
+): "today" | "yesterday" | "other" {
+  const key = toDateKey(value);
+  if (!key) return "other";
+  const today = isoLocal(new Date());
+  if (key === today) return "today";
+  const y = new Date();
+  y.setDate(y.getDate() - 1);
+  if (key === isoLocal(y)) return "yesterday";
+  return "other";
+}
+
+/** Friendly day + month label for list rows. Uses Today/Yesterday when labels are passed. */
 export function formatItemDate(
   value: string | Date | null | undefined,
   locale: string,
+  opts?: { todayLabel?: string; yesterdayLabel?: string },
 ) {
   const key = toDateKey(value);
   if (!key) return "";
+  const kind = dateRelativeKind(key);
+  if (kind === "today" && opts?.todayLabel) return opts.todayLabel;
+  if (kind === "yesterday" && opts?.yesterdayLabel) return opts.yesterdayLabel;
   const [y, m, d] = key.split("-").map(Number);
   const date = new Date(y, m - 1, d);
   const loc = locale === "ar" ? "ar" : "en";
