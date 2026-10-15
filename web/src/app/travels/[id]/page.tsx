@@ -68,6 +68,18 @@ type TravelDetail = {
   }[];
 };
 
+const DAY_MS = 86_400_000;
+
+function dayDistance(from: string, to: string) {
+  const [fromYear, fromMonth, fromDay] = from.split("-").map(Number);
+  const [toYear, toMonth, toDay] = to.split("-").map(Number);
+  return Math.round(
+    (Date.UTC(toYear, toMonth - 1, toDay) -
+      Date.UTC(fromYear, fromMonth - 1, fromDay)) /
+      DAY_MS,
+  );
+}
+
 export default function TravelDetailPage() {
   const { t, locale } = useI18n();
   const { personal, setKind } = useBooks();
@@ -335,6 +347,33 @@ export default function TravelDetailPage() {
     const to = formatItemDate(trip.endsOn, locale) || trip.endsOn;
     return trip.startsOn === trip.endsOn ? from : `${from} → ${to}`;
   })();
+  const today = todayISO();
+  const daysForBudget = Math.max(
+    1,
+    dayDistance(
+      trip.status === "upcoming" ? trip.startsOn : today,
+      trip.endsOn,
+    ) + 1,
+  );
+  const remainingBudget =
+    trip.softLimit != null ? Math.max(0, trip.remaining ?? 0) : null;
+  const dailyBudget =
+    remainingBudget != null && isOpen && !trip.overLimit
+      ? remainingBudget / daysForBudget
+      : null;
+  const timingLabel = (() => {
+    if (trip.status === "past") return t("travelsTripComplete");
+    if (trip.status === "upcoming") {
+      const days = Math.max(1, dayDistance(today, trip.startsOn));
+      return days === 1
+        ? t("travelsStartsTomorrow")
+        : fill(t("travelsStartsIn"), { n: String(days) });
+    }
+    const days = Math.max(0, dayDistance(today, trip.endsOn));
+    if (days === 0) return t("travelsLastDayToday");
+    if (days === 1) return t("travelsOneDayLeft");
+    return fill(t("travelsDaysLeft"), { n: String(days) });
+  })();
 
   function openSpend() {
     setShowSpend(true);
@@ -396,48 +435,93 @@ export default function TravelDetailPage() {
         </div>
       </header>
 
-      <section className="surface mb-3 rounded-[1.5rem] p-4">
-        <p className="text-xs font-medium text-[var(--muted)]">
-          {t("travelsSpent")}
-        </p>
-        <p className="mt-1 text-[clamp(1.5rem,7vw,2.25rem)] font-bold leading-tight tabular-nums">
-          <Money
-            amount={trip.spent}
-            currency={trip.currency}
-            locale={locale}
-          />
-          {trip.softLimit != null ? (
-            <span className="text-lg font-semibold text-[var(--muted)]">
-              {" "}
-              /{" "}
+      <section className="surface relative mb-3 overflow-hidden rounded-[1.75rem] p-4">
+        <div
+          className="pointer-events-none absolute -end-12 -top-14 h-36 w-36 rounded-full bg-[var(--accent-b-soft)] opacity-80"
+          aria-hidden
+        />
+        <div className="relative flex items-center justify-between gap-3">
+          <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--muted)]">
+            {t("travelsBudgetSnapshot")}
+          </p>
+          <span className="rounded-full bg-[var(--accent-b-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--accent-b-text)]">
+            {timingLabel}
+          </span>
+        </div>
+
+        <div
+          className={`relative mt-4 grid gap-2 ${
+            trip.softLimit != null ? "grid-cols-2" : "grid-cols-1"
+          }`}
+        >
+          <div className="rounded-2xl bg-[var(--panel-soft)] p-3">
+            <p className="text-xs font-medium text-[var(--muted)]">
+              {t("travelsSpent")}
+            </p>
+            <p className="mt-1 text-xl font-bold leading-tight tabular-nums">
               <Money
-                amount={trip.softLimit}
+                amount={trip.spent}
                 currency={trip.currency}
                 locale={locale}
               />
-            </span>
-          ) : null}
-        </p>
-        {trip.softLimit != null ? (
-          <div className="mt-3 space-y-1.5">
-            <LimitBar pct={trip.pct} over={trip.overLimit} />
-            <p
-              className={`text-xs font-semibold ${
-                trip.overLimit
-                  ? "text-amber-800 dark:text-amber-300"
-                  : "text-[var(--muted)]"
-              }`}
-            >
-              {trip.overLimit
-                ? t("travelsOverLimit")
-                : fill(t("travelsProgressHint"), {
-                    pct: String(Math.round(trip.pct ?? 0)),
-                  })}
             </p>
           </div>
-        ) : null}
-        <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-          <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-2">
+          {remainingBudget != null ? (
+            <div className="rounded-2xl bg-[var(--accent-b-soft)] p-3">
+              <p className="text-xs font-medium text-[var(--accent-b-text)] opacity-80">
+                {t("travelsRemaining")}
+              </p>
+              <p className="mt-1 text-xl font-bold leading-tight tabular-nums text-[var(--accent-b-text)]">
+                <Money
+                  amount={remainingBudget}
+                  currency={trip.currency}
+                  locale={locale}
+                />
+              </p>
+            </div>
+          ) : null}
+        </div>
+
+        {trip.softLimit != null ? (
+          <div className="relative mt-4 space-y-2">
+            <LimitBar pct={trip.pct} over={trip.overLimit} />
+            <div className="flex items-start justify-between gap-3 text-xs font-semibold">
+              <p
+                className={
+                  trip.overLimit
+                    ? "text-amber-800 dark:text-amber-300"
+                    : "text-[var(--muted)]"
+                }
+              >
+                {trip.overLimit
+                  ? t("travelsOverLimit")
+                  : fill(t("travelsProgressHint"), {
+                      pct: String(Math.round(trip.pct ?? 0)),
+                    })}
+              </p>
+              {dailyBudget != null ? (
+                <p className="shrink-0 text-end text-[var(--accent-b-text)]">
+                  {t("travelsDailyBudget")}
+                  <br />
+                  <span className="text-sm tabular-nums">
+                    <Money
+                      amount={dailyBudget}
+                      currency={trip.currency}
+                      locale={locale}
+                    />
+                  </span>
+                </p>
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          <p className="relative mt-3 text-xs leading-relaxed text-[var(--muted)]">
+            {t("travelsNoLimitInsight")}
+          </p>
+        )}
+
+        <div className="relative mt-4 grid grid-cols-2 gap-2 border-t border-[var(--chrome-edge)] pt-3 text-sm">
+          <div className="px-1">
             <p className="text-xs text-[var(--muted)]">{t("travelsFromCurrent")}</p>
             <p className="font-bold tabular-nums">
               <Money
@@ -447,7 +531,7 @@ export default function TravelDetailPage() {
               />
             </p>
           </div>
-          <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-2">
+          <div className="border-s border-[var(--chrome-edge)] px-3">
             <p className="text-xs text-[var(--muted)]">{t("travelsFromCash")}</p>
             <p className="font-bold tabular-nums">
               <Money
@@ -656,18 +740,41 @@ export default function TravelDetailPage() {
             {(trip.byCategory ?? []).map((c) => (
               <li
                 key={c.categoryId}
-                className="surface flex items-center justify-between rounded-[1.25rem] px-3.5 py-2.5"
+                className="surface rounded-[1.25rem] px-3.5 py-3"
               >
-                <span className="text-sm font-semibold">
-                  {categoryLabel(c, locale, t)}
-                </span>
-                <span className="text-sm font-bold tabular-nums">
-                  <Money
-                    amount={c.total}
-                    currency={trip.currency}
-                    locale={locale}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm"
+                      style={{ backgroundColor: `${c.color || "#0369a1"}18` }}
+                      aria-hidden
+                    >
+                      {c.emoji || "•"}
+                    </span>
+                    <span className="truncate text-sm font-semibold">
+                      {categoryLabel(c, locale, t)}
+                    </span>
+                  </div>
+                  <span className="shrink-0 text-sm font-bold tabular-nums">
+                    <Money
+                      amount={c.total}
+                      currency={trip.currency}
+                      locale={locale}
+                    />
+                  </span>
+                </div>
+                <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--panel-soft)]">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      backgroundColor: c.color || "#0369a1",
+                      width: `${Math.min(
+                        100,
+                        trip.spent > 0 ? (c.total / trip.spent) * 100 : 0,
+                      )}%`,
+                    }}
                   />
-                </span>
+                </div>
               </li>
             ))}
           </ul>

@@ -14,7 +14,6 @@ import { DateField } from "@/components/DateField";
 import { CURRENCY_OPTIONS } from "@/lib/currencies";
 import { fill } from "@/lib/i18n";
 import { formatItemDate } from "@/lib/calendar";
-import { LimitBar } from "@/components/LimitBar";
 
 type TravelCard = {
   id: string;
@@ -46,6 +45,18 @@ function tripRangeLabel(
   const to = formatItemDate(trip.endsOn, locale) || trip.endsOn;
   if (trip.startsOn === trip.endsOn) return from;
   return `${from} → ${to}`;
+}
+
+const DAY_MS = 86_400_000;
+
+function dayDistance(from: string, to: string) {
+  const [fromYear, fromMonth, fromDay] = from.split("-").map(Number);
+  const [toYear, toMonth, toDay] = to.split("-").map(Number);
+  return Math.round(
+    (Date.UTC(toYear, toMonth - 1, toDay) -
+      Date.UTC(fromYear, fromMonth - 1, fromDay)) /
+      DAY_MS,
+  );
 }
 
 export default function TravelsPage() {
@@ -84,6 +95,30 @@ export default function TravelsPage() {
 
   const openTrip = data?.open ?? data?.active ?? null;
   const canAdd = !openTrip;
+  const today = todayISO();
+  const openTripDays = openTrip
+    ? Math.max(
+        1,
+        dayDistance(
+          openTrip.status === "upcoming" ? openTrip.startsOn : today,
+          openTrip.endsOn,
+        ) + 1,
+      )
+    : 1;
+  const openTripTiming = openTrip
+    ? (() => {
+        if (openTrip.status === "upcoming") {
+          const days = Math.max(1, dayDistance(today, openTrip.startsOn));
+          return days === 1
+            ? t("travelsStartsTomorrow")
+            : fill(t("travelsStartsIn"), { n: String(days) });
+        }
+        const days = Math.max(0, dayDistance(today, openTrip.endsOn));
+        if (days === 0) return t("travelsLastDayToday");
+        if (days === 1) return t("travelsOneDayLeft");
+        return fill(t("travelsDaysLeft"), { n: String(days) });
+      })()
+    : "";
 
   async function onCreate(e: FormEvent) {
     e.preventDefault();
@@ -166,41 +201,107 @@ export default function TravelsPage() {
       {openTrip ? (
         <Link
           href={`/travels/${openTrip.id}`}
-          className="mb-4 block overflow-hidden rounded-[1.5rem] border border-[var(--surface-border)] bg-[var(--surface-bg)] p-4 shadow-[var(--surface-shadow)]"
+          className="group relative mb-4 block overflow-hidden rounded-[1.75rem] bg-[var(--wallet-b)] p-5 text-white shadow-[var(--surface-shadow)] transition active:scale-[0.99]"
         >
-          <div className="flex items-center justify-between gap-2">
-            <span className="rounded-full bg-sky-800 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
+          <div
+            className="pointer-events-none absolute -end-10 -top-10 h-36 w-36 rounded-full bg-white/10 blur-sm"
+            aria-hidden
+          />
+          <div className="relative flex items-center justify-between gap-2">
+            <span className="rounded-full bg-white/15 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-white ring-1 ring-white/20">
               {openTrip.status === "upcoming"
                 ? t("travelsUpcoming")
                 : t("travelsActive")}
             </span>
-            <span className="text-xs font-medium text-[var(--muted)]">
-              {tripRangeLabel(openTrip, locale)}
+            <span className="text-xs font-semibold text-white/75">
+              {openTripTiming}
             </span>
           </div>
-          <h2 className="mt-2.5 text-lg font-bold text-[var(--foreground)]">
-            {openTrip.name}
-          </h2>
-          <p className="mt-1 text-xl font-bold tabular-nums">
-            <Money
-              amount={openTrip.spent}
-              currency={openTrip.currency}
-              locale={locale}
-            />
-            {openTrip.softLimit != null ? (
-              <span className="text-base font-semibold text-[var(--muted)]">
-                {" "}
-                /{" "}
+          <div className="relative mt-4">
+            <h2 className="text-[1.35rem] font-bold leading-tight">
+              {openTrip.name}
+            </h2>
+            <p className="mt-1 text-xs font-medium text-white/70">
+              {tripRangeLabel(openTrip, locale)}
+            </p>
+          </div>
+          <div className="relative mt-5 grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">
+                {t("travelsSpent")}
+              </p>
+              <p className="mt-0.5 text-xl font-bold tabular-nums">
                 <Money
-                  amount={openTrip.softLimit}
+                  amount={openTrip.spent}
                   currency={openTrip.currency}
                   locale={locale}
                 />
-              </span>
-            ) : null}
-          </p>
-          <div className="mt-3">
-            <LimitBar pct={openTrip.pct} over={openTrip.overLimit} />
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-white/60">
+                {openTrip.softLimit != null
+                  ? t("travelsRemaining")
+                  : t("travelsDailyBudget")}
+              </p>
+              <p className="mt-0.5 text-xl font-bold tabular-nums">
+                {openTrip.softLimit != null ? (
+                  <Money
+                    amount={Math.max(0, openTrip.remaining ?? 0)}
+                    currency={openTrip.currency}
+                    locale={locale}
+                  />
+                ) : (
+                  "—"
+                )}
+              </p>
+            </div>
+          </div>
+          {openTrip.softLimit != null ? (
+            <div className="relative mt-4">
+              <div className="h-2 overflow-hidden rounded-full bg-white/15">
+                <div
+                  className={`h-full rounded-full transition-[width] duration-500 ${
+                    openTrip.overLimit ? "bg-amber-300" : "bg-white"
+                  }`}
+                  style={{
+                    width: `${Math.min(100, Math.max(0, openTrip.pct ?? 0))}%`,
+                  }}
+                />
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-3 text-xs">
+                <span className="font-medium text-white/70">
+                  {openTrip.overLimit
+                    ? t("travelsHomeOverLimit")
+                    : fill(t("travelsProgressHint"), {
+                        pct: String(Math.round(openTrip.pct ?? 0)),
+                      })}
+                </span>
+                {!openTrip.overLimit ? (
+                  <span className="font-semibold text-white/90">
+                    {t("travelsDailyBudget")}:{" "}
+                    <Money
+                      amount={Math.max(0, openTrip.remaining ?? 0) / openTripDays}
+                      currency={openTrip.currency}
+                      locale={locale}
+                    />
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          ) : (
+            <p className="relative mt-4 text-xs leading-relaxed text-white/70">
+              {t("travelsNoLimitInsight")}
+            </p>
+          )}
+          <div className="relative mt-4 flex items-center justify-between border-t border-white/15 pt-3 text-sm font-semibold">
+            <span>{t("travelsViewTrip")}</span>
+            <span
+              className="transition-transform group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5"
+              aria-hidden
+            >
+              →
+            </span>
           </div>
         </Link>
       ) : null}
