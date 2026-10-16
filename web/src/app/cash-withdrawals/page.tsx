@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { fill } from "@/lib/i18n";
 import { BottomNav } from "@/components/BottomNav";
@@ -15,6 +16,10 @@ import { ItemDate } from "@/components/ItemDate";
 import { useCalendarClock } from "@/hooks/useCalendarClock";
 import { budgetMonthRange, shiftBudgetMonthKey } from "@/lib/calendar";
 import { CashWithdrawalChart } from "@/components/CashWithdrawalChart";
+
+function isPeriodKey(value: string | null): value is string {
+  return Boolean(value && /^\d{4}-\d{2}$/.test(value));
+}
 
 type WithdrawalItem = {
   id: string;
@@ -153,12 +158,24 @@ function PeriodMonthPicker({
 }
 
 export default function CashWithdrawalsPage() {
+  return (
+    <Suspense fallback={null}>
+      <CashWithdrawalsInner />
+    </Suspense>
+  );
+}
+
+function CashWithdrawalsInner() {
   const { t, locale } = useI18n();
   const { personal, setKind, budgetMonthStartDay } = useBooks();
+  const search = useSearchParams();
   const currency = personal?.currency ?? "EGP";
   const cal = useCalendarClock(budgetMonthStartDay);
+  const periodFromUrl = search.get("period");
 
-  const [period, setPeriod] = useState(cal.monthKey);
+  const [period, setPeriod] = useState(() =>
+    isPeriodKey(periodFromUrl) ? periodFromUrl : cal.monthKey,
+  );
   const [data, setData] = useState<WithdrawalsSummary | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -169,8 +186,8 @@ export default function CashWithdrawalsPage() {
   );
 
   useEffect(() => {
-    setPeriod(cal.monthKey);
-  }, [budgetMonthStartDay, personal?.householdId]);
+    setPeriod(isPeriodKey(periodFromUrl) ? periodFromUrl : cal.monthKey);
+  }, [budgetMonthStartDay, personal?.householdId, periodFromUrl]);
 
   useEffect(() => {
     if (!personal) return;

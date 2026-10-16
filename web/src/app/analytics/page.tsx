@@ -1290,7 +1290,7 @@ export default function AnalyticsPage() {
               </p>
             </div>
             <Link
-              href="/cash-withdrawals"
+              href={`/cash-withdrawals?period=${encodeURIComponent(monthKey)}`}
               className="shrink-0 text-xs font-semibold text-[var(--accent-b-text)]"
             >
               {t("cashWithdrawalsPastLink")} →
