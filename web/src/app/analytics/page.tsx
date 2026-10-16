@@ -24,6 +24,10 @@ import {
   isLikelyOffline,
   isOfflineNetworkError,
 } from "@/lib/offline-queue";
+import {
+  CashWithdrawalChart,
+  type CashWithdrawalChartItem,
+} from "@/components/CashWithdrawalChart";
 
 type Period = "day" | "week" | "month" | "year" | "range";
 type DayRow = { day: string; income: number; expense: number };
@@ -53,6 +57,13 @@ type SavingsMonth = {
   expense: number;
   saved: number;
   remaining: number;
+};
+type CashWithdrawalsSummary = {
+  periodFrom: string;
+  periodTo: string;
+  total: number;
+  count: number;
+  items: CashWithdrawalChartItem[];
 };
 
 function pad(n: number) {
@@ -296,6 +307,8 @@ export default function AnalyticsPage() {
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [savingsMonths, setSavingsMonths] = useState<SavingsMonth[]>([]);
   const [savingsOpening, setSavingsOpening] = useState(0);
+  const [cashWithdrawals, setCashWithdrawals] =
+    useState<CashWithdrawalsSummary | null>(null);
   const [selectedBarKey, setSelectedBarKey] = useState<string | null>(null);
   const [error, setError] = useState("");
   const currency = active?.currency ?? "EGP";
@@ -308,6 +321,7 @@ export default function AnalyticsPage() {
     }
     return rangeFor(period, cursor, startDay);
   }, [period, cursor, rangeFrom, rangeTo, startDay]);
+  const monthKey = budgetMonthKey(cursor, startDay);
 
   const chartByMonth = period === "year" || (period === "range" && daysBetween(from, to) > 62);
 
@@ -396,6 +410,31 @@ export default function AnalyticsPage() {
       cancelled = true;
     };
   }, [active?.householdId, period, cursor, startDay]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!active || active.kind !== "PERSONAL" || period !== "month") {
+      setCashWithdrawals(null);
+      return;
+    }
+
+    api<CashWithdrawalsSummary>(
+      householdPath(
+        active.householdId,
+        `/accounts/cash-withdrawals?period=${encodeURIComponent(monthKey)}`,
+      ),
+    )
+      .then((result) => {
+        if (!cancelled) setCashWithdrawals(result);
+      })
+      .catch(() => {
+        if (!cancelled) setCashWithdrawals(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [active?.householdId, active?.kind, period, monthKey]);
 
   function catKey(c: CatRow) {
     return c.categoryId ?? c.name;
@@ -663,7 +702,6 @@ export default function AnalyticsPage() {
     activeWeek != null &&
     todayIso >= activeWeek.from &&
     todayIso <= activeWeek.to;
-  const monthKey = budgetMonthKey(cursor, startDay);
   const yearKey = String(cursor.getFullYear());
   const yearSavings = savingsMonths.filter((m) => m.month.startsWith(yearKey));
   const prior = [...savingsMonths].filter((m) => m.month < monthKey).at(-1);
@@ -1235,6 +1273,62 @@ export default function AnalyticsPage() {
                 </div>
               </>
             )}
+        </section>
+      ) : null}
+
+      {active?.kind === "PERSONAL" &&
+      period === "month" &&
+      cashWithdrawals ? (
+        <section className="surface mt-4 overflow-hidden rounded-[1.5rem] p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-[var(--foreground)]">
+                {t("cashWithdrawalsTitle")}
+              </h2>
+              <p className="mt-0.5 text-xs leading-snug text-[var(--muted)]">
+                {t("cashWithdrawalsDailyChart")}
+              </p>
+            </div>
+            <Link
+              href="/cash-withdrawals"
+              className="shrink-0 text-xs font-semibold text-[var(--accent-b-text)]"
+            >
+              {t("cashWithdrawalsPastLink")} →
+            </Link>
+          </div>
+
+          <div className="mt-4 flex items-end justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
+                {t("cashWithdrawalsPeriodTotal")}
+              </p>
+              <p className="mt-1 text-2xl font-bold tabular-nums text-[var(--foreground)]">
+                <Money
+                  amount={cashWithdrawals.total}
+                  currency={currency}
+                  locale={locale}
+                />
+              </p>
+            </div>
+            <p className="rounded-full bg-[var(--accent-b-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-b-text)]">
+              {cashWithdrawals.count === 1
+                ? t("cashWithdrawalsCountOne")
+                : fill(t("cashWithdrawalsCount"), {
+                    n: String(cashWithdrawals.count),
+                  })}
+            </p>
+          </div>
+
+          <div className="mt-4 rounded-2xl bg-[var(--panel-soft)] px-2.5 pb-2.5 pt-4">
+            <CashWithdrawalChart
+              items={cashWithdrawals.items}
+              periodFrom={cashWithdrawals.periodFrom}
+              periodTo={cashWithdrawals.periodTo}
+              currency={currency}
+              locale={locale}
+              label={t("cashWithdrawalsDailyChart")}
+            />
+          </div>
         </section>
       ) : null}
 

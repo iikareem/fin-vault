@@ -27,11 +27,8 @@ import {
   type MonthSoftLimitStatus,
 } from "@/components/MonthSoftLimitCard";
 import { MoneyToolsHomeCard } from "@/components/MoneyToolsHomeCard";
+import { ActiveTravelHomeCard } from "@/components/ActiveTravelHomeCard";
 import { BottomSheet } from "@/components/BottomSheet";
-import {
-  CashWithdrawalChart,
-  type CashWithdrawalChartItem,
-} from "@/components/CashWithdrawalChart";
 import {
   isLikelyOffline,
   isOfflineNetworkError,
@@ -81,15 +78,6 @@ type SubsHome = {
     dueOn: string;
     status: "paid" | "due" | "upcoming" | "overdue" | "scheduled";
   }[];
-};
-
-type CashWithdrawalsHome = {
-  periodKey: string;
-  periodFrom: string;
-  periodTo: string;
-  total: number;
-  count: number;
-  items: CashWithdrawalChartItem[];
 };
 
 type Tx = {
@@ -152,8 +140,6 @@ export default function HomePage() {
   const [txs, setTxs] = useState<Tx[]>([]);
   const [charity, setCharity] = useState<CharityMonth | null>(null);
   const [subs, setSubs] = useState<SubsHome | null>(null);
-  const [cashWithdrawals, setCashWithdrawals] =
-    useState<CashWithdrawalsHome | null>(null);
   const [claims, setClaims] = useState<Claim[]>([]);
   const [covers, setCovers] = useState<Cover[]>([]);
   const [payingId, setPayingId] = useState("");
@@ -255,12 +241,6 @@ export default function HomePage() {
       setCovers([]);
       jobs.push(
         api<SubsHome>(householdPath(active.householdId, "/subscriptions")),
-        api<CashWithdrawalsHome>(
-          householdPath(
-            active.householdId,
-            `/accounts/cash-withdrawals?period=${encodeURIComponent(month)}`,
-          ),
-        ),
       );
     }
     Promise.all(jobs)
@@ -300,10 +280,8 @@ export default function HomePage() {
           setClaims(sortByOccurredOnDesc(result[5] as Claim[]));
           setCovers(sortByOccurredOnDesc(result[6] as Cover[]));
           setSubs(null);
-          setCashWithdrawals(null);
         } else {
           setSubs(result[4] as SubsHome);
-          setCashWithdrawals(result[5] as CashWithdrawalsHome);
         }
       })
       .catch(async (e) => {
@@ -314,7 +292,6 @@ export default function HomePage() {
           setTxs([]);
           setSummary(null);
           setSubs(null);
-          setCashWithdrawals(null);
           const snap = await loadHomeSnapshot(active.householdId);
           if (snap) {
             setAccounts((snap.accounts as Account[]) ?? []);
@@ -971,47 +948,14 @@ export default function HomePage() {
               </span>
             </Link>
           </div>
-          <Link
-            href="/cash-withdrawals"
-            className="block rounded-[1.35rem] bg-[var(--surface-bg)] p-4 ring-1 ring-[var(--surface-border)] transition hover:opacity-95 active:scale-[0.99]"
-          >
-            <span className="flex items-start justify-between gap-3">
-              <span className="min-w-0 text-start">
-                <span className="block text-sm font-semibold text-[var(--foreground)]">
-                  {t("cashWithdrawalsTitle")}
-                </span>
-                <span className="mt-0.5 block text-[11px] font-medium leading-snug text-[var(--muted)]">
-                  {cashWithdrawals && cashWithdrawals.total > 0.001
-                    ? fill(t("cashWithdrawalsHomeTotal"), {
-                        amount: moneyVisible
-                          ? money(cashWithdrawals.total, currency, locale)
-                          : "••••",
-                      })
-                    : cashWithdrawals
-                      ? t("cashWithdrawalsHomeEmpty")
-                      : t("cashWithdrawalsHomeHint")}
-                </span>
-              </span>
-              <span className="shrink-0 text-sm text-[var(--muted)]" aria-hidden>
-                →
-              </span>
-            </span>
-            {cashWithdrawals ? (
-              <span className="mt-3 block rounded-xl bg-[var(--panel-soft)] px-2.5 pb-2 pt-3">
-                <CashWithdrawalChart
-                  items={cashWithdrawals.items}
-                  periodFrom={cashWithdrawals.periodFrom}
-                  periodTo={cashWithdrawals.periodTo}
-                  currency={currency}
-                  locale={locale}
-                  label={t("cashWithdrawalsDailyChart")}
-                  hidden={!moneyVisible}
-                  compact
-                />
-              </span>
-            ) : null}
-          </Link>
         </div>
+      ) : null}
+
+      {!offlineMode && !isHouse && active ? (
+        <ActiveTravelHomeCard
+          householdId={active.householdId}
+          moneyVisible={moneyVisible}
+        />
       ) : null}
 
       {summary &&

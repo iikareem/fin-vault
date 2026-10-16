@@ -30,18 +30,6 @@ type OutsideHome = {
   youOwe?: number;
   open: { id: string }[];
 };
-type TravelHomeCard = {
-  id: string;
-  name: string;
-  currency: string;
-  spent: number;
-  pct: number | null;
-  overLimit: boolean;
-  status: "upcoming" | "active" | "past";
-};
-type TravelsHome = {
-  active: TravelHomeCard | null;
-};
 
 type ToolChip = {
   key: string;
@@ -70,7 +58,6 @@ export function MoneyToolsHomeCard({
   const [goals, setGoals] = useState<GoalsHome | null>(null);
   const [gold, setGold] = useState<GoldHome | null>(null);
   const [outside, setOutside] = useState<OutsideHome | null>(null);
-  const [travels, setTravels] = useState<TravelsHome | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -78,14 +65,12 @@ export function MoneyToolsHomeCard({
       api<GoalsHome>(householdPath(householdId, "/savings-goals")),
       api<GoldHome>(householdPath(householdId, "/gold")),
       api<OutsideHome>(householdPath(householdId, "/outside-loans")),
-      api<TravelsHome>(householdPath(householdId, "/travels/home")),
     ])
-      .then(([g, go, o, tr]) => {
+      .then(([g, go, o]) => {
         if (cancelled) return;
         setGoals(g);
         setGold(go);
         setOutside(o);
-        setTravels(tr);
       })
       .catch(() => {
         /* Keep the hub link even if snapshots fail. */
@@ -162,17 +147,6 @@ export function MoneyToolsHomeCard({
       });
     }
 
-    if (travels?.active?.overLimit) {
-      next.push({
-        key: "travel",
-        href: `/travels/${travels.active.id}`,
-        title: t("navTravels"),
-        detail: t("travelsHomeOverLimit"),
-        warn: true,
-        score: 95,
-      });
-    }
-
     const owedAmt = outside?.owedToYou ?? 0;
     const borrowAmt = outside?.youOwe ?? 0;
     if (owedAmt > 0.001 || borrowAmt > 0.001) {
@@ -188,7 +162,7 @@ export function MoneyToolsHomeCard({
     }
 
     return next.sort((a, b) => b.score - a.score).slice(0, 3);
-  }, [subs, goals, gold, outside, travels, currency, locale, moneyVisible, t]);
+  }, [subs, goals, gold, outside, currency, locale, moneyVisible, t]);
 
   return (
     <section className="mt-5">
