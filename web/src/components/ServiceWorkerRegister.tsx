@@ -2,7 +2,15 @@
 
 import { useEffect } from "react";
 
-const WARM = ["/", "/add"];
+const WARM = ["/", "/add", "/travels"];
+
+/** Ask the service worker to keep an authenticated page available offline. */
+export function cacheOfflinePage(path: string) {
+  if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+  void navigator.serviceWorker.ready.then((registration) => {
+    registration.active?.postMessage({ type: "CACHE_DOCUMENT", path });
+  });
+}
 
 /** Registers the app-shell service worker (localhost + production). */
 export function ServiceWorkerRegister() {
@@ -16,11 +24,7 @@ export function ServiceWorkerRegister() {
         .then(() => {
           // Warm document cache while online so offline hard-nav works.
           if (navigator.onLine) {
-            void Promise.all(
-              WARM.map((url) =>
-                fetch(url, { credentials: "same-origin" }).catch(() => undefined),
-              ),
-            );
+            WARM.forEach(cacheOfflinePage);
           }
         })
         .catch(() => {

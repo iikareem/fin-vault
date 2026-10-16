@@ -2,13 +2,16 @@ import { api, AUTH_REQUIRED } from "./api";
 import type { Space } from "./space";
 
 const DB_NAME = "fin-vault-offline";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const QUEUE_STORE = "tx-queue";
 const SNAPSHOT_STORE = "add-snapshots";
 const HOME_STORE = "home-snapshots";
+const TRAVEL_STORE = "travel-snapshots";
+const TRAVELS_STORE = "travels-snapshots";
 const SESSION_KEY = "fb_me_cache";
 
 export const OFFLINE_QUEUE_CHANGED = "fb-offline-queue-changed";
+export const OFFLINE_QUEUE_SYNCED = "fb-offline-queue-synced";
 
 export type QueuedTx = {
   id: string;
@@ -30,6 +33,21 @@ export type HomeSnapshot = {
   accounts: unknown[];
   txs: unknown[];
   summary: unknown | null;
+  savedAt: number;
+};
+
+export type TravelSnapshot = {
+  id: string;
+  householdId: string;
+  travelId: string;
+  detail: unknown;
+  categories: unknown[];
+  savedAt: number;
+};
+
+export type TravelsSnapshot = {
+  householdId: string;
+  data: unknown;
   savedAt: number;
 };
 
@@ -75,6 +93,12 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(HOME_STORE)) {
         db.createObjectStore(HOME_STORE, { keyPath: "householdId" });
+      }
+      if (!db.objectStoreNames.contains(TRAVEL_STORE)) {
+        db.createObjectStore(TRAVEL_STORE, { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains(TRAVELS_STORE)) {
+        db.createObjectStore(TRAVELS_STORE, { keyPath: "householdId" });
       }
     };
     req.onsuccess = () => resolve(req.result);
@@ -248,6 +272,13 @@ export async function flushOfflineQueue(
     }
 
     const remaining = await pendingCount();
+    if (synced > 0 && typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent(OFFLINE_QUEUE_SYNCED, {
+          detail: { synced, remaining },
+        }),
+      );
+    }
     return { synced, remaining, stoppedForAuth };
   })().finally(() => {
     flushInFlight = null;
@@ -297,5 +328,72 @@ export async function loadHomeSnapshot(
     "readonly",
     (store) => store.get(householdId),
   )) as HomeSnapshot | undefined;
+  return snapshot ?? null;
+}
+
+export async function saveTravelSnapshot(
+  householdId: string,
+  travelId: string,
+  detail: unknown,
+  categories: unknown[] = [],
+): Promise<void> {
+  const previous = await loadTravelSnapshot(householdId, travelId);
+  const snapshot: TravelSnapshot = {
+    id: `${householdId}:${travelId}`,
+    householdId,
+    travelId,
+    detail,
+    categories:
+      categories.length > 0 ? categories : (previous?.categories ?? []),
+    savedAt: Date.now(),
+  };
+  await storeTx(TRAVEL_STORE, "readwrite", (store) => store.put(snapshot));
+}
+
+export async function loadTravelSnapshot(
+  householdId: string,
+  travelId: string,
+): Promise<TravelSnapshot | null> {
+  const snapshot = (await storeTx<TravelSnapshot>(
+    TRAVEL_STORE,
+    "readonly",
+    (store) => store.get(`${householdId}:${travelId}`),
+  )) as TravelSnapshot | undefined;
+  return snapshot ?? null;
+}
+
+export async function listTravelSnapshots(
+  householdId: string,
+): Promise<TravelSnapshot[]> {
+  const snapshots = (await storeTx<TravelSnapshot[]>(
+    TRAVEL_STORE,
+    "readonly",
+    (store) => store.getAll(),
+  )) as TravelSnapshot[] | undefined;
+  return (snapshots ?? [])
+    .filter((snapshot) => snapshot.householdId === householdId)
+    .sort((a, b) => b.savedAt - a.savedAt);
+}
+
+export async function saveTravelsSnapshot(
+  householdId: string,
+  data: unknown,
+): Promise<void> {
+  const snapshot: TravelsSnapshot = {
+    householdId,
+    data,
+    savedAt: Date.now(),
+  };
+  await storeTx(TRAVELS_STORE, "readwrite", (store) => store.put(snapshot));
+}
+
+export async function loadTravelsSnapshot(
+  householdId: string,
+): Promise<TravelsSnapshot | null> {
+  const snapshot = (await storeTx<TravelsSnapshot>(
+    TRAVELS_STORE,
+    "readonly",
+    (store) => store.get(householdId),
+  )) as TravelsSnapshot | undefined;
   return snapshot ?? null;
 }

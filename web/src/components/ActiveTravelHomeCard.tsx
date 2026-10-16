@@ -8,6 +8,12 @@ import { formatItemDate } from "@/lib/calendar";
 import { householdPath } from "@/lib/space";
 import { useI18n } from "@/components/I18nProvider";
 import { PrivateMoney } from "@/components/PrivateMoney";
+import { cacheOfflinePage } from "@/components/ServiceWorkerRegister";
+import {
+  listTravelSnapshots,
+  saveTravelSnapshot,
+} from "@/lib/offline-queue";
+import { offlineAwareNavigate } from "@/lib/offline-nav";
 
 type TravelHomeCard = {
   id: string;
@@ -55,10 +61,36 @@ export function ActiveTravelHomeCard({
     let cancelled = false;
     api<TravelsHome>(householdPath(householdId, "/travels/home"))
       .then((result) => {
-        if (!cancelled) setTrip(result.open);
+        if (cancelled) return;
+        setTrip(result.open);
+        if (!result.open) return;
+        const detailPath = householdPath(
+          householdId,
+          `/travels/${result.open.id}`,
+        );
+        cacheOfflinePage(`/travels/${result.open.id}`);
+        void Promise.all([
+          api<TravelHomeCard>(detailPath),
+          api<unknown[]>(householdPath(householdId, "/categories")),
+        ])
+          .then(([detail, categories]) =>
+            saveTravelSnapshot(
+              householdId,
+              result.open!.id,
+              detail,
+              categories,
+            ),
+          )
+          .catch(() => {
+            /* The last complete travel snapshot remains usable offline. */
+          });
       })
-      .catch(() => {
-        if (!cancelled) setTrip(null);
+      .catch(async () => {
+        const snapshots = await listTravelSnapshots(householdId).catch(() => []);
+        const open = snapshots
+          .map((snapshot) => snapshot.detail as TravelHomeCard)
+          .find((detail) => detail?.status !== "past");
+        if (!cancelled) setTrip(open ?? null);
       });
     return () => {
       cancelled = true;
@@ -90,6 +122,9 @@ export function ActiveTravelHomeCard({
   return (
     <Link
       href={`/travels/${trip.id}`}
+      onClick={(event) =>
+        offlineAwareNavigate(`/travels/${trip.id}`, event)
+      }
       className="group relative mt-4 block overflow-hidden rounded-[1.5rem] bg-[var(--wallet-b)] p-4 text-white shadow-[var(--surface-shadow)] transition hover:opacity-95 active:scale-[0.99]"
     >
       <span

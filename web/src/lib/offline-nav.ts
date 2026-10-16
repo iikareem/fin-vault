@@ -1,13 +1,13 @@
 import { isLikelyOffline } from "./offline-queue";
 
-const OFFLINE_ALLOWED = new Set(["/", "/add"]);
+const OFFLINE_ALLOWED = new Set(["/", "/add", "/travels"]);
 
 export function isOfflineAllowedPath(href: string): boolean {
   try {
     const path = href.startsWith("http")
       ? new URL(href).pathname
       : href.split("?")[0] || "/";
-    return OFFLINE_ALLOWED.has(path);
+    return OFFLINE_ALLOWED.has(path) || /^\/travels\/[^/]+$/.test(path);
   } catch {
     return false;
   }
@@ -15,7 +15,7 @@ export function isOfflineAllowedPath(href: string): boolean {
 
 /**
  * Soft Next.js Link navigations fail offline.
- * Only Home and Add are allowed offline; other routes are blocked.
+ * Home, Add, and cached travel pages are allowed offline; other routes are blocked.
  * Returns true if the click was handled (blocked or hard-nav).
  */
 export function offlineAwareNavigate(

@@ -214,7 +214,7 @@ const ar = {
   offlinePageTitle: "لا يوجد اتصال",
   offlinePageBody:
     "يتعذّر على Fin Vault الاتصال بالشبكة الآن. أعد الاتصال ثم حاول مجددًا. ستتم مزامنة المصروفات المحفوظة عند عودة الاتصال.",
-  offlineModeHint: "لا يوجد اتصال — يمكنك عرض الرصيد وتسجيل المصروفات فقط",
+  offlineModeHint: "لا يوجد اتصال — يمكنك عرض الرصيد وتسجيل المصروفات ومصروفات الرحلة",
   offlineModePendingOne:
     "لا يوجد اتصال — مصروف واحد بانتظار المزامنة",
   offlineModePending:
@@ -222,7 +222,7 @@ const ar = {
   offlineAddExpense: "سجّل مصروف",
   offlineHomeTitle: "تعمل دون اتصال",
   offlineHomeBody:
-    "يمكنك عرض آخر رصيد معروف وتسجيل مصروف. تحتاج الأيام والتقارير والدخل إلى اتصال.",
+    "يمكنك عرض آخر رصيد معروف وتسجيل مصروف أو مصروف رحلة. تحتاج الأيام والتقارير والدخل إلى اتصال.",
   offlineHomeLastKnown: "الرصيد من آخر اتصال وقد لا يكون محدّثًا.",
   offlineNeedsNetwork: "تتطلب هذه الميزة اتصالًا بالإنترنت",
   offlineSpendOnly: "يمكنك تسجيل المصروفات فقط دون اتصال",
@@ -1122,6 +1122,9 @@ const ar = {
   travelsPaidFrom: "مصدر الدفع",
   travelsAmountHint: "أدخل مبلغًا صحيحًا",
   travelsCategoryHint: "اختر فئة",
+  travelsOfflineReady:
+    "تُعرض آخر نسخة محفوظة. يمكنك تسجيل مصروفات الرحلة وستتم مزامنتها عند عودة الاتصال.",
+  travelsPendingSync: "بانتظار المزامنة",
   travelsByCategory: "حسب الفئة",
   travelsLog: "حركات الرحلة",
   travelsLogEmpty: "لا مصروفات بعد على هذه الرحلة.",
@@ -1429,13 +1432,13 @@ const en = {
   offlinePageTitle: "You’re offline",
   offlinePageBody:
     "Fin Vault can’t reach the network right now. Reconnect, then try again. Expenses saved offline will sync when you’re back online.",
-  offlineModeHint: "You’re offline — balance and add spend only",
+  offlineModeHint: "You’re offline — balance, spend, and trip logging are available",
   offlineModePendingOne: "You’re offline — 1 spend waiting to sync",
   offlineModePending: "You’re offline — {count} spends waiting to sync",
   offlineAddExpense: "Add spend",
   offlineHomeTitle: "Working offline",
   offlineHomeBody:
-    "You can see your last-known balance and log a spend. Days, charts, and income need the network.",
+    "You can see your last-known balance and log a spend or trip expense. Days, charts, and income need the network.",
   offlineHomeLastKnown:
     "Balance is from your last online visit (may be outdated).",
   offlineNeedsNetwork: "This needs an internet connection",
@@ -2343,6 +2346,9 @@ const en = {
   travelsPaidFrom: "From?",
   travelsAmountHint: "Enter a valid amount",
   travelsCategoryHint: "Pick a category",
+  travelsOfflineReady:
+    "Showing the last saved trip. You can log trip spend and it will sync when you’re back online.",
+  travelsPendingSync: "Waiting to sync",
   travelsByCategory: "By category",
   travelsLog: "Trip moves",
   travelsLogEmpty: "No spend on this trip yet.",

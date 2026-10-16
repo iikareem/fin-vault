@@ -18,6 +18,16 @@ import { ItemDate } from "@/components/ItemDate";
 import { CURRENCY_OPTIONS } from "@/lib/currencies";
 import { formatItemDate } from "@/lib/calendar";
 import { LimitBar } from "@/components/LimitBar";
+import { cacheOfflinePage } from "@/components/ServiceWorkerRegister";
+import {
+  enqueueTransaction,
+  isLikelyOffline,
+  isOfflineNetworkError,
+  loadTravelSnapshot,
+  OFFLINE_QUEUE_SYNCED,
+  saveTravelSnapshot,
+} from "@/lib/offline-queue";
+import { offlineAwareNavigate } from "@/lib/offline-nav";
 
 type Cat = {
   id: string;
@@ -58,6 +68,7 @@ type TravelDetail = {
     paidFrom: "CURRENT" | "CASH";
     occurredOn: string;
     note: string;
+    pendingSync?: boolean;
     category: {
       id: string;
       name: string;
@@ -109,6 +120,8 @@ export default function TravelDetailPage() {
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [offline, setOffline] = useState(false);
+  const [usingOfflineData, setUsingOfflineData] = useState(false);
 
   const expenseCats = useMemo(
     () =>
@@ -147,27 +160,60 @@ export default function TravelDetailPage() {
     setCategoryId((prev) => prev || travelChild?.id || travelParent?.id || "");
   }
 
-  function loadTrip(householdId: string, id: string) {
-    return api<TravelDetail>(
-      householdPath(householdId, `/travels/${id}`),
-    ).then((detail) => {
+  async function loadTrip(householdId: string, id: string) {
+    try {
+      const detail = await api<TravelDetail>(
+        householdPath(householdId, `/travels/${id}`),
+      );
       setTrip(detail);
       syncEditForm(detail);
       setOccurredOn(todayISO());
       setShowSpend(false);
       setShowEdit(false);
-    });
+      setUsingOfflineData(false);
+      cacheOfflinePage(`/travels/${id}`);
+      void saveTravelSnapshot(householdId, id, detail);
+    } catch (error) {
+      if (!isOfflineNetworkError(error) && !isLikelyOffline()) throw error;
+      const snapshot = await loadTravelSnapshot(householdId, id);
+      if (!snapshot) throw error;
+      const detail = snapshot.detail as TravelDetail;
+      setTrip(detail);
+      syncEditForm(detail);
+      setCats(snapshot.categories as Cat[]);
+      pickDefaultCategory(snapshot.categories as Cat[]);
+      setUsingOfflineData(true);
+    }
   }
 
-  function loadCategories(householdId: string) {
+  async function loadCategories(householdId: string) {
     if (cats.length > 0) return Promise.resolve(cats);
-    return api<Cat[]>(householdPath(householdId, "/categories")).then(
-      (list) => {
-        setCats(list);
-        pickDefaultCategory(list);
-        return list;
-      },
-    );
+    try {
+      const list = await api<Cat[]>(
+        householdPath(householdId, "/categories"),
+      );
+      setCats(list);
+      pickDefaultCategory(list);
+      const snapshot = await loadTravelSnapshot(householdId, travelId);
+      if (snapshot) {
+        void saveTravelSnapshot(
+          householdId,
+          travelId,
+          snapshot.detail,
+          list,
+        );
+      }
+      return list;
+    } catch (error) {
+      if (!isOfflineNetworkError(error) && !isLikelyOffline()) throw error;
+      const snapshot = await loadTravelSnapshot(householdId, travelId);
+      if (!snapshot?.categories.length) throw error;
+      const list = snapshot.categories as Cat[];
+      setCats(list);
+      pickDefaultCategory(list);
+      setUsingOfflineData(true);
+      return list;
+    }
   }
 
   function load(householdId: string, id: string) {
@@ -185,6 +231,97 @@ export default function TravelDetailPage() {
     load(personal.householdId, travelId).catch((e) => setError(e.message));
   }, [personal?.householdId, travelId]);
 
+  useEffect(() => {
+    const update = () => setOffline(isLikelyOffline());
+    update();
+    window.addEventListener("online", update);
+    window.addEventListener("offline", update);
+    return () => {
+      window.removeEventListener("online", update);
+      window.removeEventListener("offline", update);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hid || !travelId) return;
+    const refreshAfterSync = () => {
+      void load(hid, travelId).catch(() => undefined);
+    };
+    window.addEventListener(OFFLINE_QUEUE_SYNCED, refreshAfterSync);
+    return () => {
+      window.removeEventListener(OFFLINE_QUEUE_SYNCED, refreshAfterSync);
+    };
+  }, [hid, travelId]);
+
+  function addQueuedSpend(
+    detail: TravelDetail,
+    value: number,
+    body: {
+      categoryId: string;
+      paidFrom: "CURRENT" | "CASH";
+      occurredOn: string;
+      note?: string;
+    },
+  ): TravelDetail {
+    const category = cats.find((cat) => cat.id === body.categoryId);
+    if (!category) return detail;
+    const spent = detail.spent + value;
+    const byCategory = [...detail.byCategory];
+    const categoryIndex = byCategory.findIndex(
+      (item) => item.categoryId === category.id,
+    );
+    const categoryTotal = {
+      categoryId: category.id,
+      name: category.name,
+      nameAr: category.nameAr ?? "",
+      color: category.color ?? "#0369a1",
+      emoji: category.emoji ?? "•",
+      total:
+        (categoryIndex >= 0 ? byCategory[categoryIndex]!.total : 0) + value,
+    };
+    if (categoryIndex >= 0) byCategory[categoryIndex] = categoryTotal;
+    else byCategory.push(categoryTotal);
+    byCategory.sort((a, b) => b.total - a.total);
+    return {
+      ...detail,
+      spent,
+      remaining:
+        detail.softLimit != null
+          ? Math.max(0, detail.softLimit - spent)
+          : null,
+      pct:
+        detail.softLimit != null && detail.softLimit > 0
+          ? Math.round((spent / detail.softLimit) * 1000) / 10
+          : null,
+      overLimit:
+        detail.softLimit != null
+          ? spent > detail.softLimit + 0.001
+          : false,
+      fromWallet:
+        detail.fromWallet + (body.paidFrom === "CURRENT" ? value : 0),
+      fromCash: detail.fromCash + (body.paidFrom === "CASH" ? value : 0),
+      byCategory,
+      items: [
+        {
+          id: `offline-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          amount: value,
+          paidFrom: body.paidFrom,
+          occurredOn: body.occurredOn,
+          note: body.note ?? "",
+          pendingSync: true,
+          category: {
+            id: category.id,
+            name: category.name,
+            nameAr: category.nameAr ?? "",
+            color: category.color ?? "#0369a1",
+            emoji: category.emoji ?? "•",
+          },
+        },
+        ...detail.items,
+      ],
+    };
+  }
+
   async function onSpend(e: FormEvent) {
     e.preventDefault();
     if (!hid || !trip) return;
@@ -199,20 +336,41 @@ export default function TravelDetailPage() {
     }
     setBusy(true);
     setError("");
+    const path = householdPath(hid, `/travels/${trip.id}/spends`);
+    const body = {
+      amount: value,
+      categoryId,
+      paidFrom,
+      occurredOn,
+      ...(note.trim() ? { note: note.trim() } : {}),
+    };
     try {
-      await api(householdPath(hid, `/travels/${trip.id}/spends`), {
-        method: "POST",
-        body: JSON.stringify({
-          amount: value,
-          categoryId,
-          paidFrom,
-          occurredOn,
-          ...(note.trim() ? { note: note.trim() } : {}),
-        }),
-      });
+      let queued = isLikelyOffline();
+      if (queued) {
+        await enqueueTransaction(path, body);
+      } else {
+        try {
+          await api(path, {
+            method: "POST",
+            body: JSON.stringify(body),
+          });
+        } catch (error) {
+          if (!isOfflineNetworkError(error)) throw error;
+          await enqueueTransaction(path, body);
+          queued = true;
+        }
+      }
       setAmount("");
       setNote("");
-      await load(hid, trip.id);
+      if (queued) {
+        const updated = addQueuedSpend(trip, value, body);
+        setTrip(updated);
+        setShowSpend(false);
+        setUsingOfflineData(true);
+        await saveTravelSnapshot(hid, trip.id, updated, cats);
+      } else {
+        await load(hid, trip.id);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t("travelsSaveFailed"));
     } finally {
@@ -410,6 +568,7 @@ export default function TravelDetailPage() {
         <div className="flex items-center justify-between gap-3">
           <Link
             href="/travels"
+            onClick={(event) => offlineAwareNavigate("/travels", event)}
             className="inline-flex min-h-10 items-center gap-1 text-sm font-semibold text-[var(--accent-b-text)]"
           >
             ← {t("travelsTitle")}
@@ -423,7 +582,7 @@ export default function TravelDetailPage() {
           <span>
             {rangeLabel} · {trip.currency}
           </span>
-          {!showEdit ? (
+          {!showEdit && !offline ? (
             <button
               type="button"
               onClick={openEdit}
@@ -434,6 +593,12 @@ export default function TravelDetailPage() {
           ) : null}
         </div>
       </header>
+
+      {offline || usingOfflineData ? (
+        <p className="mb-3 rounded-xl bg-sky-800/10 px-3 py-2 text-sm text-[var(--muted)]">
+          {t("travelsOfflineReady")}
+        </p>
+      ) : null}
 
       <section className="surface relative mb-3 overflow-hidden rounded-[1.75rem] p-4">
         <div
@@ -812,6 +977,9 @@ export default function TravelDetailPage() {
                         ? t("travelsFromCurrent")
                         : t("travelsFromCash")}
                       {item.note ? ` · ${item.note}` : ""}
+                      {item.pendingSync
+                        ? ` · ${t("travelsPendingSync")}`
+                        : ""}
                     </p>
                   </div>
                   <span className="shrink-0 text-base font-bold tabular-nums text-red-800 dark:text-red-300">
@@ -829,7 +997,7 @@ export default function TravelDetailPage() {
         )}
       </section>
 
-      {isOpen ? (
+      {isOpen && !offline ? (
         <div className="mb-3 space-y-2">
           {confirmEnd ? (
             <div className="surface space-y-3 rounded-[1.5rem] p-4 ring-1 ring-amber-300/70">
@@ -871,7 +1039,7 @@ export default function TravelDetailPage() {
         </div>
       ) : null}
 
-      {trip.spent < 0.001 ? (
+      {trip.spent < 0.001 && !offline ? (
         <div className="mb-4 space-y-2">
           {confirmDelete ? (
             <div className="surface space-y-3 rounded-[1.5rem] p-4 ring-1 ring-red-300/70">

@@ -14,6 +14,15 @@ import { DateField } from "@/components/DateField";
 import { CURRENCY_OPTIONS } from "@/lib/currencies";
 import { fill } from "@/lib/i18n";
 import { formatItemDate } from "@/lib/calendar";
+import { cacheOfflinePage } from "@/components/ServiceWorkerRegister";
+import {
+  isLikelyOffline,
+  isOfflineNetworkError,
+  loadTravelsSnapshot,
+  saveTravelSnapshot,
+  saveTravelsSnapshot,
+} from "@/lib/offline-queue";
+import { offlineAwareNavigate } from "@/lib/offline-nav";
 
 type TravelCard = {
   id: string;
@@ -74,10 +83,36 @@ export default function TravelsPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  function load(householdId: string) {
-    return api<TravelsData>(householdPath(householdId, "/travels")).then(
-      setData,
-    );
+  async function load(householdId: string) {
+    try {
+      const result = await api<TravelsData>(
+        householdPath(householdId, "/travels"),
+      );
+      setData(result);
+      void saveTravelsSnapshot(householdId, result);
+      if (result.open) {
+        const open = result.open;
+        cacheOfflinePage(`/travels/${open.id}`);
+        void Promise.all([
+          api<unknown>(householdPath(householdId, `/travels/${open.id}`)),
+          api<unknown[]>(householdPath(householdId, "/categories")),
+        ])
+          .then(([detail, categories]) =>
+            saveTravelSnapshot(
+              householdId,
+              open.id,
+              detail,
+              categories,
+            ),
+          )
+          .catch(() => undefined);
+      }
+    } catch (error) {
+      if (!isOfflineNetworkError(error) && !isLikelyOffline()) throw error;
+      const snapshot = await loadTravelsSnapshot(householdId);
+      if (!snapshot) throw error;
+      setData(snapshot.data as TravelsData);
+    }
   }
 
   useEffect(() => {
@@ -201,6 +236,9 @@ export default function TravelsPage() {
       {openTrip ? (
         <Link
           href={`/travels/${openTrip.id}`}
+          onClick={(event) =>
+            offlineAwareNavigate(`/travels/${openTrip.id}`, event)
+          }
           className="group relative mb-4 block overflow-hidden rounded-[1.75rem] bg-[var(--wallet-b)] p-5 text-white shadow-[var(--surface-shadow)] transition active:scale-[0.99]"
         >
           <div
@@ -402,6 +440,9 @@ export default function TravelsPage() {
               <li key={trip.id}>
                 <Link
                   href={`/travels/${trip.id}`}
+                  onClick={(event) =>
+                    offlineAwareNavigate(`/travels/${trip.id}`, event)
+                  }
                   className="surface flex items-center justify-between gap-3 rounded-[1.5rem] px-4 py-3"
                 >
                   <div className="min-w-0">
@@ -435,6 +476,9 @@ export default function TravelsPage() {
               <li key={trip.id}>
                 <Link
                   href={`/travels/${trip.id}`}
+                  onClick={(event) =>
+                    offlineAwareNavigate(`/travels/${trip.id}`, event)
+                  }
                   className="surface flex items-center gap-3 rounded-[1.35rem] px-4 py-3.5 transition hover:opacity-95 active:scale-[0.99]"
                 >
                   <span
