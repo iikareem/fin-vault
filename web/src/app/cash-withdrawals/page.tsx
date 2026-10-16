@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
+import { fill } from "@/lib/i18n";
 import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
 import { Money } from "@/components/Money";
@@ -13,6 +14,7 @@ import { Hint } from "@/components/Hint";
 import { ItemDate } from "@/components/ItemDate";
 import { useCalendarClock } from "@/hooks/useCalendarClock";
 import { budgetMonthRange, shiftBudgetMonthKey } from "@/lib/calendar";
+import { CashWithdrawalChart } from "@/components/CashWithdrawalChart";
 
 type WithdrawalItem = {
   id: string;
@@ -231,13 +233,37 @@ export default function CashWithdrawalsPage() {
       ) : null}
 
       {data ? (
-        <section className="surface mt-4 rounded-[1.5rem] px-4 py-3.5">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
-            {t("cashWithdrawalsPeriodTotal")}
-          </p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-[var(--foreground)]">
-            <Money amount={data.total} currency={currency} locale={locale} />
-          </p>
+        <section className="surface mt-4 rounded-[1.5rem] p-4">
+          <div className="flex items-end justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
+                {t("cashWithdrawalsPeriodTotal")}
+              </p>
+              <p className="mt-1 text-2xl font-bold tabular-nums text-[var(--foreground)]">
+                <Money amount={data.total} currency={currency} locale={locale} />
+              </p>
+            </div>
+            <p className="shrink-0 rounded-full bg-[var(--accent-b-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-b-text)]">
+              {data.count === 1
+                ? t("cashWithdrawalsCountOne")
+                : fill(t("cashWithdrawalsCount"), {
+                    n: String(data.count),
+                  })}
+            </p>
+          </div>
+          <div className="mt-5 border-t border-[var(--surface-border)] pt-4">
+            <p className="mb-3 text-xs font-semibold text-[var(--muted)]">
+              {t("cashWithdrawalsDailyChart")}
+            </p>
+            <CashWithdrawalChart
+              items={data.items}
+              periodFrom={data.periodFrom}
+              periodTo={data.periodTo}
+              currency={currency}
+              locale={locale}
+              label={t("cashWithdrawalsDailyChart")}
+            />
+          </div>
         </section>
       ) : loading ? (
         <p className="mt-4 text-sm text-[var(--muted)]">{t("saving")}</p>

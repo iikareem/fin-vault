@@ -29,6 +29,10 @@ import {
 import { MoneyToolsHomeCard } from "@/components/MoneyToolsHomeCard";
 import { BottomSheet } from "@/components/BottomSheet";
 import {
+  CashWithdrawalChart,
+  type CashWithdrawalChartItem,
+} from "@/components/CashWithdrawalChart";
+import {
   isLikelyOffline,
   isOfflineNetworkError,
   loadHomeSnapshot,
@@ -81,8 +85,11 @@ type SubsHome = {
 
 type CashWithdrawalsHome = {
   periodKey: string;
+  periodFrom: string;
+  periodTo: string;
   total: number;
   count: number;
+  items: CashWithdrawalChartItem[];
 };
 
 type Tx = {
@@ -966,27 +973,43 @@ export default function HomePage() {
           </div>
           <Link
             href="/cash-withdrawals"
-            className="flex min-h-12 items-center justify-between gap-3 rounded-[1.15rem] bg-[var(--panel-soft)] px-4 py-3 transition hover:opacity-95 active:scale-[0.99]"
+            className="block rounded-[1.35rem] bg-[var(--surface-bg)] p-4 ring-1 ring-[var(--surface-border)] transition hover:opacity-95 active:scale-[0.99]"
           >
-            <span className="min-w-0 text-start">
-              <span className="block text-sm font-semibold text-[var(--foreground)]">
-                {t("cashWithdrawalsTitle")}
+            <span className="flex items-start justify-between gap-3">
+              <span className="min-w-0 text-start">
+                <span className="block text-sm font-semibold text-[var(--foreground)]">
+                  {t("cashWithdrawalsTitle")}
+                </span>
+                <span className="mt-0.5 block text-[11px] font-medium leading-snug text-[var(--muted)]">
+                  {cashWithdrawals && cashWithdrawals.total > 0.001
+                    ? fill(t("cashWithdrawalsHomeTotal"), {
+                        amount: moneyVisible
+                          ? money(cashWithdrawals.total, currency, locale)
+                          : "••••",
+                      })
+                    : cashWithdrawals
+                      ? t("cashWithdrawalsHomeEmpty")
+                      : t("cashWithdrawalsHomeHint")}
+                </span>
               </span>
-              <span className="mt-0.5 block text-[11px] font-medium leading-snug text-[var(--muted)]">
-                {cashWithdrawals && cashWithdrawals.total > 0.001
-                  ? fill(t("cashWithdrawalsHomeTotal"), {
-                      amount: moneyVisible
-                        ? money(cashWithdrawals.total, currency, locale)
-                        : "••••",
-                    })
-                  : cashWithdrawals
-                    ? t("cashWithdrawalsHomeEmpty")
-                    : t("cashWithdrawalsHomeHint")}
+              <span className="shrink-0 text-sm text-[var(--muted)]" aria-hidden>
+                →
               </span>
             </span>
-            <span className="shrink-0 text-sm text-[var(--muted)]" aria-hidden>
-              →
-            </span>
+            {cashWithdrawals ? (
+              <span className="mt-3 block rounded-xl bg-[var(--panel-soft)] px-2.5 pb-2 pt-3">
+                <CashWithdrawalChart
+                  items={cashWithdrawals.items}
+                  periodFrom={cashWithdrawals.periodFrom}
+                  periodTo={cashWithdrawals.periodTo}
+                  currency={currency}
+                  locale={locale}
+                  label={t("cashWithdrawalsDailyChart")}
+                  hidden={!moneyVisible}
+                  compact
+                />
+              </span>
+            ) : null}
           </Link>
         </div>
       ) : null}
