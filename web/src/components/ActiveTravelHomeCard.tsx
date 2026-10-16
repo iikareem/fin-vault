@@ -13,7 +13,7 @@ import {
   listTravelSnapshots,
   saveTravelSnapshot,
 } from "@/lib/offline-queue";
-import { offlineAwareNavigate } from "@/lib/offline-nav";
+import { cachedPageNavigate } from "@/lib/offline-nav";
 
 type TravelHomeCard = {
   id: string;
@@ -123,7 +123,7 @@ export function ActiveTravelHomeCard({
     <Link
       href={`/travels/${trip.id}`}
       onClick={(event) =>
-        offlineAwareNavigate(`/travels/${trip.id}`, event)
+        cachedPageNavigate(`/travels/${trip.id}`, event)
       }
       className="group relative mt-4 block overflow-hidden rounded-[1.5rem] bg-[var(--wallet-b)] p-4 text-white shadow-[var(--surface-shadow)] transition hover:opacity-95 active:scale-[0.99]"
     >

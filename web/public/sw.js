@@ -1,5 +1,6 @@
 /* Fin Vault service worker — app shell cache for offline use. */
 const CACHE = "fin-vault-shell-v4";
+const DOCUMENT_CACHE = "fin-vault-documents-v1";
 const OFFLINE_URL = "/offline.html";
 const APP_SHELL = ["/", "/add", "/travels"];
 const PRECACHE = [
@@ -33,7 +34,9 @@ self.addEventListener("activate", (event) => {
       .keys()
       .then((keys) =>
         Promise.all(
-          keys.filter((key) => key !== CACHE).map((key) => caches.delete(key)),
+          keys
+            .filter((key) => key !== CACHE && key !== DOCUMENT_CACHE)
+            .map((key) => caches.delete(key)),
         ),
       )
       .then(() => self.clients.claim()),
@@ -48,7 +51,7 @@ async function cacheDocument(path) {
     headers: { Accept: "text/html" },
   });
   if (!response.ok) return;
-  const cache = await caches.open(CACHE);
+  const cache = await caches.open(DOCUMENT_CACHE);
   const html = await response.clone().text();
   const assets = [
     ...html.matchAll(/(?:src|href)="([^"]*\/_next\/static\/[^"]+)"/g),
@@ -96,7 +99,7 @@ async function networkFirstDocument(request) {
     const response = await fetch(request);
     if (response.ok) {
       const copy = response.clone();
-      const cache = await caches.open(CACHE);
+      const cache = await caches.open(DOCUMENT_CACHE);
       await cache.put(request, copy);
       // Also store by pathname for offline hard navigations.
       try {

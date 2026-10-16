@@ -27,7 +27,7 @@ import {
   OFFLINE_QUEUE_SYNCED,
   saveTravelSnapshot,
 } from "@/lib/offline-queue";
-import { offlineAwareNavigate } from "@/lib/offline-nav";
+import { cachedPageNavigate } from "@/lib/offline-nav";
 
 type Cat = {
   id: string;
@@ -568,7 +568,7 @@ export default function TravelDetailPage() {
         <div className="flex items-center justify-between gap-3">
           <Link
             href="/travels"
-            onClick={(event) => offlineAwareNavigate("/travels", event)}
+            onClick={(event) => cachedPageNavigate("/travels", event)}
             className="inline-flex min-h-10 items-center gap-1 text-sm font-semibold text-[var(--accent-b-text)]"
           >
             ← {t("travelsTitle")}

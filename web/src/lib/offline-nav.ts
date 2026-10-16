@@ -38,6 +38,22 @@ export function offlineAwareNavigate(
   return true;
 }
 
+/**
+ * Use a real document navigation for cached routes. If connectivity is stale
+ * (navigator.onLine still says true), the service worker can still fall back
+ * to the cached HTML after the network request fails.
+ */
+export function cachedPageNavigate(
+  href: string,
+  event?: { preventDefault: () => void },
+): boolean {
+  event?.preventDefault();
+  if (typeof window !== "undefined") {
+    window.location.assign(href);
+  }
+  return true;
+}
+
 /** Full reload replace — use when soft router.replace would fail offline. */
 export function offlineAwareReplace(href: string) {
   if (typeof window === "undefined") return;

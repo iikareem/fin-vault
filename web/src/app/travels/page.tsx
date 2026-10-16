@@ -22,7 +22,7 @@ import {
   saveTravelSnapshot,
   saveTravelsSnapshot,
 } from "@/lib/offline-queue";
-import { offlineAwareNavigate } from "@/lib/offline-nav";
+import { cachedPageNavigate } from "@/lib/offline-nav";
 
 type TravelCard = {
   id: string;
@@ -237,7 +237,7 @@ export default function TravelsPage() {
         <Link
           href={`/travels/${openTrip.id}`}
           onClick={(event) =>
-            offlineAwareNavigate(`/travels/${openTrip.id}`, event)
+            cachedPageNavigate(`/travels/${openTrip.id}`, event)
           }
           className="group relative mb-4 block overflow-hidden rounded-[1.75rem] bg-[var(--wallet-b)] p-5 text-white shadow-[var(--surface-shadow)] transition active:scale-[0.99]"
         >
@@ -441,7 +441,7 @@ export default function TravelsPage() {
                 <Link
                   href={`/travels/${trip.id}`}
                   onClick={(event) =>
-                    offlineAwareNavigate(`/travels/${trip.id}`, event)
+                    cachedPageNavigate(`/travels/${trip.id}`, event)
                   }
                   className="surface flex items-center justify-between gap-3 rounded-[1.5rem] px-4 py-3"
                 >
@@ -477,7 +477,7 @@ export default function TravelsPage() {
                 <Link
                   href={`/travels/${trip.id}`}
                   onClick={(event) =>
-                    offlineAwareNavigate(`/travels/${trip.id}`, event)
+                    cachedPageNavigate(`/travels/${trip.id}`, event)
                   }
                   className="surface flex items-center gap-3 rounded-[1.35rem] px-4 py-3.5 transition hover:opacity-95 active:scale-[0.99]"
                 >
