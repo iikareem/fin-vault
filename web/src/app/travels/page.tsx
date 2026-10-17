@@ -14,7 +14,10 @@ import { DateField } from "@/components/DateField";
 import { CURRENCY_OPTIONS } from "@/lib/currencies";
 import { fill } from "@/lib/i18n";
 import { formatItemDate } from "@/lib/calendar";
-import { cacheOfflinePage } from "@/components/ServiceWorkerRegister";
+import {
+  cacheOfflinePage,
+  rememberOfflineTrip,
+} from "@/components/ServiceWorkerRegister";
 import {
   isLikelyOffline,
   isOfflineNetworkError,
@@ -92,7 +95,8 @@ export default function TravelsPage() {
       void saveTravelsSnapshot(householdId, result);
       if (result.open) {
         const open = result.open;
-        cacheOfflinePage(`/travels/${open.id}`);
+        rememberOfflineTrip(open.id);
+        void cacheOfflinePage(`/travels/${open.id}`);
         void Promise.all([
           api<unknown>(householdPath(householdId, `/travels/${open.id}`)),
           api<unknown[]>(householdPath(householdId, "/categories")),

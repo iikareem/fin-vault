@@ -18,7 +18,10 @@ import { ItemDate } from "@/components/ItemDate";
 import { CURRENCY_OPTIONS } from "@/lib/currencies";
 import { formatItemDate } from "@/lib/calendar";
 import { LimitBar } from "@/components/LimitBar";
-import { cacheOfflinePage } from "@/components/ServiceWorkerRegister";
+import {
+  cacheOfflinePage,
+  rememberOfflineTrip,
+} from "@/components/ServiceWorkerRegister";
 import {
   enqueueTransaction,
   isLikelyOffline,
@@ -171,7 +174,8 @@ export default function TravelDetailPage() {
       setShowSpend(false);
       setShowEdit(false);
       setUsingOfflineData(false);
-      cacheOfflinePage(`/travels/${id}`);
+      rememberOfflineTrip(id);
+      void cacheOfflinePage(`/travels/${id}`);
       void saveTravelSnapshot(householdId, id, detail);
     } catch (error) {
       if (!isOfflineNetworkError(error) && !isLikelyOffline()) throw error;

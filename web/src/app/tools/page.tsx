@@ -11,6 +11,11 @@ import { useBooks } from "@/components/BooksProvider";
 import { householdPath } from "@/lib/space";
 import { fill } from "@/lib/i18n";
 import { useMoneyVisible } from "@/hooks/useUiPrefs";
+import { cachedPageNavigate } from "@/lib/offline-nav";
+import {
+  cacheOfflinePage,
+  rememberOfflineTrip,
+} from "@/components/ServiceWorkerRegister";
 
 type GoalsHome = {
   allocated: number;
@@ -107,6 +112,12 @@ export default function ToolsPage() {
         setGold(go);
         setOutside(o);
         setTravels(tr);
+        if (tr?.active?.id) {
+          rememberOfflineTrip(tr.active.id);
+          void cacheOfflinePage(`/travels/${tr.active.id}`);
+        } else {
+          void cacheOfflinePage("/travels");
+        }
       })
       .catch((e) => setError(e.message));
   }, [hid]);
@@ -325,6 +336,11 @@ export default function ToolsPage() {
             <li key={row.key}>
               <Link
                 href={row.href}
+                onClick={
+                  row.key === "travels"
+                    ? (event) => cachedPageNavigate(row.href, event)
+                    : undefined
+                }
                 className="surface flex min-h-[4.5rem] items-start gap-3 rounded-[1.35rem] px-4 py-3.5 transition hover:bg-[var(--panel-soft)] active:scale-[0.99]"
               >
                 <StatusDot tone={row.dotTone} />

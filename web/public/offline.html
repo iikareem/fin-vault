@@ -46,6 +46,13 @@
         color: var(--muted);
         line-height: 1.45;
       }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        justify-content: center;
+      }
+      a,
       button {
         appearance: none;
         border: 0;
@@ -53,9 +60,20 @@
         padding: 0.7rem 1.1rem;
         font: inherit;
         font-weight: 600;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      button {
         background: #0f766e;
         color: #fff;
-        cursor: pointer;
+      }
+      a.secondary {
+        background: #075985;
+        color: #fff;
+      }
+      a.ghost {
+        background: color-mix(in srgb, var(--fg) 10%, transparent);
+        color: var(--fg);
       }
       .ar {
         margin-top: 1.5rem;
@@ -69,15 +87,21 @@
     <main>
       <h1>You’re offline</h1>
       <p>
-        Fin Vault can’t reach the network right now. Reconnect, then try again.
-        Expenses saved offline will sync when you’re back online.
+        Fin Vault can’t reach the network right now. Open Home, Add spend, or
+        your trip if you opened it once while online.
       </p>
-      <button type="button" onclick="location.reload()">Try again</button>
+      <div class="actions">
+        <a class="ghost" href="/">Home</a>
+        <a class="secondary" href="/travels">Trip</a>
+        <button type="button" onclick="location.href='/add?type=expense'">
+          Add spend
+        </button>
+      </div>
       <div class="ar">
         <h1>أنت مش متصل</h1>
         <p>
-          فين فولت مش قادر يوصل للشبكة دلوقتي. اتصل تاني وجرب. المصاريف
-          المحفوظة بدون نت هتتزامن لما ترجع أونلاين.
+          فين فولت مش قادر يوصل للشبكة دلوقتي. افتح الرئيسية أو سجّل مصروف أو
+          الرحلة إذا فتحتها مرة وأنت متصل.
         </p>
       </div>
     </main>

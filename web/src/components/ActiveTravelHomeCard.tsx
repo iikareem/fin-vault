@@ -8,7 +8,10 @@ import { formatItemDate } from "@/lib/calendar";
 import { householdPath } from "@/lib/space";
 import { useI18n } from "@/components/I18nProvider";
 import { PrivateMoney } from "@/components/PrivateMoney";
-import { cacheOfflinePage } from "@/components/ServiceWorkerRegister";
+import {
+  cacheOfflinePage,
+  rememberOfflineTrip,
+} from "@/components/ServiceWorkerRegister";
 import {
   listTravelSnapshots,
   saveTravelSnapshot,
@@ -64,22 +67,19 @@ export function ActiveTravelHomeCard({
         if (cancelled) return;
         setTrip(result.open);
         if (!result.open) return;
+        const open = result.open;
+        rememberOfflineTrip(open.id);
+        void cacheOfflinePage(`/travels/${open.id}`);
         const detailPath = householdPath(
           householdId,
-          `/travels/${result.open.id}`,
+          `/travels/${open.id}`,
         );
-        cacheOfflinePage(`/travels/${result.open.id}`);
         void Promise.all([
           api<TravelHomeCard>(detailPath),
           api<unknown[]>(householdPath(householdId, "/categories")),
         ])
           .then(([detail, categories]) =>
-            saveTravelSnapshot(
-              householdId,
-              result.open!.id,
-              detail,
-              categories,
-            ),
+            saveTravelSnapshot(householdId, open.id, detail, categories),
           )
           .catch(() => {
             /* The last complete travel snapshot remains usable offline. */

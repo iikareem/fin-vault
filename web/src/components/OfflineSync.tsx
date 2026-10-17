@@ -10,7 +10,11 @@ import {
   pendingCount,
   type FlushProgress,
 } from "@/lib/offline-queue";
-import { offlineAwareNavigate } from "@/lib/offline-nav";
+import {
+  cachedPageNavigate,
+  offlineAwareNavigate,
+} from "@/lib/offline-nav";
+import { loadOfflineTrip } from "./ServiceWorkerRegister";
 
 /**
  * Flushes queued offline expenses when the network returns and shows status
@@ -20,6 +24,7 @@ export function OfflineSync() {
   const { t } = useI18n();
   const [count, setCount] = useState(0);
   const [offline, setOffline] = useState(false);
+  const [tripPath, setTripPath] = useState<string | null>(null);
   const [progress, setProgress] = useState<FlushProgress | null>(null);
   const doneHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -71,7 +76,10 @@ export function OfflineSync() {
   }, [refreshCount]);
 
   useEffect(() => {
-    const updateOnline = () => setOffline(isLikelyOffline());
+    const updateOnline = () => {
+      setOffline(isLikelyOffline());
+      setTripPath(loadOfflineTrip()?.path ?? null);
+    };
     updateOnline();
     void refreshCount();
     void sync();
@@ -82,6 +90,7 @@ export function OfflineSync() {
     };
     const onOffline = () => {
       setOffline(true);
+      setTripPath(loadOfflineTrip()?.path ?? null);
       setProgress(null);
     };
     const onVisible = () => {
@@ -151,13 +160,24 @@ export function OfflineSync() {
         </div>
       ) : null}
       {offline ? (
-        <Link
-          href="/add?type=expense"
-          onClick={(e) => offlineAwareNavigate("/add?type=expense", e)}
-          className="mt-2 inline-flex min-h-10 items-center justify-center rounded-full bg-emerald-800 px-4 text-sm font-semibold text-white"
-        >
-          {t("offlineAddExpense")}
-        </Link>
+        <div className="mt-2 flex flex-wrap items-center justify-center gap-2">
+          <Link
+            href="/add?type=expense"
+            onClick={(e) => offlineAwareNavigate("/add?type=expense", e)}
+            className="inline-flex min-h-10 items-center justify-center rounded-full bg-emerald-800 px-4 text-sm font-semibold text-white"
+          >
+            {t("offlineAddExpense")}
+          </Link>
+          {tripPath ? (
+            <Link
+              href={tripPath}
+              onClick={(e) => cachedPageNavigate(tripPath, e)}
+              className="inline-flex min-h-10 items-center justify-center rounded-full bg-sky-800 px-4 text-sm font-semibold text-white"
+            >
+              {t("offlineOpenTrip")}
+            </Link>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

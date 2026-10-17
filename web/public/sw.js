@@ -1,6 +1,6 @@
-/* Fin Vault service worker — app shell cache for offline use. */
-const CACHE = "fin-vault-shell-v4";
-const DOCUMENT_CACHE = "fin-vault-documents-v1";
+/* Fin Vault service worker — app shell + trip documents for offline use. */
+const CACHE = "fin-vault-shell-v5";
+const DOCUMENT_CACHE = "fin-vault-documents-v2";
 const OFFLINE_URL = "/offline.html";
 const APP_SHELL = ["/", "/add", "/travels"];
 const PRECACHE = [
@@ -17,11 +17,8 @@ self.addEventListener("install", (event) => {
     caches
       .open(CACHE)
       .then(async (cache) => {
-        // Cache each URL independently so one failure does not abort install.
         await Promise.all(
-          PRECACHE.map((url) =>
-            cache.add(url).catch(() => undefined),
-          ),
+          PRECACHE.map((url) => cache.add(url).catch(() => undefined)),
         );
       })
       .then(() => self.skipWaiting()),
@@ -43,44 +40,26 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-async function cacheDocument(path) {
-  const url = new URL(path, self.location.origin);
-  if (url.origin !== self.location.origin) return;
-  const response = await fetch(url.href, {
-    credentials: "include",
-    headers: { Accept: "text/html" },
-  });
-  if (!response.ok) return;
-  const cache = await caches.open(DOCUMENT_CACHE);
-  const html = await response.clone().text();
-  const assets = [
-    ...html.matchAll(/(?:src|href)="([^"]*\/_next\/static\/[^"]+)"/g),
-  ].map((match) => new URL(match[1], url).href);
-  await Promise.all(
-    [...new Set(assets)].map((asset) =>
-      cache.add(asset).catch(() => undefined),
-    ),
-  );
-  await cache.put(url.pathname, response);
-}
-
-self.addEventListener("message", (event) => {
-  if (event.data?.type !== "CACHE_DOCUMENT" || !event.data.path) return;
-  event.waitUntil(cacheDocument(event.data.path).catch(() => undefined));
-});
-
 function isApiRequest(url) {
   return url.pathname.startsWith("/api/");
 }
 
 function isStaticAsset(url) {
+  const path = url.pathname;
   return (
-    url.pathname.startsWith("/_next/static/") ||
-    url.pathname.endsWith(".png") ||
-    url.pathname.endsWith(".ico") ||
-    url.pathname.endsWith(".svg") ||
-    url.pathname.endsWith(".webp") ||
-    url.pathname === "/offline.html"
+    path.startsWith("/_next/static/") ||
+    path.endsWith(".js") ||
+    path.endsWith(".css") ||
+    path.endsWith(".woff") ||
+    path.endsWith(".woff2") ||
+    path.endsWith(".ttf") ||
+    path.endsWith(".png") ||
+    path.endsWith(".ico") ||
+    path.endsWith(".svg") ||
+    path.endsWith(".webp") ||
+    path.endsWith(".jpg") ||
+    path.endsWith(".jpeg") ||
+    path === "/offline.html"
   );
 }
 
@@ -90,34 +69,93 @@ function isNavigation(request) {
 
 function isRscRequest(request, url) {
   if (url.searchParams.has("_rsc")) return true;
-  const dest = request.headers.get("RSC");
-  return dest === "1";
+  return request.headers.get("RSC") === "1";
 }
 
+function isOfflineDocumentPath(pathname) {
+  return (
+    APP_SHELL.includes(pathname) ||
+    pathname === "/" ||
+    /^\/travels\/[^/]+$/.test(pathname)
+  );
+}
+
+async function matchDocument(pathname) {
+  const docCache = await caches.open(DOCUMENT_CACHE);
+  const shellCache = await caches.open(CACHE);
+  return (
+    (await docCache.match(pathname)) ||
+    (await shellCache.match(pathname)) ||
+    (await caches.match(pathname))
+  );
+}
+
+async function putDocument(pathname, response) {
+  if (!response || !response.ok) return;
+  const cache = await caches.open(DOCUMENT_CACHE);
+  await cache.put(pathname, response.clone());
+  if (APP_SHELL.includes(pathname) || pathname === "/") {
+    const shell = await caches.open(CACHE);
+    await shell.put(pathname, response.clone());
+  }
+}
+
+async function cacheDocument(path) {
+  const url = new URL(path, self.location.origin);
+  if (url.origin !== self.location.origin) return;
+  const pathname = url.pathname;
+  const response = await fetch(pathname, {
+    credentials: "include",
+    headers: { Accept: "text/html" },
+    cache: "no-cache",
+  });
+  if (!response.ok) return;
+
+  const html = await response.clone().text();
+  const assets = [
+    ...html.matchAll(/(?:src|href)="([^"]*\/_next\/static\/[^"]+)"/g),
+  ].map((match) => new URL(match[1], url).href);
+
+  const assetCache = await caches.open(CACHE);
+  await Promise.all(
+    [...new Set(assets)].map((asset) =>
+      assetCache.add(asset).catch(() => undefined),
+    ),
+  );
+  await putDocument(pathname, response);
+}
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type !== "CACHE_DOCUMENT" || !event.data.path) return;
+  event.waitUntil(cacheDocument(event.data.path).catch(() => undefined));
+});
+
 async function networkFirstDocument(request) {
+  const url = new URL(request.url);
+  const pathname = url.pathname;
+
   try {
     const response = await fetch(request);
     if (response.ok) {
-      const copy = response.clone();
-      const cache = await caches.open(DOCUMENT_CACHE);
-      await cache.put(request, copy);
-      // Also store by pathname for offline hard navigations.
-      try {
-        const path = new URL(request.url).pathname;
-        if (APP_SHELL.includes(path) || path === "/") {
-          await cache.put(path, response.clone());
-        }
-      } catch {
-        /* ignore */
-      }
+      await putDocument(pathname, response);
     }
     return response;
   } catch {
-    const cached = await caches.match(request);
+    const cached = await matchDocument(pathname);
     if (cached) return cached;
-    const url = new URL(request.url);
-    const byPath = await caches.match(url.pathname);
-    if (byPath) return byPath;
+
+    // Trip detail miss → travels hub (still usable offline from IndexedDB).
+    if (/^\/travels\/[^/]+$/.test(pathname)) {
+      const list = await matchDocument("/travels");
+      if (list) return list;
+    }
+
+    // Offline-allowed shell miss → home.
+    if (isOfflineDocumentPath(pathname) && pathname !== "/") {
+      const home = await matchDocument("/");
+      if (home) return home;
+    }
+
     return (
       (await caches.match(OFFLINE_URL)) ||
       new Response("Offline", {
@@ -143,36 +181,45 @@ self.addEventListener("fetch", (event) => {
 
   if (isStaticAsset(url)) {
     event.respondWith(
-      caches.match(request).then((cached) => {
+      caches.match(request).then(async (cached) => {
         if (cached) return cached;
-        return fetch(request).then((response) => {
+        try {
+          const response = await fetch(request);
           if (response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE).then((cache) => cache.put(request, copy));
+            const cache = await caches.open(CACHE);
+            await cache.put(request, response.clone());
           }
           return response;
-        });
+        } catch {
+          return (
+            cached ||
+            new Response("", {
+              status: 503,
+              statusText: "Offline",
+            })
+          );
+        }
       }),
     );
     return;
   }
 
-  // Soft App Router navigations are not mode=navigate. Offline they fail;
-  // clients should hard-navigate. Still try cache for same-origin document-ish GETs.
-  if (isNavigation(request) || isRscRequest(request, url)) {
-    if (isRscRequest(request, url)) {
-      // Never invent RSC payloads from HTML cache — let the client hard-nav.
-      event.respondWith(
-        fetch(request).catch(
-          () =>
-            new Response(null, {
-              status: 503,
-              statusText: "Offline",
-            }),
-        ),
-      );
-      return;
-    }
+  if (isRscRequest(request, url)) {
+    // Soft App Router navigations cannot reuse HTML cache. Fail fast offline
+    // so the client can hard-navigate to a cached document.
+    event.respondWith(
+      fetch(request).catch(
+        () =>
+          new Response(null, {
+            status: 503,
+            statusText: "Offline",
+          }),
+      ),
+    );
+    return;
+  }
+
+  if (isNavigation(request) || isOfflineDocumentPath(url.pathname)) {
     event.respondWith(networkFirstDocument(request));
   }
 });

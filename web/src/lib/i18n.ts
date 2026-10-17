@@ -220,6 +220,7 @@ const ar = {
   offlineModePending:
     "لا يوجد اتصال — {count} مصروفات بانتظار المزامنة",
   offlineAddExpense: "سجّل مصروف",
+  offlineOpenTrip: "افتح الرحلة",
   offlineHomeTitle: "تعمل دون اتصال",
   offlineHomeBody:
     "يمكنك عرض آخر رصيد معروف وتسجيل مصروف أو مصروف رحلة. تحتاج الأيام والتقارير والدخل إلى اتصال.",
@@ -1436,6 +1437,7 @@ const en = {
   offlineModePendingOne: "You’re offline — 1 spend waiting to sync",
   offlineModePending: "You’re offline — {count} spends waiting to sync",
   offlineAddExpense: "Add spend",
+  offlineOpenTrip: "Open trip",
   offlineHomeTitle: "Working offline",
   offlineHomeBody:
     "You can see your last-known balance and log a spend or trip expense. Days, charts, and income need the network.",
