@@ -24,10 +24,7 @@ import {
   isLikelyOffline,
   isOfflineNetworkError,
 } from "@/lib/offline-queue";
-import {
-  CashWithdrawalChart,
-  type CashWithdrawalChartItem,
-} from "@/components/CashWithdrawalChart";
+import type { CashWithdrawalChartItem } from "@/components/CashWithdrawalChart";
 
 type Period = "day" | "week" | "month" | "year" | "range";
 type DayRow = { day: string; income: number; expense: number };
@@ -1306,33 +1303,32 @@ export default function AnalyticsPage() {
       ) : null}
 
       {period === "month" && (periodIncome || cashWithdrawals) ? (
-        <section className="mt-4 space-y-2">
-          <p className="px-0.5 text-xs text-[var(--muted)]">
-            {t("chartsMoneyFlowsHint")}
-          </p>
-          {periodIncome ? (
-            <Link
-              href={`/income?period=${encodeURIComponent(monthKey)}`}
-              className="surface flex items-center gap-3 overflow-hidden rounded-[1.35rem] p-3.5 transition hover:bg-[var(--panel-soft)] active:scale-[0.99]"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-baseline justify-between gap-2">
-                  <h2 className="truncate text-sm font-semibold text-[var(--foreground)]">
+        <section className="mt-5">
+          <div className="mb-2 flex items-end justify-between gap-3 px-0.5">
+            <div>
+              <h2 className="text-base font-bold tracking-tight text-[var(--foreground)]">
+                {t("analyticsMoneyActivity")}
+              </h2>
+              <p className="mt-0.5 text-xs text-[var(--muted)]">
+                {t("analyticsMoneyActivityHint")}
+              </p>
+            </div>
+          </div>
+
+          <div className="surface divide-y divide-[var(--surface-border)] overflow-hidden rounded-[1.5rem]">
+            {periodIncome ? (
+              <Link
+                href={`/income?period=${encodeURIComponent(monthKey)}`}
+                className="group flex min-h-[4.75rem] items-center gap-3 px-4 py-3 transition hover:bg-[var(--panel-soft)] active:bg-[var(--panel-soft)]"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-600/12 text-lg font-bold text-emerald-800">
+                  +
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="truncate text-sm font-semibold text-[var(--foreground)]">
                     {t("incomeLogTitle")}
-                  </h2>
-                  <span className="shrink-0 text-xs font-semibold text-emerald-800">
-                    {t("incomeLogOpenDetails")} →
-                  </span>
-                </div>
-                <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                  <p className="text-lg font-bold tabular-nums text-emerald-800">
-                    <Money
-                      amount={periodIncome.total}
-                      currency={currency}
-                      locale={locale}
-                    />
-                  </p>
-                  <p className="text-xs font-medium text-[var(--muted)]">
+                  </h3>
+                  <p className="mt-0.5 truncate text-xs text-[var(--muted)]">
                     {periodIncome.count === 1
                       ? t("incomeLogCountOne")
                       : fill(t("incomeLogCount"), {
@@ -1340,44 +1336,40 @@ export default function AnalyticsPage() {
                         })}
                   </p>
                 </div>
-              </div>
-              <div className="w-[4.5rem] shrink-0 self-stretch opacity-90">
-                <CashWithdrawalChart
-                  items={periodIncome.items}
-                  periodFrom={periodIncome.periodFrom}
-                  periodTo={periodIncome.periodTo}
-                  currency={currency}
-                  locale={locale}
-                  label={t("incomeLogDailyChart")}
-                  compact
-                  tone="income"
-                />
-              </div>
-            </Link>
-          ) : null}
-          {active?.kind === "PERSONAL" && cashWithdrawals ? (
-            <Link
-              href={`/cash-withdrawals?period=${encodeURIComponent(monthKey)}`}
-              className="surface flex items-center gap-3 overflow-hidden rounded-[1.35rem] p-3.5 transition hover:bg-[var(--panel-soft)] active:scale-[0.99]"
-            >
-              <div className="min-w-0 flex-1">
-                <div className="flex items-baseline justify-between gap-2">
-                  <h2 className="truncate text-sm font-semibold text-[var(--foreground)]">
-                    {t("cashWithdrawalsTitle")}
-                  </h2>
-                  <span className="shrink-0 text-xs font-semibold text-[var(--accent-b-text)]">
-                    {t("cashWithdrawalsOpenDetails")} →
-                  </span>
-                </div>
-                <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-                  <p className="text-lg font-bold tabular-nums text-[var(--foreground)]">
+                <div className="shrink-0 text-end">
+                  <p className="text-base font-bold tabular-nums text-emerald-800">
                     <Money
-                      amount={cashWithdrawals.total}
+                      amount={periodIncome.total}
                       currency={currency}
                       locale={locale}
                     />
                   </p>
-                  <p className="text-xs font-medium text-[var(--muted)]">
+                  <p className="mt-0.5 text-[11px] font-semibold text-emerald-800/75">
+                    {t("incomeLogOpenDetails")}
+                  </p>
+                </div>
+                <span
+                  className="shrink-0 text-xl text-[var(--muted)] transition-transform group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5"
+                  aria-hidden
+                >
+                  ›
+                </span>
+              </Link>
+            ) : null}
+
+            {active?.kind === "PERSONAL" && cashWithdrawals ? (
+              <Link
+                href={`/cash-withdrawals?period=${encodeURIComponent(monthKey)}`}
+                className="group flex min-h-[4.75rem] items-center gap-3 px-4 py-3 transition hover:bg-[var(--panel-soft)] active:bg-[var(--panel-soft)]"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[var(--accent-b-soft)] text-lg font-bold text-[var(--accent-b-text)]">
+                  −
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="truncate text-sm font-semibold text-[var(--foreground)]">
+                    {t("cashWithdrawalsTitle")}
+                  </h3>
+                  <p className="mt-0.5 truncate text-xs text-[var(--muted)]">
                     {cashWithdrawals.count === 1
                       ? t("cashWithdrawalsCountOne")
                       : fill(t("cashWithdrawalsCount"), {
@@ -1385,20 +1377,27 @@ export default function AnalyticsPage() {
                         })}
                   </p>
                 </div>
-              </div>
-              <div className="w-[4.5rem] shrink-0 self-stretch opacity-90">
-                <CashWithdrawalChart
-                  items={cashWithdrawals.items}
-                  periodFrom={cashWithdrawals.periodFrom}
-                  periodTo={cashWithdrawals.periodTo}
-                  currency={currency}
-                  locale={locale}
-                  label={t("cashWithdrawalsDailyChart")}
-                  compact
-                />
-              </div>
-            </Link>
-          ) : null}
+                <div className="shrink-0 text-end">
+                  <p className="text-base font-bold tabular-nums text-[var(--foreground)]">
+                    <Money
+                      amount={cashWithdrawals.total}
+                      currency={currency}
+                      locale={locale}
+                    />
+                  </p>
+                  <p className="mt-0.5 text-[11px] font-semibold text-[var(--accent-b-text)]">
+                    {t("cashWithdrawalsOpenDetails")}
+                  </p>
+                </div>
+                <span
+                  className="shrink-0 text-xl text-[var(--muted)] transition-transform group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5"
+                  aria-hidden
+                >
+                  ›
+                </span>
+              </Link>
+            ) : null}
+          </div>
         </section>
       ) : null}
 
