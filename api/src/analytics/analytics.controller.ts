@@ -104,6 +104,15 @@ export class AnalyticsController {
     );
   }
 
+  @Get('income')
+  async income(
+    @CurrentMembership() membership: MembershipContext,
+    @CurrentUser() user: AuthUser,
+    @Query('period') period?: string,
+  ) {
+    return this.analytics.listPeriodIncome(membership, user.id, period);
+  }
+
   @Get('category-log')
   async categoryLog(
     @CurrentMembership() membership: MembershipContext,

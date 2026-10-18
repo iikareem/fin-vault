@@ -1081,4 +1081,68 @@ export class AnalyticsService {
       })),
     };
   }
+
+  /** Income entries in a payday (personal) or calendar (house) budget period. */
+  async listPeriodIncome(
+    membership: MembershipContext,
+    userId: string,
+    periodKey?: string,
+  ) {
+    const PERIOD_KEY_RE = /^\d{4}-\d{2}$/;
+    if (periodKey && !PERIOD_KEY_RE.test(periodKey)) {
+      throw new BadRequestException('Pick a valid month (YYYY-MM)');
+    }
+    const startDay = await this.resolveBudgetStartDay(membership, userId);
+    const range = budgetMonthRange(periodKey ?? new Date(), startDay);
+
+    const rows = await this.prisma.transaction.findMany({
+      where: {
+        householdId: membership.householdId,
+        type: 'INCOME',
+        occurredOn: {
+          gte: dateOnlyUtc(range.from),
+          lte: dateOnlyUtc(range.to),
+        },
+        category: {
+          name: {
+            notIn: ['Wallet transfer', 'Loan collected', 'Loan received'],
+          },
+        },
+      },
+      orderBy: [{ occurredOn: 'desc' }, { createdAt: 'desc' }],
+      take: 500,
+      select: {
+        id: true,
+        amount: true,
+        occurredOn: true,
+        note: true,
+        createdAt: true,
+        category: {
+          select: { id: true, name: true, nameAr: true, emoji: true, color: true },
+        },
+        account: { select: { id: true, name: true, type: true } },
+      },
+    });
+
+    const items = rows.map((row) => ({
+      id: row.id,
+      amount: Number(row.amount),
+      occurredOn: isoFromDbDate(row.occurredOn),
+      note: row.note,
+      createdAt: row.createdAt.toISOString(),
+      category: row.category,
+      account: row.account,
+    }));
+    const total = items.reduce((s, row) => s + row.amount, 0);
+
+    return {
+      periodKey: range.key,
+      periodFrom: range.from,
+      periodTo: range.to,
+      budgetMonthStartDay: startDay,
+      total,
+      count: items.length,
+      items,
+    };
+  }
 }

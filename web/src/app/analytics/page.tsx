@@ -65,6 +65,13 @@ type CashWithdrawalsSummary = {
   count: number;
   items: CashWithdrawalChartItem[];
 };
+type IncomeSummary = {
+  periodFrom: string;
+  periodTo: string;
+  total: number;
+  count: number;
+  items: CashWithdrawalChartItem[];
+};
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -309,6 +316,7 @@ export default function AnalyticsPage() {
   const [savingsOpening, setSavingsOpening] = useState(0);
   const [cashWithdrawals, setCashWithdrawals] =
     useState<CashWithdrawalsSummary | null>(null);
+  const [periodIncome, setPeriodIncome] = useState<IncomeSummary | null>(null);
   const [selectedBarKey, setSelectedBarKey] = useState<string | null>(null);
   const [error, setError] = useState("");
   const currency = active?.currency ?? "EGP";
@@ -413,23 +421,44 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    if (!active || active.kind !== "PERSONAL" || period !== "month") {
+    if (!active || period !== "month") {
       setCashWithdrawals(null);
+      setPeriodIncome(null);
       return;
     }
 
-    api<CashWithdrawalsSummary>(
+    const incomeReq = api<IncomeSummary>(
       householdPath(
         active.householdId,
-        `/accounts/cash-withdrawals?period=${encodeURIComponent(monthKey)}`,
+        `/analytics/income?period=${encodeURIComponent(monthKey)}`,
       ),
     )
       .then((result) => {
-        if (!cancelled) setCashWithdrawals(result);
+        if (!cancelled) setPeriodIncome(result);
       })
       .catch(() => {
-        if (!cancelled) setCashWithdrawals(null);
+        if (!cancelled) setPeriodIncome(null);
       });
+
+    const withdrawReq =
+      active.kind === "PERSONAL"
+        ? api<CashWithdrawalsSummary>(
+            householdPath(
+              active.householdId,
+              `/accounts/cash-withdrawals?period=${encodeURIComponent(monthKey)}`,
+            ),
+          )
+            .then((result) => {
+              if (!cancelled) setCashWithdrawals(result);
+            })
+            .catch(() => {
+              if (!cancelled) setCashWithdrawals(null);
+            })
+        : Promise.resolve().then(() => {
+            if (!cancelled) setCashWithdrawals(null);
+          });
+
+    void Promise.all([incomeReq, withdrawReq]);
 
     return () => {
       cancelled = true;
@@ -1276,59 +1305,100 @@ export default function AnalyticsPage() {
         </section>
       ) : null}
 
-      {active?.kind === "PERSONAL" &&
-      period === "month" &&
-      cashWithdrawals ? (
-        <section className="surface mt-4 overflow-hidden rounded-[1.5rem] p-4">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className="text-sm font-semibold text-[var(--foreground)]">
-                {t("cashWithdrawalsTitle")}
-              </h2>
-              <p className="mt-0.5 text-xs leading-snug text-[var(--muted)]">
-                {t("cashWithdrawalsDailyChart")}
-              </p>
-            </div>
+      {period === "month" && (periodIncome || cashWithdrawals) ? (
+        <section className="mt-4 space-y-2">
+          <p className="px-0.5 text-xs text-[var(--muted)]">
+            {t("chartsMoneyFlowsHint")}
+          </p>
+          {periodIncome ? (
             <Link
-              href={`/cash-withdrawals?period=${encodeURIComponent(monthKey)}`}
-              className="shrink-0 text-xs font-semibold text-[var(--accent-b-text)]"
+              href={`/income?period=${encodeURIComponent(monthKey)}`}
+              className="surface flex items-center gap-3 overflow-hidden rounded-[1.35rem] p-3.5 transition hover:bg-[var(--panel-soft)] active:scale-[0.99]"
             >
-              {t("cashWithdrawalsPastLink")} →
-            </Link>
-          </div>
-
-          <div className="mt-4 flex items-end justify-between gap-3">
-            <div>
-              <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
-                {t("cashWithdrawalsPeriodTotal")}
-              </p>
-              <p className="mt-1 text-2xl font-bold tabular-nums text-[var(--foreground)]">
-                <Money
-                  amount={cashWithdrawals.total}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <h2 className="truncate text-sm font-semibold text-[var(--foreground)]">
+                    {t("incomeLogTitle")}
+                  </h2>
+                  <span className="shrink-0 text-xs font-semibold text-emerald-800">
+                    {t("incomeLogOpenDetails")} →
+                  </span>
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <p className="text-lg font-bold tabular-nums text-emerald-800">
+                    <Money
+                      amount={periodIncome.total}
+                      currency={currency}
+                      locale={locale}
+                    />
+                  </p>
+                  <p className="text-xs font-medium text-[var(--muted)]">
+                    {periodIncome.count === 1
+                      ? t("incomeLogCountOne")
+                      : fill(t("incomeLogCount"), {
+                          n: String(periodIncome.count),
+                        })}
+                  </p>
+                </div>
+              </div>
+              <div className="w-[4.5rem] shrink-0 self-stretch opacity-90">
+                <CashWithdrawalChart
+                  items={periodIncome.items}
+                  periodFrom={periodIncome.periodFrom}
+                  periodTo={periodIncome.periodTo}
                   currency={currency}
                   locale={locale}
+                  label={t("incomeLogDailyChart")}
+                  compact
+                  tone="income"
                 />
-              </p>
-            </div>
-            <p className="rounded-full bg-[var(--accent-b-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--accent-b-text)]">
-              {cashWithdrawals.count === 1
-                ? t("cashWithdrawalsCountOne")
-                : fill(t("cashWithdrawalsCount"), {
-                    n: String(cashWithdrawals.count),
-                  })}
-            </p>
-          </div>
-
-          <div className="mt-4 rounded-2xl bg-[var(--panel-soft)] px-2.5 pb-2.5 pt-4">
-            <CashWithdrawalChart
-              items={cashWithdrawals.items}
-              periodFrom={cashWithdrawals.periodFrom}
-              periodTo={cashWithdrawals.periodTo}
-              currency={currency}
-              locale={locale}
-              label={t("cashWithdrawalsDailyChart")}
-            />
-          </div>
+              </div>
+            </Link>
+          ) : null}
+          {active?.kind === "PERSONAL" && cashWithdrawals ? (
+            <Link
+              href={`/cash-withdrawals?period=${encodeURIComponent(monthKey)}`}
+              className="surface flex items-center gap-3 overflow-hidden rounded-[1.35rem] p-3.5 transition hover:bg-[var(--panel-soft)] active:scale-[0.99]"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex items-baseline justify-between gap-2">
+                  <h2 className="truncate text-sm font-semibold text-[var(--foreground)]">
+                    {t("cashWithdrawalsTitle")}
+                  </h2>
+                  <span className="shrink-0 text-xs font-semibold text-[var(--accent-b-text)]">
+                    {t("cashWithdrawalsOpenDetails")} →
+                  </span>
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <p className="text-lg font-bold tabular-nums text-[var(--foreground)]">
+                    <Money
+                      amount={cashWithdrawals.total}
+                      currency={currency}
+                      locale={locale}
+                    />
+                  </p>
+                  <p className="text-xs font-medium text-[var(--muted)]">
+                    {cashWithdrawals.count === 1
+                      ? t("cashWithdrawalsCountOne")
+                      : fill(t("cashWithdrawalsCount"), {
+                          n: String(cashWithdrawals.count),
+                        })}
+                  </p>
+                </div>
+              </div>
+              <div className="w-[4.5rem] shrink-0 self-stretch opacity-90">
+                <CashWithdrawalChart
+                  items={cashWithdrawals.items}
+                  periodFrom={cashWithdrawals.periodFrom}
+                  periodTo={cashWithdrawals.periodTo}
+                  currency={currency}
+                  locale={locale}
+                  label={t("cashWithdrawalsDailyChart")}
+                  compact
+                />
+              </div>
+            </Link>
+          ) : null}
         </section>
       ) : null}
 

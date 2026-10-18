@@ -16,6 +16,8 @@ type Props = {
   label: string;
   hidden?: boolean;
   compact?: boolean;
+  /** accent = cash withdrawals (default), income = emerald */
+  tone?: "accent" | "income";
 };
 
 function parseDateKey(key: string) {
@@ -60,7 +62,10 @@ export function CashWithdrawalChart({
   label,
   hidden = false,
   compact = false,
+  tone = "accent",
 }: Props) {
+  const activeBar =
+    tone === "income" ? "bg-emerald-600" : "bg-[var(--accent-b)]";
   const totals = new Map<string, number>();
   for (const item of items) {
     totals.set(
@@ -105,7 +110,7 @@ export function CashWithdrawalChart({
                   hidden
                     ? "bg-[var(--surface-border)] opacity-55"
                     : amount > 0
-                      ? "bg-[var(--accent-b)]"
+                      ? activeBar
                       : "bg-[var(--panel-soft)]"
                 }`}
                 style={{ height: `${height}%` }}
