@@ -13,6 +13,7 @@ import {
 import { CreateTravelDto } from './dto/create-travel.dto';
 import { UpdateTravelDto } from './dto/update-travel.dto';
 import { AddTravelSpendDto } from './dto/add-travel-spend.dto';
+import { UpdateTravelSpendDto } from './dto/update-travel-spend.dto';
 
 type TravelStatus = 'upcoming' | 'active' | 'past';
 
@@ -443,5 +444,111 @@ export class TravelsService {
       account: created.account,
       travel: this.shape(travel, await this.spentTotal(travelId)),
     };
+  }
+
+  async updateSpend(
+    householdId: string,
+    travelId: string,
+    spendId: string,
+    dto: UpdateTravelSpendDto,
+  ) {
+    const travel = await this.prisma.travel.findFirst({
+      where: { id: travelId, householdId },
+    });
+    if (!travel) throw new NotFoundException();
+
+    const tx = await this.prisma.transaction.findFirst({
+      where: {
+        id: spendId,
+        householdId,
+        travelId,
+        type: { in: ['EXPENSE', 'TRACK'] },
+      },
+    });
+    if (!tx) throw new NotFoundException();
+
+    const data: Prisma.TransactionUpdateInput = {};
+
+    if (dto.amount !== undefined) {
+      data.amount = new Prisma.Decimal(dto.amount);
+    }
+    if (dto.note !== undefined) {
+      data.note = dto.note.trim();
+    }
+    if (dto.occurredOn) {
+      data.occurredOn = dateOnlyUtc(dto.occurredOn);
+    }
+    if (dto.paidFrom) {
+      data.type = dto.paidFrom === 'CURRENT' ? 'EXPENSE' : 'TRACK';
+    }
+    if (dto.categoryId) {
+      const category = await this.prisma.category.findFirst({
+        where: {
+          id: dto.categoryId,
+          householdId,
+          kind: 'EXPENSE',
+        },
+      });
+      if (!category || category.hidden) {
+        throw new BadRequestException('Pick an expense category');
+      }
+      data.category = { connect: { id: category.id } };
+    }
+
+    const updated = await this.prisma.transaction.update({
+      where: { id: spendId },
+      data,
+      include: {
+        category: {
+          select: {
+            id: true,
+            name: true,
+            nameAr: true,
+            color: true,
+            emoji: true,
+          },
+        },
+        account: { select: { id: true, name: true } },
+      },
+    });
+
+    return {
+      id: updated.id,
+      amount: Number(updated.amount),
+      type: updated.type,
+      paidFrom:
+        updated.type === 'EXPENSE'
+          ? ('CURRENT' as const)
+          : ('CASH' as const),
+      occurredOn: isoFromDbDate(updated.occurredOn),
+      note: updated.note,
+      category: updated.category,
+      account: updated.account,
+      travel: this.shape(travel, await this.spentTotal(travelId)),
+    };
+  }
+
+  async removeSpend(
+    householdId: string,
+    travelId: string,
+    spendId: string,
+  ) {
+    const travel = await this.prisma.travel.findFirst({
+      where: { id: travelId, householdId },
+    });
+    if (!travel) throw new NotFoundException();
+
+    const tx = await this.prisma.transaction.findFirst({
+      where: {
+        id: spendId,
+        householdId,
+        travelId,
+        type: { in: ['EXPENSE', 'TRACK'] },
+      },
+    });
+    if (!tx) throw new NotFoundException();
+
+    await this.prisma.transaction.delete({ where: { id: spendId } });
+    return { ok: true };
   }
 }

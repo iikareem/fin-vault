@@ -19,6 +19,7 @@ import { MembershipContext } from '../households/membership-context';
 import { CreateTravelDto } from './dto/create-travel.dto';
 import { UpdateTravelDto } from './dto/update-travel.dto';
 import { AddTravelSpendDto } from './dto/add-travel-spend.dto';
+import { UpdateTravelSpendDto } from './dto/update-travel-spend.dto';
 
 @Controller('households/:householdId/travels')
 @UseGuards(JwtAuthGuard, HouseholdGuard, PersonalKindGuard)
@@ -89,6 +90,34 @@ export class TravelsController {
       user.id,
       travelId,
       dto,
+    );
+  }
+
+  @Patch(':travelId/spends/:spendId')
+  updateSpend(
+    @CurrentMembership() membership: MembershipContext,
+    @Param('travelId') travelId: string,
+    @Param('spendId') spendId: string,
+    @Body() dto: UpdateTravelSpendDto,
+  ) {
+    return this.travels.updateSpend(
+      membership.householdId,
+      travelId,
+      spendId,
+      dto,
+    );
+  }
+
+  @Delete(':travelId/spends/:spendId')
+  removeSpend(
+    @CurrentMembership() membership: MembershipContext,
+    @Param('travelId') travelId: string,
+    @Param('spendId') spendId: string,
+  ) {
+    return this.travels.removeSpend(
+      membership.householdId,
+      travelId,
+      spendId,
     );
   }
 }

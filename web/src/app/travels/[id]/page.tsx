@@ -111,6 +111,8 @@ export default function TravelDetailPage() {
   const [note, setNote] = useState("");
   const [showSpend, setShowSpend] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+  const [editingSpendId, setEditingSpendId] = useState("");
+  const [confirmDeleteSpendId, setConfirmDeleteSpendId] = useState("");
   const [editName, setEditName] = useState("");
   const [editCurrency, setEditCurrency] = useState("EGP");
   const [editStartsOn, setEditStartsOn] = useState(todayISO());
@@ -173,6 +175,8 @@ export default function TravelDetailPage() {
       setOccurredOn(todayISO());
       setShowSpend(false);
       setShowEdit(false);
+      setEditingSpendId("");
+      setConfirmDeleteSpendId("");
       setUsingOfflineData(false);
       rememberOfflineTrip(id);
       void cacheOfflinePage(`/travels/${id}`);
@@ -382,6 +386,100 @@ export default function TravelDetailPage() {
     }
   }
 
+  function openSpendEdit(item: TravelDetail["items"][number]) {
+    if (item.pendingSync || offline) return;
+    if (editingSpendId === item.id) {
+      setEditingSpendId("");
+      setConfirmDeleteSpendId("");
+      return;
+    }
+    setEditingSpendId(item.id);
+    setConfirmDeleteSpendId("");
+    setShowSpend(false);
+    setShowEdit(false);
+    setConfirmEnd(false);
+    setConfirmDelete(false);
+    setAmount(String(item.amount));
+    setCategoryId(item.category.id);
+    setPaidFrom(item.paidFrom);
+    setOccurredOn(item.occurredOn);
+    setNote(item.note ?? "");
+    setError("");
+    if (hid) {
+      void loadCategories(hid).catch((e) =>
+        setError(e instanceof Error ? e.message : t("travelsSaveFailed")),
+      );
+    }
+  }
+
+  async function onSaveSpendEdit(e: FormEvent) {
+    e.preventDefault();
+    if (!hid || !trip || !editingSpendId || busy) return;
+    const value = parseAmount(amount);
+    if (!Number.isFinite(value) || value <= 0) {
+      setError(t("travelsAmountHint"));
+      return;
+    }
+    if (!categoryId) {
+      setError(t("travelsCategoryHint"));
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      await api(
+        householdPath(
+          hid,
+          `/travels/${trip.id}/spends/${editingSpendId}`,
+        ),
+        {
+          method: "PATCH",
+          body: JSON.stringify({
+            amount: value,
+            categoryId,
+            paidFrom,
+            occurredOn,
+            note: note.trim(),
+          }),
+        },
+      );
+      setEditingSpendId("");
+      setConfirmDeleteSpendId("");
+      setAmount("");
+      setNote("");
+      await load(hid, trip.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("travelsSaveFailed"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDeleteSpend(spendId: string) {
+    if (!hid || !trip || busy) return;
+    if (confirmDeleteSpendId !== spendId) {
+      setConfirmDeleteSpendId(spendId);
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      await api(
+        householdPath(hid, `/travels/${trip.id}/spends/${spendId}`),
+        { method: "DELETE" },
+      );
+      setEditingSpendId("");
+      setConfirmDeleteSpendId("");
+      setAmount("");
+      setNote("");
+      await load(hid, trip.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("travelsSaveFailed"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function onSaveEdit(e: FormEvent) {
     e.preventDefault();
     if (!hid || !trip || editBusy) return;
@@ -432,6 +530,8 @@ export default function TravelDetailPage() {
       setConfirmEnd(true);
       setConfirmDelete(false);
       setShowEdit(false);
+      setEditingSpendId("");
+      setConfirmDeleteSpendId("");
       return;
     }
     setEnding(true);
@@ -540,8 +640,14 @@ export default function TravelDetailPage() {
   function openSpend() {
     setShowSpend(true);
     setShowEdit(false);
+    setEditingSpendId("");
+    setConfirmDeleteSpendId("");
     setConfirmEnd(false);
     setConfirmDelete(false);
+    setAmount("");
+    setNote("");
+    setPaidFrom("CURRENT");
+    setOccurredOn(todayISO());
     setError("");
     if (hid) {
       void loadCategories(hid).catch((e) =>
@@ -555,6 +661,8 @@ export default function TravelDetailPage() {
     syncEditForm(trip);
     setShowEdit(true);
     setShowSpend(false);
+    setEditingSpendId("");
+    setConfirmDeleteSpendId("");
     setConfirmEnd(false);
     setConfirmDelete(false);
     setError("");
@@ -563,6 +671,8 @@ export default function TravelDetailPage() {
   function closePanels() {
     setShowSpend(false);
     setShowEdit(false);
+    setEditingSpendId("");
+    setConfirmDeleteSpendId("");
     setError("");
   }
 
@@ -713,7 +823,7 @@ export default function TravelDetailPage() {
         </div>
       </section>
 
-      {isOpen && !showSpend && !showEdit ? (
+      {isOpen && !showSpend && !showEdit && !editingSpendId ? (
         <button
           type="button"
           onClick={openSpend}
@@ -896,7 +1006,7 @@ export default function TravelDetailPage() {
         </form>
       ) : null}
 
-      {error && !showSpend ? (
+      {error && !showSpend && !editingSpendId ? (
         <p className="mb-3 text-sm text-red-700">{error}</p>
       ) : null}
 
@@ -951,52 +1061,171 @@ export default function TravelDetailPage() {
       ) : null}
 
       <section className="mb-5">
-        <h2 className="mb-2.5 text-base font-semibold text-[var(--foreground)]">
-          {t("travelsLog")}
-        </h2>
+        <div className="mb-2.5 flex items-end justify-between gap-3">
+          <h2 className="text-base font-semibold text-[var(--foreground)]">
+            {t("travelsLog")}
+          </h2>
+          {(trip.items?.length ?? 0) > 0 && !offline ? (
+            <p className="text-xs font-medium text-[var(--muted)]">
+              {t("travelsTapSpendToEdit")}
+            </p>
+          ) : null}
+        </div>
         {(trip.items?.length ?? 0) === 0 ? (
           <div className="surface rounded-[1.35rem] p-4 text-sm text-[var(--muted)]">
             {t("travelsLogEmpty")}
           </div>
         ) : (
           <ul className="space-y-2">
-            {(trip.items ?? []).map((item) => (
-              <li
-                key={item.id}
-                className="surface flex items-start gap-3 rounded-[1.35rem] px-4 py-3"
-              >
-                <span
-                  className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ background: item.category.color || "#0369a1" }}
-                  aria-hidden
-                />
-                <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-[15px] font-semibold">
-                      {categoryLabel(item.category, locale, t)}
-                    </p>
-                    <p className="mt-0.5 text-xs text-[var(--muted)]">
-                      <ItemDate value={item.occurredOn} locale={locale} /> ·{" "}
-                      {item.paidFrom === "CURRENT"
-                        ? t("travelsFromCurrent")
-                        : t("travelsFromCash")}
-                      {item.note ? ` · ${item.note}` : ""}
-                      {item.pendingSync
-                        ? ` · ${t("travelsPendingSync")}`
-                        : ""}
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-base font-bold tabular-nums text-red-800 dark:text-red-300">
-                    −
-                    <Money
-                      amount={item.amount}
-                      currency={trip.currency}
-                      locale={locale}
+            {(trip.items ?? []).map((item) => {
+              const editing = editingSpendId === item.id;
+              const editable = !item.pendingSync && !offline;
+              return (
+                <li
+                  key={item.id}
+                  className={`surface overflow-hidden rounded-[1.35rem] transition ${
+                    editing ? "ring-2 ring-[var(--accent-b)]" : ""
+                  }`}
+                >
+                  <button
+                    type="button"
+                    className="flex w-full items-start gap-3 px-4 py-3 text-start"
+                    onClick={() => (editable ? openSpendEdit(item) : undefined)}
+                    disabled={!editable}
+                  >
+                    <span
+                      className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
+                      style={{
+                        background: item.category.color || "#0369a1",
+                      }}
+                      aria-hidden
                     />
-                  </span>
-                </div>
-              </li>
-            ))}
+                    <div className="flex min-w-0 flex-1 items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-[15px] font-semibold">
+                          {categoryLabel(item.category, locale, t)}
+                        </p>
+                        <p className="mt-0.5 text-xs text-[var(--muted)]">
+                          <ItemDate value={item.occurredOn} locale={locale} /> ·{" "}
+                          {item.paidFrom === "CURRENT"
+                            ? t("travelsFromCurrent")
+                            : t("travelsFromCash")}
+                          {item.note ? ` · ${item.note}` : ""}
+                          {item.pendingSync
+                            ? ` · ${t("travelsPendingSync")}`
+                            : ""}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-base font-bold tabular-nums text-red-800 dark:text-red-300">
+                        −
+                        <Money
+                          amount={item.amount}
+                          currency={trip.currency}
+                          locale={locale}
+                        />
+                      </span>
+                    </div>
+                  </button>
+                  {editing ? (
+                    <form
+                      onSubmit={onSaveSpendEdit}
+                      className="space-y-3 border-t border-[var(--surface-border)] px-4 pb-4 pt-3"
+                    >
+                      <p className="text-sm font-semibold">
+                        {t("travelsEditSpend")}
+                      </p>
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
+                          {t("amount")}
+                        </span>
+                        <input
+                          inputMode="decimal"
+                          dir="ltr"
+                          className="amount-input field text-2xl font-bold"
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                          required
+                          autoFocus
+                        />
+                      </label>
+                      <div>
+                        <p className="mb-1.5 text-xs font-medium text-[var(--muted)]">
+                          {t("travelsPaidFrom")}
+                        </p>
+                        <div className="seg grid-cols-2">
+                          <button
+                            type="button"
+                            onClick={() => setPaidFrom("CURRENT")}
+                            className={`seg-item ${paidFrom === "CURRENT" ? "seg-active" : ""}`}
+                            aria-pressed={paidFrom === "CURRENT"}
+                          >
+                            <span className="seg-ico" aria-hidden>
+                              💵
+                            </span>
+                            {t("travelsFromCurrent")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPaidFrom("CASH")}
+                            className={`seg-item ${paidFrom === "CASH" ? "seg-active" : ""}`}
+                            aria-pressed={paidFrom === "CASH"}
+                          >
+                            <span className="seg-ico" aria-hidden>
+                              📋
+                            </span>
+                            {t("travelsFromCash")}
+                          </button>
+                        </div>
+                      </div>
+                      <CategoryPicker
+                        categories={expenseCats}
+                        value={categoryId}
+                        onChange={setCategoryId}
+                      />
+                      <div className="surface rounded-[1.5rem] p-3.5 !shadow-none ring-1 ring-[var(--input-border)]">
+                        <DateField
+                          value={occurredOn}
+                          onChange={setOccurredOn}
+                        />
+                      </div>
+                      <label className="block">
+                        <span className="mb-1 block text-xs font-medium text-[var(--muted)]">
+                          {t("noteOptional")}
+                        </span>
+                        <input
+                          className="field text-base"
+                          value={note}
+                          onChange={(e) => setNote(e.target.value)}
+                          placeholder={t("notePlaceholder")}
+                        />
+                      </label>
+                      {error ? (
+                        <p className="text-sm text-red-700">{error}</p>
+                      ) : null}
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => onDeleteSpend(item.id)}
+                          className="flex min-h-12 flex-1 items-center justify-center rounded-[1.25rem] bg-[var(--panel-soft)] text-base font-semibold text-rose-700 ring-1 ring-[var(--input-border)] disabled:opacity-60 dark:text-rose-300"
+                        >
+                          {confirmDeleteSpendId === item.id
+                            ? t("confirmDelete")
+                            : t("deleteItem")}
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={busy}
+                          className="flex min-h-12 flex-[1.35] items-center justify-center rounded-[1.25rem] bg-sky-800 text-base font-bold text-white disabled:opacity-60"
+                        >
+                          {busy ? t("saving") : t("travelsEditSpendSave")}
+                        </button>
+                      </div>
+                    </form>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

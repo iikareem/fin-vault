@@ -1143,6 +1143,9 @@ const ar = {
   travelsByCategory: "حسب الفئة",
   travelsLog: "حركات الرحلة",
   travelsLogEmpty: "لا مصروفات بعد على هذه الرحلة.",
+  travelsTapSpendToEdit: "اضغط مصروفًا للتعديل",
+  travelsEditSpend: "تعديل المصروف",
+  travelsEditSpendSave: "حفظ المصروف",
   travelsEnd: "إنهاء الرحلة",
   travelsEndConfirm: "هل تريد إنهاء هذه الرحلة؟",
   travelsEndConfirmHint:
@@ -2382,6 +2385,9 @@ const en = {
   travelsByCategory: "By category",
   travelsLog: "Trip moves",
   travelsLogEmpty: "No spend on this trip yet.",
+  travelsTapSpendToEdit: "Tap a spend to edit",
+  travelsEditSpend: "Edit spend",
+  travelsEditSpendSave: "Save spend",
   travelsEnd: "End trip",
   travelsEndConfirm: "Are you sure you want to end this trip?",
   travelsEndConfirmHint:
