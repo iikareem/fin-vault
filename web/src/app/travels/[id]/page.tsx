@@ -15,6 +15,7 @@ import { DateField } from "@/components/DateField";
 import { CategoryPicker } from "@/components/CategoryPicker";
 import { categoryLabel, fill } from "@/lib/i18n";
 import { ItemDate } from "@/components/ItemDate";
+import { ItemTime } from "@/components/ItemTime";
 import { CURRENCY_OPTIONS } from "@/lib/currencies";
 import { formatItemDate } from "@/lib/calendar";
 import { LimitBar } from "@/components/LimitBar";
@@ -70,6 +71,7 @@ type TravelDetail = {
     amount: number;
     paidFrom: "CURRENT" | "CASH";
     occurredOn: string;
+    createdAt?: string;
     note: string;
     pendingSync?: boolean;
     category: {
@@ -96,7 +98,7 @@ function dayDistance(from: string, to: string) {
 
 export default function TravelDetailPage() {
   const { t, locale } = useI18n();
-  const { personal, setKind } = useBooks();
+  const { personal, setKind, skipAddConfirm } = useBooks();
   const params = useParams();
   const router = useRouter();
   const travelId = String(params.id ?? "");
@@ -113,6 +115,7 @@ export default function TravelDetailPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [editingSpendId, setEditingSpendId] = useState("");
   const [confirmDeleteSpendId, setConfirmDeleteSpendId] = useState("");
+  const [confirmSpendOpen, setConfirmSpendOpen] = useState(false);
   const [editName, setEditName] = useState("");
   const [editCurrency, setEditCurrency] = useState("EGP");
   const [editStartsOn, setEditStartsOn] = useState(todayISO());
@@ -135,6 +138,15 @@ export default function TravelDetailPage() {
       ),
     [cats],
   );
+  const selectedSpendCategory = useMemo(
+    () => expenseCats.find((c) => c.id === categoryId) ?? null,
+    [expenseCats, categoryId],
+  );
+  const confirmSpendAmount = parseAmount(amount);
+  const spendWalletToneClass =
+    paidFrom === "CASH"
+      ? "bg-stone-100 text-stone-800 ring-stone-300/80 dark:bg-stone-800/60 dark:text-stone-100 dark:ring-stone-600/60"
+      : "bg-emerald-100 text-emerald-950 ring-emerald-300/80 dark:bg-emerald-950/40 dark:text-emerald-100 dark:ring-emerald-700/60";
 
   const isOpen = trip?.status === "active" || trip?.status === "upcoming";
 
@@ -177,6 +189,7 @@ export default function TravelDetailPage() {
       setShowEdit(false);
       setEditingSpendId("");
       setConfirmDeleteSpendId("");
+      setConfirmSpendOpen(false);
       setUsingOfflineData(false);
       rememberOfflineTrip(id);
       void cacheOfflinePage(`/travels/${id}`);
@@ -315,6 +328,7 @@ export default function TravelDetailPage() {
           amount: value,
           paidFrom: body.paidFrom,
           occurredOn: body.occurredOn,
+          createdAt: new Date().toISOString(),
           note: body.note ?? "",
           pendingSync: true,
           category: {
@@ -330,60 +344,29 @@ export default function TravelDetailPage() {
     };
   }
 
-  async function onSpend(e: FormEvent) {
-    e.preventDefault();
-    if (!hid || !trip) return;
+  function validateSpendForm() {
     const value = parseAmount(amount);
     if (!Number.isFinite(value) || value <= 0) {
       setError(t("travelsAmountHint"));
-      return;
+      return false;
     }
     if (!categoryId) {
       setError(t("travelsCategoryHint"));
+      return false;
+    }
+    setError("");
+    return true;
+  }
+
+  function onSpend(e: FormEvent) {
+    e.preventDefault();
+    if (!hid || !trip || busy) return;
+    if (!validateSpendForm()) return;
+    if (skipAddConfirm) {
+      void confirmSaveSpend();
       return;
     }
-    setBusy(true);
-    setError("");
-    const path = householdPath(hid, `/travels/${trip.id}/spends`);
-    const body = {
-      amount: value,
-      categoryId,
-      paidFrom,
-      occurredOn,
-      ...(note.trim() ? { note: note.trim() } : {}),
-    };
-    try {
-      let queued = isLikelyOffline();
-      if (queued) {
-        await enqueueTransaction(path, body);
-      } else {
-        try {
-          await api(path, {
-            method: "POST",
-            body: JSON.stringify(body),
-          });
-        } catch (error) {
-          if (!isOfflineNetworkError(error)) throw error;
-          await enqueueTransaction(path, body);
-          queued = true;
-        }
-      }
-      setAmount("");
-      setNote("");
-      if (queued) {
-        const updated = addQueuedSpend(trip, value, body);
-        setTrip(updated);
-        setShowSpend(false);
-        setUsingOfflineData(true);
-        await saveTravelSnapshot(hid, trip.id, updated, cats);
-      } else {
-        await load(hid, trip.id);
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t("travelsSaveFailed"));
-    } finally {
-      setBusy(false);
-    }
+    setConfirmSpendOpen(true);
   }
 
   function openSpendEdit(item: TravelDetail["items"][number]) {
@@ -391,10 +374,12 @@ export default function TravelDetailPage() {
     if (editingSpendId === item.id) {
       setEditingSpendId("");
       setConfirmDeleteSpendId("");
+      setConfirmSpendOpen(false);
       return;
     }
     setEditingSpendId(item.id);
     setConfirmDeleteSpendId("");
+    setConfirmSpendOpen(false);
     setShowSpend(false);
     setShowEdit(false);
     setConfirmEnd(false);
@@ -412,42 +397,86 @@ export default function TravelDetailPage() {
     }
   }
 
-  async function onSaveSpendEdit(e: FormEvent) {
+  function onSaveSpendEdit(e: FormEvent) {
     e.preventDefault();
     if (!hid || !trip || !editingSpendId || busy) return;
+    if (!validateSpendForm()) return;
+    if (skipAddConfirm) {
+      void confirmSaveSpend();
+      return;
+    }
+    setConfirmSpendOpen(true);
+  }
+
+  async function confirmSaveSpend() {
+    if (!hid || !trip || busy) return;
     const value = parseAmount(amount);
-    if (!Number.isFinite(value) || value <= 0) {
-      setError(t("travelsAmountHint"));
-      return;
-    }
-    if (!categoryId) {
-      setError(t("travelsCategoryHint"));
-      return;
-    }
+    if (!Number.isFinite(value) || value <= 0 || !categoryId) return;
+
     setBusy(true);
     setError("");
     try {
-      await api(
-        householdPath(
-          hid,
-          `/travels/${trip.id}/spends/${editingSpendId}`,
-        ),
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            amount: value,
-            categoryId,
-            paidFrom,
-            occurredOn,
-            note: note.trim(),
-          }),
-        },
-      );
-      setEditingSpendId("");
-      setConfirmDeleteSpendId("");
+      if (editingSpendId) {
+        await api(
+          householdPath(
+            hid,
+            `/travels/${trip.id}/spends/${editingSpendId}`,
+          ),
+          {
+            method: "PATCH",
+            body: JSON.stringify({
+              amount: value,
+              categoryId,
+              paidFrom,
+              occurredOn,
+              note: note.trim(),
+            }),
+          },
+        );
+        setEditingSpendId("");
+        setConfirmDeleteSpendId("");
+        setConfirmSpendOpen(false);
+        setAmount("");
+        setNote("");
+        await load(hid, trip.id);
+        return;
+      }
+
+      const path = householdPath(hid, `/travels/${trip.id}/spends`);
+      const body = {
+        amount: value,
+        categoryId,
+        paidFrom,
+        occurredOn,
+        ...(note.trim() ? { note: note.trim() } : {}),
+      };
+      let queued = isLikelyOffline();
+      if (queued) {
+        await enqueueTransaction(path, body);
+      } else {
+        try {
+          await api(path, {
+            method: "POST",
+            body: JSON.stringify(body),
+          });
+        } catch (error) {
+          if (!isOfflineNetworkError(error)) throw error;
+          await enqueueTransaction(path, body);
+          queued = true;
+        }
+      }
       setAmount("");
       setNote("");
-      await load(hid, trip.id);
+      setConfirmSpendOpen(false);
+      if (queued) {
+        const updated = addQueuedSpend(trip, value, body);
+        setTrip(updated);
+        setShowSpend(false);
+        setUsingOfflineData(true);
+        await saveTravelSnapshot(hid, trip.id, updated, cats);
+      } else {
+        await load(hid, trip.id);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t("travelsSaveFailed"));
     } finally {
@@ -532,6 +561,7 @@ export default function TravelDetailPage() {
       setShowEdit(false);
       setEditingSpendId("");
       setConfirmDeleteSpendId("");
+      setConfirmSpendOpen(false);
       return;
     }
     setEnding(true);
@@ -642,6 +672,7 @@ export default function TravelDetailPage() {
     setShowEdit(false);
     setEditingSpendId("");
     setConfirmDeleteSpendId("");
+    setConfirmSpendOpen(false);
     setConfirmEnd(false);
     setConfirmDelete(false);
     setAmount("");
@@ -663,6 +694,7 @@ export default function TravelDetailPage() {
     setShowSpend(false);
     setEditingSpendId("");
     setConfirmDeleteSpendId("");
+    setConfirmSpendOpen(false);
     setConfirmEnd(false);
     setConfirmDelete(false);
     setError("");
@@ -673,6 +705,7 @@ export default function TravelDetailPage() {
     setShowEdit(false);
     setEditingSpendId("");
     setConfirmDeleteSpendId("");
+    setConfirmSpendOpen(false);
     setError("");
   }
 
@@ -1105,15 +1138,21 @@ export default function TravelDetailPage() {
                         <p className="truncate text-[15px] font-semibold">
                           {categoryLabel(item.category, locale, t)}
                         </p>
-                        <p className="mt-0.5 text-xs text-[var(--muted)]">
-                          <ItemDate value={item.occurredOn} locale={locale} /> ·{" "}
-                          {item.paidFrom === "CURRENT"
-                            ? t("travelsFromCurrent")
-                            : t("travelsFromCash")}
-                          {item.note ? ` · ${item.note}` : ""}
-                          {item.pendingSync
-                            ? ` · ${t("travelsPendingSync")}`
-                            : ""}
+                        <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-[var(--muted)]">
+                          <ItemDate value={item.occurredOn} locale={locale} />
+                          {item.createdAt ? (
+                            <ItemTime value={item.createdAt} locale={locale} />
+                          ) : null}
+                          <span>
+                            ·{" "}
+                            {item.paidFrom === "CURRENT"
+                              ? t("travelsFromCurrent")
+                              : t("travelsFromCash")}
+                            {item.note ? ` · ${item.note}` : ""}
+                            {item.pendingSync
+                              ? ` · ${t("travelsPendingSync")}`
+                              : ""}
+                          </span>
                         </p>
                       </div>
                       <span className="shrink-0 text-base font-bold tabular-nums text-red-800 dark:text-red-300">
@@ -1311,6 +1350,120 @@ export default function TravelDetailPage() {
               {t("travelsDelete")}
             </button>
           )}
+        </div>
+      ) : null}
+
+      {confirmSpendOpen ? (
+        <div
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-black/45 p-3 sm:items-center"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="travel-spend-confirm-title"
+          onClick={() => {
+            if (!busy) setConfirmSpendOpen(false);
+          }}
+        >
+          <div
+            className="surface w-full max-w-md overflow-hidden rounded-[1.75rem] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="border-b border-[var(--surface-border)] px-4 py-3.5">
+              <p
+                id="travel-spend-confirm-title"
+                className="text-base font-semibold text-[var(--foreground)]"
+              >
+                {t("addConfirmTitle")}
+              </p>
+              <p className="mt-0.5 text-xs leading-snug text-[var(--muted)]">
+                {t("addConfirmHint")}
+              </p>
+            </div>
+
+            <div className="space-y-3 px-4 py-4">
+              <div className="text-center">
+                <p className="text-xs font-medium text-[var(--muted)]">
+                  {t("amount")}
+                </p>
+                <p className="mt-1 text-3xl font-bold tabular-nums text-[var(--foreground)]">
+                  <Money
+                    amount={confirmSpendAmount}
+                    currency={trip.currency}
+                    locale={locale}
+                  />
+                </p>
+              </div>
+
+              <div
+                className={`rounded-2xl px-3 py-3 ring-1 ${spendWalletToneClass}`}
+              >
+                <p className="text-[11px] font-medium opacity-70">
+                  {paidFrom === "CASH"
+                    ? t("addConfirmNoCash")
+                    : t("addConfirmSource")}
+                </p>
+                <p className="mt-0.5 text-base font-bold">
+                  {paidFrom === "CASH"
+                    ? `📋 ${t("travelsFromCash")}`
+                    : `💵 ${t("currentWallet")}`}
+                </p>
+                <p className="mt-1 text-xs leading-snug opacity-80">
+                  {paidFrom === "CASH"
+                    ? t("travelsFromCashHint")
+                    : t("travelsFromCurrentHint")}
+                </p>
+              </div>
+
+              <dl className="space-y-2 text-sm">
+                {selectedSpendCategory ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <dt className="text-[var(--muted)]">{t("forWhat")}</dt>
+                    <dd className="font-semibold text-end">
+                      {categoryLabel(selectedSpendCategory, locale, t)}
+                    </dd>
+                  </div>
+                ) : null}
+                <div className="flex items-center justify-between gap-3">
+                  <dt className="text-[var(--muted)]">{t("day")}</dt>
+                  <dd>
+                    <ItemDate value={occurredOn} locale={locale} />
+                  </dd>
+                </div>
+                {note.trim() ? (
+                  <div className="flex items-start justify-between gap-3">
+                    <dt className="shrink-0 text-[var(--muted)]">
+                      {t("noteOptional")}
+                    </dt>
+                    <dd className="text-end font-medium leading-snug">
+                      {note.trim()}
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+
+              {error ? (
+                <p className="text-sm text-red-700">{error}</p>
+              ) : null}
+            </div>
+
+            <div className="flex gap-2 border-t border-[var(--surface-border)] px-4 py-3">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void confirmSaveSpend()}
+                className="flex min-h-12 flex-1 items-center justify-center rounded-3xl bg-emerald-800 text-base font-semibold text-white disabled:opacity-60"
+              >
+                {busy ? t("saving") : `✅ ${t("addConfirmAction")}`}
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setConfirmSpendOpen(false)}
+                className="min-h-12 rounded-3xl px-4 text-sm font-semibold text-[var(--muted)] disabled:opacity-60"
+              >
+                {t("subsCancel")}
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
 

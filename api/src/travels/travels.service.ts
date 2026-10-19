@@ -264,6 +264,7 @@ export class TravelsService {
         type: tx.type,
         paidFrom: tx.type === 'EXPENSE' ? ('CURRENT' as const) : ('CASH' as const),
         occurredOn: day,
+        createdAt: tx.createdAt.toISOString(),
         note: tx.note,
         category: cat,
         account: tx.account,
