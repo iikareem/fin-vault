@@ -1155,12 +1155,20 @@ export default function TravelDetailPage() {
                           </span>
                         </p>
                       </div>
-                      <span className="shrink-0 text-base font-bold tabular-nums text-red-800 dark:text-red-300">
-                        −
+                      <span
+                        className={`shrink-0 text-base font-bold tabular-nums ${
+                          item.paidFrom === "CASH"
+                            ? "text-[var(--muted)]"
+                            : "text-red-800 dark:text-red-300"
+                        }`}
+                      >
                         <Money
                           amount={item.amount}
                           currency={trip.currency}
                           locale={locale}
+                          extraSign={
+                            item.paidFrom === "CASH" ? undefined : "−"
+                          }
                         />
                       </span>
                     </div>
