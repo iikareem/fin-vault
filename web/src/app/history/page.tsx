@@ -39,6 +39,8 @@ type Tx = {
   amount: number;
   note: string;
   createdAt?: string;
+  travelId?: string | null;
+  travel?: { id: string; name: string } | null;
   category: {
     id?: string;
     name: string;
@@ -540,6 +542,7 @@ function HistoryInner() {
                   ? "track"
                   : "out";
             const wallet = walletLabel(tx.account, t);
+            const tripName = tx.travel?.name?.trim() || null;
             const subParts = [
               tx.note || null,
               tx.type === "TRACK" ? t("trackOnlyBadge") : wallet,
@@ -573,12 +576,19 @@ function HistoryInner() {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p
-                            className="truncate text-base font-bold text-[var(--foreground)]"
-                            dir="auto"
-                          >
-                            {categoryLabel(tx.category, locale, t)}
-                          </p>
+                          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                            <p
+                              className="truncate text-base font-bold text-[var(--foreground)]"
+                              dir="auto"
+                            >
+                              {categoryLabel(tx.category, locale, t)}
+                            </p>
+                            {tripName ? (
+                              <span className="inline-flex max-w-full items-center truncate rounded-lg bg-sky-800/10 px-2 py-0.5 text-[11px] font-semibold text-sky-900 ring-1 ring-sky-800/15 dark:text-sky-200">
+                                {fill(t("travelsDayOnTrip"), { name: tripName })}
+                              </span>
+                            ) : null}
+                          </div>
                           {(() => {
                             const showUser =
                               active?.kind === "HOUSE" &&

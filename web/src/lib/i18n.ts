@@ -1146,6 +1146,8 @@ const ar = {
   travelsTapSpendToEdit: "اضغط مصروفًا للتعديل",
   travelsEditSpend: "تعديل المصروف",
   travelsEditSpendSave: "حفظ المصروف",
+  travelsDayBadge: "رحلة",
+  travelsDayOnTrip: "رحلة · {name}",
   travelsEnd: "إنهاء الرحلة",
   travelsEndConfirm: "هل تريد إنهاء هذه الرحلة؟",
   travelsEndConfirmHint:
@@ -2388,6 +2390,8 @@ const en = {
   travelsTapSpendToEdit: "Tap a spend to edit",
   travelsEditSpend: "Edit spend",
   travelsEditSpendSave: "Save spend",
+  travelsDayBadge: "Trip",
+  travelsDayOnTrip: "Trip · {name}",
   travelsEnd: "End trip",
   travelsEndConfirm: "Are you sure you want to end this trip?",
   travelsEndConfirmHint:

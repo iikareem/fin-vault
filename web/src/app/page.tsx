@@ -86,6 +86,7 @@ type Tx = {
   amount: string | number;
   note: string;
   occurredOn?: string;
+  travel?: { id: string; name: string } | null;
   category: { name: string; nameAr?: string | null };
   user: { name: string; nameAr?: string | null };
   account?: { name: string; type?: string };
@@ -1838,6 +1839,13 @@ export default function HomePage() {
                           </span>
                         ) : null}
                       </span>
+                      {tx.travel?.name ? (
+                        <span className="mt-1 inline-flex max-w-full items-center truncate rounded-lg bg-sky-800/10 px-2 py-0.5 text-[11px] font-semibold text-sky-900 ring-1 ring-sky-800/15 dark:text-sky-200">
+                          {fill(t("travelsDayOnTrip"), {
+                            name: tx.travel.name,
+                          })}
+                        </span>
+                      ) : null}
                       <ItemDate
                         value={tx.occurredOn}
                         locale={locale}
@@ -1963,6 +1971,13 @@ export default function HomePage() {
                           </span>
                         ) : null}
                       </p>
+                      {tx.travel?.name ? (
+                        <span className="mt-0.5 inline-flex max-w-full items-center truncate rounded-lg bg-sky-800/10 px-2 py-0.5 text-[11px] font-semibold text-sky-900 ring-1 ring-sky-800/15 dark:text-sky-200">
+                          {fill(t("travelsDayOnTrip"), {
+                            name: tx.travel.name,
+                          })}
+                        </span>
+                      ) : null}
                       {meta ? (
                         <p className="mt-0.5 truncate text-xs text-[var(--muted)]">
                           {meta}

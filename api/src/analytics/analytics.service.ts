@@ -1001,6 +1001,7 @@ export class AnalyticsService {
         account: { select: { id: true, name: true } },
         category: { select: { id: true, name: true, nameAr: true, color: true, emoji: true, kind: true } },
         user: { select: { id: true, name: true, nameAr: true } },
+        travel: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -1046,12 +1047,16 @@ export class AnalyticsService {
       date,
       income,
       expense,
-      txs: txs.map((t) => ({
-        ...actorForSpace(membership.kind, t),
-        amount: Number(t.amount),
-        travelId: t.travelId,
-        createdAt: t.createdAt.toISOString(),
-      })),
+      txs: txs.map((t) => {
+        const { travel, travelId, ...rest } = t;
+        return {
+          ...actorForSpace(membership.kind, rest),
+          amount: Number(t.amount),
+          travelId: travelId,
+          travel: travel ? { id: travel.id, name: travel.name } : null,
+          createdAt: t.createdAt.toISOString(),
+        };
+      }),
       claims: claims.map((c) => {
         const reimbursed = c.reimbursements.reduce(
           (s, r) => s + Number(r.amount),

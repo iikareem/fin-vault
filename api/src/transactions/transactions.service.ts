@@ -23,11 +23,20 @@ export class TransactionsService {
         account: { select: { id: true, name: true, type: true } },
         category: { select: { id: true, name: true, nameAr: true, color: true, kind: true } },
         user: { select: { id: true, name: true, nameAr: true } },
+        travel: { select: { id: true, name: true } },
       },
       orderBy: [{ occurredOn: 'desc' }, { createdAt: 'desc' }],
       take: day ? 200 : 80,
     });
-    return rows.map((row) => actorForSpace(kind, row));
+    return rows.map((row) => {
+      const shaped = actorForSpace(kind, row);
+      return {
+        ...shaped,
+        travel: row.travel
+          ? { id: row.travel.id, name: row.travel.name }
+          : null,
+      };
+    });
   }
 
   async create(
