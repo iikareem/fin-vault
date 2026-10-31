@@ -174,6 +174,10 @@ export class AnalyticsService {
   async summary(membership: MembershipContext, userId: string) {
     const householdId = membership.householdId;
     const startDay = await this.resolveBudgetStartDay(membership, userId);
+    // Run before balance reads so Home's parallel /accounts call can race-safe claim.
+    if (membership.kind === 'PERSONAL') {
+      await this.softLimits.applyMonthStartSaveSweep(householdId, userId);
+    }
     const now = new Date();
     const today = dateOnlyUtc(isoLocal(now));
     const [totalMoney, cash, cashAccounts] = await Promise.all([

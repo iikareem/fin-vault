@@ -38,6 +38,9 @@ export type MonthSoftLimitStatus = {
   save: SaveTrack | null;
   spendAllowance: SpendAllowanceTrack | null;
   overLimit: boolean;
+  /** Current → Savings move for the closed period at this period's start. */
+  autoSweptAmount?: number;
+  autoSweepPreviousPeriodKey?: string | null;
 };
 
 type Props = {
@@ -278,6 +281,25 @@ export function MonthSoftLimitCard({
   const save = status.save;
   const allowance = status.spendAllowance;
   const incomeKnown = status.periodIncome > 0.001;
+  const sweptAmount =
+    status.autoSweptAmount != null && status.autoSweptAmount > 0.001
+      ? status.autoSweptAmount
+      : 0;
+
+  const sweepNotice =
+    sweptAmount > 0 ? (
+      <p className="text-xs leading-snug text-[var(--accent-a-text)]">
+        {fill(t("monthSaveSweptNotice"), {
+          amount: moneyVisible
+            ? new Intl.NumberFormat(locale === "ar" ? "ar-EG" : "en-US", {
+                style: "currency",
+                currency,
+                maximumFractionDigits: 2,
+              }).format(sweptAmount)
+            : "•••",
+        })}
+      </p>
+    ) : null;
 
   if (editing) {
     return (
@@ -447,6 +469,7 @@ export function MonthSoftLimitCard({
               </span>
             )}
           </div>
+          {sweepNotice}
           {hasPlan && save && verdict ? (
             <>
               {(leftToSpend != null || overSpend != null || leftToSave != null) && (
@@ -550,6 +573,8 @@ export function MonthSoftLimitCard({
             {hasPlan ? t("monthLimitEdit") : t("monthLimitSet")}
           </span>
         </div>
+
+        {sweepNotice}
 
         {hasPlan && save && verdict ? (
           <>

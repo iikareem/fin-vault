@@ -25,8 +25,14 @@ export class AccountsController {
   constructor(private accounts: AccountsService) {}
 
   @Get()
-  list(@CurrentMembership() membership: MembershipContext) {
-    return this.accounts.list(membership.householdId);
+  list(
+    @CurrentMembership() membership: MembershipContext,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.accounts.list(membership.householdId, {
+      kind: membership.kind,
+      userId: user.id,
+    });
   }
 
   @Get('cash-withdrawals')

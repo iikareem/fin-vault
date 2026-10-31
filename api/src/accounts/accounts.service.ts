@@ -15,6 +15,7 @@ import {
   dateOnlyUtc,
   isoFromDbDate,
 } from '../common/calendar';
+import { MonthSoftLimitsService } from '../month-soft-limits/month-soft-limits.service';
 
 export const WALLET_TRANSFER_CATEGORY = 'Wallet transfer';
 export const CASH_WITHDRAWAL_CATEGORY = 'Cash withdrawal';
@@ -23,9 +24,18 @@ const PERIOD_KEY_RE = /^\d{4}-\d{2}$/;
 
 @Injectable()
 export class AccountsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private softLimits: MonthSoftLimitsService,
+  ) {}
 
-  async list(householdId: string) {
+  async list(
+    householdId: string,
+    opts?: { kind: HouseholdKind; userId: string },
+  ) {
+    if (opts?.kind === 'PERSONAL' && opts.userId) {
+      await this.softLimits.applyMonthStartSaveSweep(householdId, opts.userId);
+    }
     await this.ensureCashPots(householdId);
     const accounts = await this.prisma.account.findMany({
       where: { householdId, archived: false, type: 'CASH' },
