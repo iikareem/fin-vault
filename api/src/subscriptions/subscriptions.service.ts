@@ -16,6 +16,7 @@ import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
 import { PaySubscriptionDto } from './dto/pay-subscription.dto';
 import { UnpaySubscriptionDto } from './dto/unpay-subscription.dto';
+import { SkipSubscriptionDto } from './dto/skip-subscription.dto';
 
 const SUB_COLORS = [
   '#4f46e5',
@@ -28,7 +29,13 @@ const SUB_COLORS = [
 
 const PERIOD_KEY_RE = /^\d{4}-\d{2}$/;
 
-type SubStatus = 'paid' | 'due' | 'upcoming' | 'overdue' | 'scheduled';
+type SubStatus =
+  | 'paid'
+  | 'skipped'
+  | 'due'
+  | 'upcoming'
+  | 'overdue'
+  | 'scheduled';
 
 type SubRow = {
   id: string;
@@ -58,6 +65,11 @@ type SubRow = {
     amount: Prisma.Decimal;
     paidOn: Date;
     transactionId: string;
+  }[];
+  skips: {
+    id: string;
+    periodKey: string;
+    createdAt: Date;
   }[];
 };
 
@@ -108,6 +120,7 @@ export class SubscriptionsService {
 
   private statusFor(
     paid: boolean,
+    skipped: boolean,
     dueOn: string,
     today: string,
     periodFrom: string,
@@ -117,6 +130,7 @@ export class SubscriptionsService {
   ): SubStatus {
     if (periodKey < startPeriodKey) return 'scheduled';
     if (paid) return 'paid';
+    if (skipped) return 'skipped';
     // Future period that has not started yet (e.g. viewing next month).
     if (today < periodFrom) return 'upcoming';
     // Past period left unpaid.
@@ -203,6 +217,7 @@ export class SubscriptionsService {
 
   private shape(sub: SubRow, ctx: PeriodCtx) {
     const payment = sub.payments.find((p) => p.periodKey === ctx.periodKey);
+    const skip = sub.skips.find((s) => s.periodKey === ctx.periodKey);
     const dueOn = this.dueDateInPeriod(
       ctx.periodFrom,
       ctx.periodTo,
@@ -211,6 +226,7 @@ export class SubscriptionsService {
     );
     const status = this.statusFor(
       Boolean(payment),
+      Boolean(skip),
       dueOn,
       ctx.today,
       ctx.periodFrom,
@@ -250,6 +266,13 @@ export class SubscriptionsService {
             transactionId: payment.transactionId,
           }
         : null,
+      skip: skip
+        ? {
+            id: skip.id,
+            periodKey: skip.periodKey,
+            createdAt: skip.createdAt,
+          }
+        : null,
     };
   }
 
@@ -275,6 +298,7 @@ export class SubscriptionsService {
         },
         account: { select: { id: true, name: true } },
         payments: { where: { periodKey } },
+        skips: { where: { periodKey } },
       },
       orderBy: [{ active: 'desc' }, { billingDay: 'asc' }, { name: 'asc' }],
     });
@@ -292,8 +316,9 @@ export class SubscriptionsService {
     // Count commitments that apply to this period:
     // active ones that have started, closed installments paid this month
     // (final payment still counts), and unfinished closed installments.
+    // Skipped this period are excluded from totals (no spend expected).
     const dueNow = subscriptions.filter((s) => {
-      if (s.status === 'scheduled') return false;
+      if (s.status === 'scheduled' || s.status === 'skipped') return false;
       if (s.active || s.status === 'paid') return true;
       return (
         s.kind === SubscriptionKind.INSTALLMENT &&
@@ -527,6 +552,20 @@ export class SubscriptionsService {
       throw new ConflictException('Already paid for this period');
     }
 
+    const skipped = await this.prisma.subscriptionSkip.findUnique({
+      where: {
+        subscriptionId_periodKey: {
+          subscriptionId: id,
+          periodKey: ctx.periodKey,
+        },
+      },
+    });
+    if (skipped) {
+      throw new ConflictException(
+        'Skipped for this period — undo skip before marking paid',
+      );
+    }
+
     const accountId = dto.accountId ?? sub.accountId;
     await this.assertAccount(householdId, accountId);
     await this.assertCategory(householdId, sub.categoryId);
@@ -633,6 +672,86 @@ export class SubscriptionsService {
         });
       }
     });
+
+    return this.summary(householdId, userId, ctx.periodKey);
+  }
+
+  async skip(
+    householdId: string,
+    userId: string,
+    id: string,
+    dto: SkipSubscriptionDto = {},
+  ) {
+    const sub = await this.requireOwn(householdId, userId, id);
+    if (
+      !sub.active &&
+      sub.kind !== SubscriptionKind.INSTALLMENT
+    ) {
+      throw new BadRequestException('Commitment is archived');
+    }
+
+    const ctx = await this.periodContext(userId, dto.periodKey);
+    if (ctx.periodKey < sub.startPeriodKey) {
+      throw new BadRequestException(
+        'This commitment has not started yet for that month',
+      );
+    }
+
+    const payment = await this.prisma.subscriptionPayment.findUnique({
+      where: {
+        subscriptionId_periodKey: {
+          subscriptionId: id,
+          periodKey: ctx.periodKey,
+        },
+      },
+    });
+    if (payment) {
+      throw new ConflictException(
+        'Already paid for this period — undo pay before skipping',
+      );
+    }
+
+    const existing = await this.prisma.subscriptionSkip.findUnique({
+      where: {
+        subscriptionId_periodKey: {
+          subscriptionId: id,
+          periodKey: ctx.periodKey,
+        },
+      },
+    });
+    if (existing) {
+      throw new ConflictException('Already skipped for this period');
+    }
+
+    await this.prisma.subscriptionSkip.create({
+      data: {
+        subscriptionId: id,
+        periodKey: ctx.periodKey,
+      },
+    });
+
+    return this.summary(householdId, userId, ctx.periodKey);
+  }
+
+  async unskip(
+    householdId: string,
+    userId: string,
+    id: string,
+    dto: SkipSubscriptionDto = {},
+  ) {
+    await this.requireOwn(householdId, userId, id);
+    const ctx = await this.periodContext(userId, dto.periodKey);
+    const skip = await this.prisma.subscriptionSkip.findUnique({
+      where: {
+        subscriptionId_periodKey: {
+          subscriptionId: id,
+          periodKey: ctx.periodKey,
+        },
+      },
+    });
+    if (!skip) throw new NotFoundException('Not skipped this period');
+
+    await this.prisma.subscriptionSkip.delete({ where: { id: skip.id } });
 
     return this.summary(householdId, userId, ctx.periodKey);
   }

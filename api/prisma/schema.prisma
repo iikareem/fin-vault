@@ -591,6 +591,7 @@ model Subscription {
   createdAt   DateTime               @default(now())
   updatedAt   DateTime               @updatedAt
   payments    SubscriptionPayment[]
+  skips       SubscriptionSkip[]
 
   @@index([householdId, active])
   @@index([userId])
@@ -606,6 +607,19 @@ model SubscriptionPayment {
   paidOn         DateTime     @db.Date
   transactionId  String       @unique
   transaction    Transaction  @relation("SubscriptionPayTx", fields: [transactionId], references: [id])
+  createdAt      DateTime     @default(now())
+
+  @@unique([subscriptionId, periodKey])
+  @@index([subscriptionId])
+}
+
+/** Marks a commitment as skipped for one budget period only (no expense). */
+model SubscriptionSkip {
+  id             String       @id @default(cuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  /** Personal budget period key YYYY-MM. */
+  periodKey      String
   createdAt      DateTime     @default(now())
 
   @@unique([subscriptionId, periodKey])

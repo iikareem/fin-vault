@@ -33,7 +33,13 @@ type Category = {
   emoji?: string | null;
 };
 
-type SubStatus = "paid" | "due" | "upcoming" | "overdue" | "scheduled";
+type SubStatus =
+  | "paid"
+  | "skipped"
+  | "due"
+  | "upcoming"
+  | "overdue"
+  | "scheduled";
 type SubKind = "SUBSCRIPTION" | "INSTALLMENT" | "CHARITY" | "OTHER";
 
 const KIND_OPTIONS: SubKind[] = [
@@ -74,6 +80,11 @@ type Subscription = {
     amount: number;
     paidOn: string;
     transactionId: string;
+  } | null;
+  skip: {
+    id: string;
+    periodKey: string;
+    createdAt: string;
   } | null;
 };
 
@@ -351,6 +362,9 @@ export default function SubscriptionsPage() {
   const [payingId, setPayingId] = useState("");
   const [unpayingId, setUnpayingId] = useState("");
   const [confirmUnpayId, setConfirmUnpayId] = useState("");
+  const [confirmSkipId, setConfirmSkipId] = useState("");
+  const [skippingId, setSkippingId] = useState("");
+  const [unskippingId, setUnskippingId] = useState("");
   const [editId, setEditId] = useState("");
   const [editName, setEditName] = useState("");
   const [editAmount, setEditAmount] = useState("");
@@ -450,6 +464,7 @@ export default function SubscriptionsPage() {
         .filter(
           (s) =>
             s.status !== "paid" &&
+            s.status !== "skipped" &&
             s.status !== "scheduled" &&
             (s.active || stillNeedsInstallmentPayment(s)),
         )
@@ -472,6 +487,11 @@ export default function SubscriptionsPage() {
       (data?.subscriptions ?? []).filter((s) => s.status === "paid"),
     [data],
   );
+  const skipped = useMemo(
+    () =>
+      (data?.subscriptions ?? []).filter((s) => s.status === "skipped"),
+    [data],
+  );
   const closedInstallments = useMemo(
     () =>
       (data?.subscriptions ?? []).filter(
@@ -479,6 +499,7 @@ export default function SubscriptionsPage() {
           !s.active &&
           s.kind === "INSTALLMENT" &&
           s.status !== "paid" &&
+          s.status !== "skipped" &&
           !stillNeedsInstallmentPayment(s),
       ),
     [data],
@@ -486,6 +507,7 @@ export default function SubscriptionsPage() {
 
   function statusLabel(status: SubStatus) {
     if (status === "paid") return t("subsStatusPaid");
+    if (status === "skipped") return t("subsStatusSkipped");
     if (status === "overdue") return t("subsStatusOverdue");
     if (status === "due") return t("subsStatusDue");
     if (status === "scheduled") return t("subsStatusScheduled");
@@ -587,7 +609,15 @@ export default function SubscriptionsPage() {
   function openPay(sub: Subscription) {
     setConfirmPayId(sub.id);
     setConfirmUnpayId("");
+    setConfirmSkipId("");
     setPayAccountId(sub.accountId || accountId);
+    setError("");
+  }
+
+  function openSkip(sub: Subscription) {
+    setConfirmSkipId(sub.id);
+    setConfirmPayId("");
+    setConfirmUnpayId("");
     setError("");
   }
 
@@ -637,6 +667,47 @@ export default function SubscriptionsPage() {
     }
   }
 
+  async function confirmSkip(id: string) {
+    if (!personal) return;
+    setSkippingId(id);
+    setError("");
+    try {
+      const next = await api<SubsSummary>(
+        householdPath(personal.householdId, `/subscriptions/${id}/skip`),
+        {
+          method: "POST",
+          body: JSON.stringify({ periodKey: period }),
+        },
+      );
+      setData(next);
+      setConfirmSkipId("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("couldNotSave"));
+    } finally {
+      setSkippingId("");
+    }
+  }
+
+  async function confirmUnskip(id: string) {
+    if (!personal) return;
+    setUnskippingId(id);
+    setError("");
+    try {
+      const next = await api<SubsSummary>(
+        householdPath(personal.householdId, `/subscriptions/${id}/unskip`),
+        {
+          method: "POST",
+          body: JSON.stringify({ periodKey: period }),
+        },
+      );
+      setData(next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("couldNotSave"));
+    } finally {
+      setUnskippingId("");
+    }
+  }
+
   function openEdit(sub: Subscription) {
     setEditId(sub.id);
     setEditName(sub.name);
@@ -652,6 +723,7 @@ export default function SubscriptionsPage() {
     setEditNote(sub.note);
     setEditColor(sub.color);
     setConfirmPayId("");
+    setConfirmSkipId("");
     setError("");
   }
 
@@ -725,6 +797,7 @@ export default function SubscriptionsPage() {
       setData(next);
       setConfirmPayId("");
       setConfirmUnpayId("");
+      setConfirmSkipId("");
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -1122,6 +1195,31 @@ export default function SubscriptionsPage() {
                           </button>
                         </div>
                       </div>
+                    ) : confirmSkipId === sub.id ? (
+                      <div className="mt-3 space-y-2 rounded-2xl bg-[var(--panel-soft)] p-3">
+                        <p className="text-sm leading-relaxed">
+                          {t("subsSkipConfirm")}
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            disabled={skippingId === sub.id}
+                            onClick={() => confirmSkip(sub.id)}
+                            className="flex min-h-11 flex-1 items-center justify-center rounded-2xl bg-stone-900 text-sm font-semibold text-white disabled:opacity-60"
+                          >
+                            {skippingId === sub.id
+                              ? t("saving")
+                              : t("subsConfirmSkip")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setConfirmSkipId("")}
+                            className="min-h-11 rounded-2xl px-4 text-sm font-semibold text-[var(--muted)]"
+                          >
+                            {t("subsCancel")}
+                          </button>
+                        </div>
+                      </div>
                     ) : (
                       <div className="mt-3 flex flex-wrap gap-2">
                         <button
@@ -1130,6 +1228,13 @@ export default function SubscriptionsPage() {
                           className="min-h-10 rounded-2xl bg-stone-900 px-4 text-sm font-semibold text-white"
                         >
                           {t("subsMarkPaid")}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openSkip(sub)}
+                          className="min-h-10 rounded-2xl bg-[var(--panel-soft)] px-3 text-sm font-semibold"
+                        >
+                          {t("subsSkip")}
                         </button>
                         {sub.kind === "INSTALLMENT" ? (
                           <button
@@ -1362,6 +1467,75 @@ export default function SubscriptionsPage() {
         </section>
       ) : null}
 
+      {skipped.length > 0 ? (
+        <section className="mt-6">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">
+            {t("subsSkippedSection")}
+          </h2>
+          <ul className="mt-2 space-y-2">
+            {skipped.map((sub) => (
+              <li
+                key={sub.id}
+                className="surface overflow-hidden rounded-[1.35rem]"
+              >
+                <div className="min-w-0 flex-1 p-3.5">
+                  <div className="flex items-start gap-3">
+                    <span
+                      className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-stone-400"
+                      aria-hidden
+                    />
+                    <div className="flex min-w-0 flex-1 items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate text-[15px] font-semibold">
+                          {sub.name}
+                        </p>
+                        <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-[var(--muted)]">
+                          <span>{t("subsStatusSkipped")}</span>
+                          {sub.kind === "INSTALLMENT" &&
+                          installmentProgress(sub) ? (
+                            <span>· {installmentProgress(sub)}</span>
+                          ) : (
+                            <span>
+                              · {kindLabel(sub.kind ?? "SUBSCRIPTION", t)}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <p className="shrink-0 text-base font-bold tabular-nums text-[var(--muted)] line-through">
+                        <Money
+                          amount={sub.amount}
+                          currency={currency}
+                          locale={locale}
+                        />
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={unskippingId === sub.id}
+                      onClick={() => confirmUnskip(sub.id)}
+                      className="min-h-9 rounded-2xl px-3 text-xs font-semibold text-[var(--muted)] disabled:opacity-60"
+                    >
+                      {unskippingId === sub.id
+                        ? t("saving")
+                        : t("subsUndoSkip")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openEdit(sub)}
+                      className="min-h-9 rounded-2xl px-3 text-xs font-semibold text-[var(--muted)]"
+                    >
+                      {t("subsEdit")}
+                    </button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       {paid.length > 0 ? (
         <section className="mt-6">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">
@@ -1432,6 +1606,7 @@ export default function SubscriptionsPage() {
                         onClick={() => {
                           setConfirmUnpayId(sub.id);
                           setConfirmPayId("");
+                          setConfirmSkipId("");
                         }}
                         className="min-h-9 rounded-2xl px-3 text-xs font-semibold text-[var(--muted)]"
                       >

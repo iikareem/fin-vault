@@ -76,7 +76,7 @@ type SubsHome = {
     id: string;
     amount: number;
     dueOn: string;
-    status: "paid" | "due" | "upcoming" | "overdue" | "scheduled";
+    status: "paid" | "skipped" | "due" | "upcoming" | "overdue" | "scheduled";
   }[];
 };
 

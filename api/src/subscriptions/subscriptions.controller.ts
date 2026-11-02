@@ -21,6 +21,7 @@ import { CreateSubscriptionDto } from './dto/create-subscription.dto';
 import { UpdateSubscriptionDto } from './dto/update-subscription.dto';
 import { PaySubscriptionDto } from './dto/pay-subscription.dto';
 import { UnpaySubscriptionDto } from './dto/unpay-subscription.dto';
+import { SkipSubscriptionDto } from './dto/skip-subscription.dto';
 
 @Controller('households/:householdId/subscriptions')
 @UseGuards(JwtAuthGuard, HouseholdGuard, PersonalKindGuard)
@@ -107,5 +108,25 @@ export class SubscriptionsController {
     @Body() dto: UnpaySubscriptionDto,
   ) {
     return this.subscriptions.unpay(membership.householdId, user.id, id, dto);
+  }
+
+  @Post(':id/skip')
+  skip(
+    @CurrentMembership() membership: MembershipContext,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: SkipSubscriptionDto,
+  ) {
+    return this.subscriptions.skip(membership.householdId, user.id, id, dto);
+  }
+
+  @Post(':id/unskip')
+  unskip(
+    @CurrentMembership() membership: MembershipContext,
+    @CurrentUser() user: AuthUser,
+    @Param('id') id: string,
+    @Body() dto: SkipSubscriptionDto,
+  ) {
+    return this.subscriptions.unskip(membership.householdId, user.id, id, dto);
   }
 }
