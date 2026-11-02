@@ -241,7 +241,8 @@ export class SubscriptionsService {
     return {
       id: sub.id,
       name: sub.name,
-      amount: Number(sub.amount),
+      // Paid periods keep the amount captured at pay time, not later edits.
+      amount: payment ? Number(payment.amount) : Number(sub.amount),
       billingDay: sub.billingDay,
       kind: sub.kind,
       totalInstallments: sub.totalInstallments,
