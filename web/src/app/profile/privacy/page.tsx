@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useBooks } from "@/components/BooksProvider";
 import { useI18n } from "@/components/I18nProvider";
+import { useToast } from "@/components/Toast";
 import {
   PrefToggle,
   SettingsCard,
@@ -11,6 +12,7 @@ import {
 
 export default function PrivacySettingsPage() {
   const { t } = useI18n();
+  const toast = useToast();
   const {
     hideBalances,
     reduceMotion,
@@ -21,12 +23,6 @@ export default function PrivacySettingsPage() {
   } = useBooks();
   const [busyKey, setBusyKey] = useState<string>("");
   const [error, setError] = useState("");
-  const [saved, setSaved] = useState("");
-
-  function flashSaved() {
-    setSaved(t("prefsSaved"));
-    window.setTimeout(() => setSaved(""), 2200);
-  }
 
   async function onPref(
     key:
@@ -40,10 +36,9 @@ export default function PrivacySettingsPage() {
     if (busyKey) return;
     setBusyKey(key);
     setError("");
-    setSaved("");
     try {
       await setPreferences({ [key]: value });
-      flashSaved();
+      toast.success(t("prefsSaved"));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -58,7 +53,6 @@ export default function PrivacySettingsPage() {
           {error}
         </p>
       ) : null}
-      {saved ? <p className="flash">{saved}</p> : null}
       <SettingsCard>
         <div className="space-y-2">
           <PrefToggle

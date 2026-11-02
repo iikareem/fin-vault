@@ -3,19 +3,19 @@
 import { FormEvent, useState } from "react";
 import { api } from "@/lib/api";
 import { useI18n } from "@/components/I18nProvider";
+import { useToast } from "@/components/Toast";
 
 export function ChangePasswordForm() {
   const { t } = useI18n();
+  const toast = useToast();
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState(false);
   const [error, setError] = useState("");
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
-    setDone(false);
     setError("");
     try {
       await api("/auth/change-password", {
@@ -24,7 +24,7 @@ export function ChangePasswordForm() {
       });
       setCurrentPassword("");
       setNewPassword("");
-      setDone(true);
+      toast.success(`${t("passwordChanged")} ${t("passwordChangedHint")}`);
     } catch (err) {
       const msg = err instanceof Error && err.message ? err.message : "";
       setError(
@@ -65,11 +65,6 @@ export function ChangePasswordForm() {
           required
         />
       </label>
-      {done ? (
-        <p className="flash">
-          {t("passwordChanged")} {t("passwordChangedHint")}
-        </p>
-      ) : null}
       {error ? <p className="text-red-700">{error}</p> : null}
       <button
         disabled={busy}

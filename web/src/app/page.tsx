@@ -29,6 +29,8 @@ import {
 import { MoneyToolsHomeCard } from "@/components/MoneyToolsHomeCard";
 import { ActiveTravelHomeCard } from "@/components/ActiveTravelHomeCard";
 import { BottomSheet } from "@/components/BottomSheet";
+import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/ConfirmDialog";
 import {
   isLikelyOffline,
   isOfflineNetworkError,
@@ -120,6 +122,8 @@ type Cover = {
 
 export default function HomePage() {
   const { t, locale } = useI18n();
+  const toast = useToast();
+  const { confirm } = useConfirm();
   const {
     displayName,
     userId,
@@ -152,9 +156,7 @@ export default function HomePage() {
   const [editId, setEditId] = useState("");
   const [editAmount, setEditAmount] = useState("");
   const [editNote, setEditNote] = useState("");
-  const [confirmDeleteId, setConfirmDeleteId] = useState("");
   const [error, setError] = useState("");
-  const [flash, setFlash] = useState("");
   const [offlineMode, setOfflineMode] = useState(false);
   const [busyEdit, setBusyEdit] = useState(false);
   const [personalMoneyVisible, setPersonalMoneyVisible] = useMoneyVisible();
@@ -163,36 +165,6 @@ export default function HomePage() {
   useEffect(() => {
     if (!showPersonalMonthSpend) setMonthCashflowOpen(false);
   }, [showPersonalMonthSpend]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const key = sessionStorage.getItem("fb_flash");
-    if (key === "claimSaved") {
-      sessionStorage.removeItem("fb_flash");
-      setFlash(t("claimSaved"));
-    } else if (key === "payBackDone") {
-      sessionStorage.removeItem("fb_flash");
-      setFlash(t("payBackDone"));
-    } else if (key === "housePaidForSaved") {
-      sessionStorage.removeItem("fb_flash");
-      setFlash(t("housePaidForSaved"));
-    } else if (key === "coverRepayDone") {
-      sessionStorage.removeItem("fb_flash");
-      setFlash(t("coverRepayDone"));
-    } else if (key === "transferSaved") {
-      sessionStorage.removeItem("fb_flash");
-      setFlash(t("transferSaved"));
-    } else if (key === "cashWithdrawSaved") {
-      sessionStorage.removeItem("fb_flash");
-      setFlash(t("cashWithdrawSaved"));
-    } else if (key === "cashWithdrawWithTransferSaved") {
-      sessionStorage.removeItem("fb_flash");
-      setFlash(t("cashWithdrawWithTransferSaved"));
-    } else if (key === "savedOffline") {
-      sessionStorage.removeItem("fb_flash");
-      setFlash(t("savedOffline"));
-    }
-  }, [t]);
 
   useEffect(() => {
     if (!active) return;
@@ -436,7 +408,7 @@ export default function HomePage() {
       );
       await refreshHouseLists();
       setPayAmounts((prev) => ({ ...prev, [claim.id]: "" }));
-      setFlash(t("payBackDone"));
+      toast.success(t("payBackDone"));
     } catch (e) {
       setError(e instanceof Error ? e.message : t("couldNotSave"));
     } finally {
@@ -471,7 +443,7 @@ export default function HomePage() {
       );
       await refreshHouseLists();
       setRepayAmounts((prev) => ({ ...prev, [cover.id]: "" }));
-      setFlash(t("coverRepayDone"));
+      toast.success(t("coverRepayDone"));
     } catch (e) {
       setError(e instanceof Error ? e.message : t("couldNotSave"));
     } finally {
@@ -481,7 +453,6 @@ export default function HomePage() {
 
   function startEditObligation(id: string, amount: number, note: string) {
     setEditId(id);
-    setConfirmDeleteId("");
     setEditAmount(String(amount));
     setEditNote(note);
   }
@@ -500,6 +471,7 @@ export default function HomePage() {
       });
       setEditId("");
       await refreshHouseLists();
+      toast.success(t("actionSaved"));
     } catch (e) {
       setError(e instanceof Error ? e.message : t("couldNotSave"));
     } finally {
@@ -521,6 +493,7 @@ export default function HomePage() {
       });
       setEditId("");
       await refreshHouseLists();
+      toast.success(t("actionSaved"));
     } catch (e) {
       setError(e instanceof Error ? e.message : t("couldNotSave"));
     } finally {
@@ -530,13 +503,20 @@ export default function HomePage() {
 
   async function deleteObligation(path: string) {
     if (!active) return;
+    const ok = await confirm({
+      title: t("confirmDeleteTitle"),
+      message: t("confirmDeleteHint"),
+      confirmLabel: t("deleteItem"),
+      tone: "danger",
+    });
+    if (!ok) return;
     setBusyEdit(true);
     setError("");
     try {
       await api(householdPath(active.householdId, path), { method: "DELETE" });
-      setConfirmDeleteId("");
       setEditId("");
       await refreshHouseLists();
+      toast.success(t("actionDeleted"));
     } catch (e) {
       setError(e instanceof Error ? e.message : t("couldNotSave"));
     } finally {
@@ -580,7 +560,6 @@ export default function HomePage() {
           </Link>
         </div>
       )}
-      {flash ? <p className="flash mt-3">{flash}</p> : null}
       {error ? <p className="mt-2 text-red-700">{error}</p> : null}
       {offlineMode ? (
         <section className="mt-3 rounded-[1.75rem] border border-[color-mix(in_srgb,var(--foreground)_12%,transparent)] bg-[color-mix(in_srgb,var(--foreground)_5%,transparent)] p-4">
@@ -1171,16 +1150,12 @@ export default function HomePage() {
                               type="button"
                               disabled={busyEdit}
                               onClick={() =>
-                                confirmDeleteId === c.id
-                                  ? deleteObligation(`/claims/${c.id}`)
-                                  : setConfirmDeleteId(c.id)
+                                void deleteObligation(`/claims/${c.id}`)
                               }
                               className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-red-800"
                             >
-                              {confirmDeleteId === c.id
-                                ? t("confirmDelete")
-                                : t("deleteItem")}
-                            </button>
+                              {t("deleteItem")}
+                            </button}
                           </div>
                         ) : null}
                         {editId === c.id ? (
@@ -1322,15 +1297,11 @@ export default function HomePage() {
                               type="button"
                               disabled={busyEdit}
                               onClick={() =>
-                                confirmDeleteId === c.id
-                                  ? deleteObligation(`/covers/${c.id}`)
-                                  : setConfirmDeleteId(c.id)
+                                void deleteObligation(`/covers/${c.id}`)
                               }
                               className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-red-800"
                             >
-                              {confirmDeleteId === c.id
-                                ? t("confirmDelete")
-                                : t("deleteItem")}
+                              {t("deleteItem")}
                             </button>
                           </div>
                         ) : null}
@@ -1505,15 +1476,11 @@ export default function HomePage() {
                       type="button"
                       disabled={busyEdit}
                       onClick={() =>
-                        confirmDeleteId === c.id
-                          ? deleteObligation(`/claims/${c.id}`)
-                          : setConfirmDeleteId(c.id)
+                        void deleteObligation(`/claims/${c.id}`)
                       }
                       className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-red-800"
                     >
-                      {confirmDeleteId === c.id
-                        ? t("confirmDelete")
-                        : t("deleteItem")}
+                      {t("deleteItem")}
                     </button>
                   </div>
                 ) : null}
@@ -1653,15 +1620,11 @@ export default function HomePage() {
                         type="button"
                         disabled={busyEdit}
                         onClick={() =>
-                          confirmDeleteId === c.id
-                            ? deleteObligation(`/covers/${c.id}`)
-                            : setConfirmDeleteId(c.id)
+                          void deleteObligation(`/covers/${c.id}`)
                         }
                         className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-red-800"
                       >
-                        {confirmDeleteId === c.id
-                          ? t("confirmDelete")
-                          : t("deleteItem")}
+                        {t("deleteItem")}
                       </button>
                     </div>
                   ) : null}

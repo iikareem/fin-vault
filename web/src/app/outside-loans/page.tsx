@@ -8,6 +8,8 @@ import { PageShell } from "@/components/PageShell";
 import { Money } from "@/components/Money";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
+import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 import { ItemDate } from "@/components/ItemDate";
@@ -68,6 +70,8 @@ function chipClass(active: boolean) {
 
 export default function OutsideLoansPage() {
   const { t, locale } = useI18n();
+  const toast = useToast();
+  const { confirm } = useConfirm();
   const { personal, setKind } = useBooks();
   const currency = personal?.currency ?? "EGP";
   const hid = personal?.householdId ?? "";
@@ -91,10 +95,8 @@ export default function OutsideLoansPage() {
   const [editAmount, setEditAmount] = useState("");
   const [editOccurredOn, setEditOccurredOn] = useState(todayISO());
   const [editNote, setEditNote] = useState("");
-  const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
 
   function load(householdId: string) {
     return Promise.all([
@@ -125,7 +127,6 @@ export default function OutsideLoansPage() {
     if (!hid) return;
     setBusy(true);
     setError("");
-    setMessage("");
     try {
       await api(householdPath(hid, "/outside-loans"), {
         method: "POST",
@@ -142,7 +143,7 @@ export default function OutsideLoansPage() {
       setAmount("");
       setNote("");
       setShowForm(false);
-      setMessage(
+      toast.success(
         direction === "BORROW" ? t("outsideBorrowedSaved") : t("outsideSaved"),
       );
       await load(hid);
@@ -163,22 +164,18 @@ export default function OutsideLoansPage() {
     setEditAmount(String(loan.originalAmount));
     setEditOccurredOn(loanDay(loan.occurredOn));
     setEditNote(loan.note);
-    setDeleteConfirm(false);
     setError("");
-    setMessage("");
   }
 
   function closeLoanEdit() {
     if (busy) return;
     setEditingLoan(null);
-    setDeleteConfirm(false);
   }
 
   async function saveLoanEdit() {
     if (!hid || !editingLoan) return;
     setBusy(true);
     setError("");
-    setMessage("");
     try {
       await api(householdPath(hid, `/outside-loans/${editingLoan.id}`), {
         method: "PATCH",
@@ -190,7 +187,7 @@ export default function OutsideLoansPage() {
         }),
       });
       setEditingLoan(null);
-      setMessage(t("loanEditSaved"));
+      toast.success(t("loanEditSaved"));
       await load(hid);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
@@ -201,6 +198,13 @@ export default function OutsideLoansPage() {
 
   async function deleteLoanEdit() {
     if (!hid || !editingLoan) return;
+    const ok = await confirm({
+      title: t("confirmDeleteTitle"),
+      message: t("confirmDeleteHint"),
+      confirmLabel: t("deleteItem"),
+      tone: "danger",
+    });
+    if (!ok) return;
     setBusy(true);
     setError("");
     try {
@@ -208,7 +212,7 @@ export default function OutsideLoansPage() {
         method: "DELETE",
       });
       setEditingLoan(null);
-      setDeleteConfirm(false);
+      toast.success(t("actionDeleted"));
       await load(hid);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
@@ -226,7 +230,6 @@ export default function OutsideLoansPage() {
     const target = collectTarget[loan.id] || "CURRENT";
     setBusy(true);
     setError("");
-    setMessage("");
     try {
       await api(householdPath(hid, `/outside-loans/${loan.id}/collect`), {
         method: "POST",
@@ -237,7 +240,7 @@ export default function OutsideLoansPage() {
         }),
       });
       setCollectAmount((prev) => ({ ...prev, [loan.id]: "" }));
-      setMessage(
+      toast.success(
         loan.direction === "BORROW"
           ? t("outsideRepaid")
           : t("outsideCollected"),
@@ -303,7 +306,6 @@ export default function OutsideLoansPage() {
         onClick={() => {
           setShowForm((v) => !v);
           setError("");
-          setMessage("");
         }}
         className="mt-4 flex min-h-12 w-full items-center justify-center rounded-2xl bg-[var(--cta-bg)] text-base font-semibold text-[var(--cta-fg)] shadow-sm"
       >
@@ -433,7 +435,6 @@ export default function OutsideLoansPage() {
       ) : null}
 
       {error ? <p className="mt-3 text-red-700">{error}</p> : null}
-      {message ? <p className="flash mt-3">{message}</p> : null}
 
       <section className="mt-6 space-y-2.5">
         {!data?.open.length ? (
@@ -658,23 +659,11 @@ export default function OutsideLoansPage() {
               <button
                 type="button"
                 disabled={busy}
-                onClick={() =>
-                  deleteConfirm ? void deleteLoanEdit() : setDeleteConfirm(true)
-                }
+                onClick={() => void deleteLoanEdit()}
                 className="flex min-h-11 w-full items-center justify-center rounded-2xl bg-red-50 text-sm font-semibold text-red-800 ring-1 ring-red-200 disabled:opacity-60 dark:bg-red-950/30 dark:ring-red-900"
               >
-                {deleteConfirm ? t("confirmDelete") : t("deleteItem")}
+                {t("deleteItem")}
               </button>
-              {deleteConfirm ? (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => setDeleteConfirm(false)}
-                  className="w-full py-2 text-sm font-medium text-stone-500"
-                >
-                  {t("goalsCancel")}
-                </button>
-              ) : null}
             </div>
           ) : (
             <button

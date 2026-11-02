@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Hint } from "@/components/Hint";
 import { useBooks } from "@/components/BooksProvider";
 import { useI18n } from "@/components/I18nProvider";
+import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/ConfirmDialog";
 import {
   SettingsCard,
   SettingsPage,
@@ -24,6 +26,8 @@ function formatIsoDate(iso: string, locale: string) {
 
 export default function MoneySettingsPage() {
   const { t, locale } = useI18n();
+  const toast = useToast();
+  const { confirm } = useConfirm();
   const {
     preferredCurrency,
     budgetMonthStartDay,
@@ -34,13 +38,10 @@ export default function MoneySettingsPage() {
   const [currencyBusy, setCurrencyBusy] = useState(false);
   const [paydayDraft, setPaydayDraft] = useState(budgetMonthStartDay);
   const [paydayBusy, setPaydayBusy] = useState(false);
-  const [paydayConfirming, setPaydayConfirming] = useState(false);
   const [error, setError] = useState("");
-  const [saved, setSaved] = useState("");
 
   useEffect(() => {
     setPaydayDraft(budgetMonthStartDay);
-    setPaydayConfirming(false);
   }, [budgetMonthStartDay]);
 
   const paydayDirty = paydayDraft !== budgetMonthStartDay;
@@ -49,18 +50,12 @@ export default function MoneySettingsPage() {
     [paydayDraft],
   );
 
-  function flashSaved() {
-    setSaved(t("prefsSaved"));
-    window.setTimeout(() => setSaved(""), 2200);
-  }
-
   async function onCurrency(next: string) {
     setCurrencyBusy(true);
     setError("");
-    setSaved("");
     try {
       await setPreferences({ preferredCurrency: next });
-      flashSaved();
+      toast.success(t("prefsSaved"));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -70,30 +65,27 @@ export default function MoneySettingsPage() {
 
   function onPaydayDraft(next: number) {
     setPaydayDraft(next);
-    setPaydayConfirming(false);
     setError("");
-    setSaved("");
   }
 
   function cancelPayday() {
     setPaydayDraft(budgetMonthStartDay);
-    setPaydayConfirming(false);
     setError("");
   }
 
   async function savePayday() {
     if (!paydayDirty || paydayBusy) return;
-    if (!paydayConfirming) {
-      setPaydayConfirming(true);
-      return;
-    }
+    const ok = await confirm({
+      title: t("budgetMonthStartConfirm"),
+      message: t("budgetMonthStartWarn"),
+      confirmLabel: t("budgetMonthStartConfirm"),
+    });
+    if (!ok) return;
     setPaydayBusy(true);
     setError("");
-    setSaved("");
     try {
       await setPreferences({ budgetMonthStartDay: paydayDraft });
-      flashSaved();
-      setPaydayConfirming(false);
+      toast.success(t("prefsSaved"));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -108,7 +100,6 @@ export default function MoneySettingsPage() {
           {error}
         </p>
       ) : null}
-      {saved ? <p className="flash">{saved}</p> : null}
 
       <SettingsCard>
         <label className="block">
@@ -162,21 +153,14 @@ export default function MoneySettingsPage() {
                 to: formatIsoDate(draftRange.to, locale),
               })}
             </p>
-            {paydayConfirming ? (
-              <p className="text-sm leading-relaxed text-[var(--muted)]">
-                {t("budgetMonthStartWarn")}
-              </p>
-            ) : null}
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 disabled={paydayBusy}
-                onClick={savePayday}
+                onClick={() => void savePayday()}
                 className="rounded-[1.15rem] bg-[var(--cta-bg)] px-4 py-2.5 text-base font-semibold text-[var(--cta-fg)] disabled:opacity-60"
               >
-                {paydayConfirming
-                  ? t("budgetMonthStartConfirm")
-                  : t("budgetMonthStartContinue")}
+                {paydayBusy ? t("saving") : t("budgetMonthStartContinue")}
               </button>
               <button
                 type="button"

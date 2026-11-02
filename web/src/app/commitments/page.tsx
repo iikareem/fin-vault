@@ -8,6 +8,7 @@ import { PageShell } from "@/components/PageShell";
 import { Money } from "@/components/Money";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
+import { useToast } from "@/components/Toast";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 import { ItemDate } from "@/components/ItemDate";
@@ -333,6 +334,7 @@ function categoryIdForKind(kind: SubKind, cats: Category[]): string | undefined 
 
 export default function SubscriptionsPage() {
   const { t, locale } = useI18n();
+  const toast = useToast();
   const { personal, setKind, budgetMonthStartDay } = useBooks();
   const currency = personal?.currency ?? "EGP";
   const hid = personal?.householdId ?? "";
@@ -599,6 +601,7 @@ export default function SubscriptionsPage() {
       setColor(
         ACCENT_COLORS[(next.subscriptions.length || 0) % ACCENT_COLORS.length],
       );
+      toast.success(t("actionSaved"));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -639,6 +642,7 @@ export default function SubscriptionsPage() {
       );
       setData(next);
       setConfirmPayId("");
+      toast.success(t("actionDone"));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -660,6 +664,7 @@ export default function SubscriptionsPage() {
       );
       setData(next);
       setConfirmUnpayId("");
+      toast.success(t("actionDone"));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -681,6 +686,7 @@ export default function SubscriptionsPage() {
       );
       setData(next);
       setConfirmSkipId("");
+      toast.success(t("actionDone"));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -701,6 +707,7 @@ export default function SubscriptionsPage() {
         },
       );
       setData(next);
+      toast.success(t("actionDone"));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -773,6 +780,7 @@ export default function SubscriptionsPage() {
       );
       setData(next);
       setEditId("");
+      toast.success(t("actionSaved"));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -798,6 +806,7 @@ export default function SubscriptionsPage() {
       setConfirmPayId("");
       setConfirmUnpayId("");
       setConfirmSkipId("");
+      toast.success(t("actionDone"));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -818,6 +827,7 @@ export default function SubscriptionsPage() {
       );
       setData(next);
       if (editId === id) setEditId("");
+      toast.success(t("actionDeleted"));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {

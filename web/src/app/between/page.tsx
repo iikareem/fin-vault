@@ -7,6 +7,8 @@ import { BottomNav } from "@/components/BottomNav";
 import { PageShell } from "@/components/PageShell";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
+import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { labelFor, categoryLabel, fill, personLabel } from "@/lib/i18n";
 import { householdPath } from "@/lib/space";
 import { Money } from "@/components/Money";
@@ -41,6 +43,8 @@ type Loan = {
 
 export default function BetweenPage() {
   const { t, locale } = useI18n();
+  const toast = useToast();
+  const { confirm } = useConfirm();
   const { userId, house, setKind } = useBooks();
   const houseId = house?.householdId ?? "";
   const currency = house?.currency ?? "EGP";
@@ -61,7 +65,6 @@ export default function BetweenPage() {
   const [editAmount, setEditAmount] = useState("");
   const [editOccurredOn, setEditOccurredOn] = useState(todayISO());
   const [editNote, setEditNote] = useState("");
-  const [deleteConfirm, setDeleteConfirm] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -116,6 +119,7 @@ export default function BetweenPage() {
       setAmount("");
       setNote("");
       await refresh(houseId);
+      toast.success(t("actionSaved"));
     } catch {
       setError(t("couldNotSave"));
     } finally {
@@ -135,6 +139,7 @@ export default function BetweenPage() {
       });
       setPayAmount((prev) => ({ ...prev, [loanId]: "" }));
       await refresh(houseId);
+      toast.success(t("actionDone"));
     } catch {
       setError(t("couldNotSave"));
     } finally {
@@ -154,14 +159,12 @@ export default function BetweenPage() {
     setEditAmount(String(loan.originalAmount));
     setEditOccurredOn(loanDay(loan.occurredOn));
     setEditNote(loan.note);
-    setDeleteConfirm(false);
     setError("");
   }
 
   function closeLoanEdit() {
     if (busy) return;
     setEditingLoan(null);
-    setDeleteConfirm(false);
   }
 
   async function saveLoanEdit() {
@@ -180,6 +183,7 @@ export default function BetweenPage() {
       });
       setEditingLoan(null);
       await refresh(houseId);
+      toast.success(t("actionSaved"));
     } catch {
       setError(t("couldNotSave"));
     } finally {
@@ -189,6 +193,13 @@ export default function BetweenPage() {
 
   async function deleteLoan() {
     if (!houseId || !editingLoan) return;
+    const ok = await confirm({
+      title: t("confirmDeleteTitle"),
+      message: t("confirmDeleteHint"),
+      confirmLabel: t("deleteItem"),
+      tone: "danger",
+    });
+    if (!ok) return;
     setBusy(true);
     setError("");
     try {
@@ -196,8 +207,8 @@ export default function BetweenPage() {
         method: "DELETE",
       });
       setEditingLoan(null);
-      setDeleteConfirm(false);
       await refresh(houseId);
+      toast.success(t("actionDeleted"));
     } catch {
       setError(t("couldNotSave"));
     } finally {
@@ -509,23 +520,11 @@ export default function BetweenPage() {
               <button
                 type="button"
                 disabled={busy}
-                onClick={() =>
-                  deleteConfirm ? void deleteLoan() : setDeleteConfirm(true)
-                }
+                onClick={() => void deleteLoan()}
                 className="flex min-h-11 w-full items-center justify-center rounded-2xl bg-red-50 text-sm font-semibold text-red-800 ring-1 ring-red-200 disabled:opacity-60 dark:bg-red-950/30 dark:ring-red-900"
               >
-                {deleteConfirm ? t("confirmDelete") : t("deleteItem")}
+                {t("deleteItem")}
               </button>
-              {deleteConfirm ? (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => setDeleteConfirm(false)}
-                  className="w-full py-2 text-sm font-medium text-stone-500"
-                >
-                  {t("goalsCancel")}
-                </button>
-              ) : null}
             </div>
           ) : (
             <button

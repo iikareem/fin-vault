@@ -14,6 +14,8 @@ import { PageShell } from "@/components/PageShell";
 import { Hint } from "@/components/Hint";
 import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
+import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { categoryLabel, fill } from "@/lib/i18n";
 import { householdPath } from "@/lib/space";
 import { HIDDEN_EXPENSE_CATEGORIES, HIDDEN_INCOME_CATEGORIES } from "@/lib/category-visibility";
@@ -144,6 +146,8 @@ function isHidden(cat: ManageCat) {
 
 export default function MyCategoriesPage() {
   const { t, locale } = useI18n();
+  const toast = useToast();
+  const { confirm } = useConfirm();
   const { personal, setKind } = useBooks();
   const [cats, setCats] = useState<ManageCat[]>([]);
   const [kind, setKindTab] = useState<KindTab>("EXPENSE");
@@ -157,7 +161,6 @@ export default function MyCategoriesPage() {
   const [parentId, setParentId] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [flash, setFlash] = useState("");
   const editorRef = useRef<HTMLFormElement>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -229,7 +232,6 @@ export default function MyCategoriesPage() {
 
   function openCreate(parent: string | null) {
     setError("");
-    setFlash("");
     setName("");
     setNameAr("");
     setColor(ACCENT_COLORS[Math.floor(Math.random() * ACCENT_COLORS.length)]);
@@ -240,7 +242,6 @@ export default function MyCategoriesPage() {
 
   function openEdit(cat: ManageCat) {
     setError("");
-    setFlash("");
     setName(cat.name);
     setNameAr(cat.nameAr);
     setColor(cat.color);
@@ -294,7 +295,7 @@ export default function MyCategoriesPage() {
         );
       }
       await load(personal.householdId);
-      setFlash(t("catsSaved"));
+      toast.success(t("catsSaved"));
       closeEditor();
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
@@ -308,7 +309,13 @@ export default function MyCategoriesPage() {
     const msg = cat.parentId
       ? t("catsDeleteConfirmSub")
       : t("catsDeleteConfirm");
-    if (!window.confirm(msg)) return;
+    const ok = await confirm({
+      title: t("confirmDeleteTitle"),
+      message: msg,
+      confirmLabel: t("deleteItem"),
+      tone: "danger",
+    });
+    if (!ok) return;
     setBusy(true);
     setError("");
     try {
@@ -317,7 +324,7 @@ export default function MyCategoriesPage() {
         { method: "DELETE" },
       );
       await load(personal.householdId);
-      setFlash(t("catsDeleted"));
+      toast.success(t("catsDeleted"));
       if (
         editor.type === "edit" &&
         (editor.cat.id === cat.id || editor.cat.parentId === cat.id)
@@ -528,7 +535,6 @@ export default function MyCategoriesPage() {
           {t("catsManageHint")}
         </p>
       </header>
-      {flash ? <p className="flash mt-3">{flash}</p> : null}
       {error && editor.type === "closed" ? (
         <p className="mt-3 text-red-700">{error}</p>
       ) : null}

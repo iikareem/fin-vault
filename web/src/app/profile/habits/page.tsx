@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Hint } from "@/components/Hint";
 import { useBooks, type AddTypePref } from "@/components/BooksProvider";
 import { useI18n } from "@/components/I18nProvider";
+import { useToast } from "@/components/Toast";
 import {
   PrefToggle,
   SettingsCard,
@@ -12,6 +13,7 @@ import {
 
 export default function HabitsSettingsPage() {
   const { t } = useI18n();
+  const toast = useToast();
   const {
     showHomeTools,
     defaultAddType,
@@ -20,12 +22,6 @@ export default function HabitsSettingsPage() {
   } = useBooks();
   const [busyKey, setBusyKey] = useState("");
   const [error, setError] = useState("");
-  const [saved, setSaved] = useState("");
-
-  function flashSaved() {
-    setSaved(t("prefsSaved"));
-    window.setTimeout(() => setSaved(""), 2200);
-  }
 
   async function onToggle(
     key: "showHomeTools" | "skipAddConfirm",
@@ -34,10 +30,9 @@ export default function HabitsSettingsPage() {
     if (busyKey) return;
     setBusyKey(key);
     setError("");
-    setSaved("");
     try {
       await setPreferences({ [key]: value });
-      flashSaved();
+      toast.success(t("prefsSaved"));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -49,10 +44,9 @@ export default function HabitsSettingsPage() {
     if (busyKey || next === defaultAddType) return;
     setBusyKey("defaultAddType");
     setError("");
-    setSaved("");
     try {
       await setPreferences({ defaultAddType: next });
-      flashSaved();
+      toast.success(t("prefsSaved"));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -67,7 +61,6 @@ export default function HabitsSettingsPage() {
           {error}
         </p>
       ) : null}
-      {saved ? <p className="flash">{saved}</p> : null}
 
       <SettingsCard>
         <span className="block text-[15px] font-semibold">

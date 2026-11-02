@@ -10,6 +10,8 @@ import { useI18n } from "@/components/I18nProvider";
 import { useBooks } from "@/components/BooksProvider";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
+import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/ConfirmDialog";
 import { fill } from "@/lib/i18n";
 
 type Goal = {
@@ -60,6 +62,8 @@ function ProgressBar({ pct, color }: { pct: number; color: string }) {
 
 export default function GoalsPage() {
   const { t, locale } = useI18n();
+  const toast = useToast();
+  const { confirm } = useConfirm();
   const { personal, setKind, active } = useBooks();
   const currency = personal?.currency ?? "EGP";
 
@@ -73,7 +77,6 @@ export default function GoalsPage() {
   const [busy, setBusy] = useState(false);
   const [deletingId, setDeletingId] = useState("");
   const [buyingId, setBuyingId] = useState("");
-  const [confirmBuyId, setConfirmBuyId] = useState("");
   const [actionId, setActionId] = useState("");
   const [actionMode, setActionMode] = useState<ActionMode>(null);
   const [actionAmount, setActionAmount] = useState("");
@@ -101,7 +104,6 @@ export default function GoalsPage() {
     setActionId(id);
     setActionMode(mode);
     setActionAmount("");
-    setConfirmBuyId("");
     if (mode === "edit" && goal) {
       setEditName(goal.name);
       setEditTarget(String(goal.targetAmount));
@@ -179,6 +181,7 @@ export default function GoalsPage() {
       setNote("");
       setShowAdd(false);
       setColor(ACCENT_COLORS[(next.goals.length || 0) % ACCENT_COLORS.length]);
+      toast.success(t("actionSaved"));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -188,6 +191,13 @@ export default function GoalsPage() {
 
   async function onDelete(id: string) {
     if (!personal) return;
+    const ok = await confirm({
+      title: t("confirmDeleteTitle"),
+      message: t("confirmDeleteHint"),
+      confirmLabel: t("goalsDelete"),
+      tone: "danger",
+    });
+    if (!ok) return;
     setDeletingId(id);
     setError("");
     try {
@@ -197,7 +207,7 @@ export default function GoalsPage() {
       );
       setData(next);
       if (actionId === id) closeAction();
-      if (confirmBuyId === id) setConfirmBuyId("");
+      toast.success(t("actionDeleted"));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -207,6 +217,13 @@ export default function GoalsPage() {
 
   async function onBuy(id: string) {
     if (!personal) return;
+    const ok = await confirm({
+      title: t("goalsBuy"),
+      message: `${t("goalsBuyConfirm")}\n\n${t("goalsBuyHint")}`,
+      confirmLabel: t("goalsBuy"),
+      tone: "default",
+    });
+    if (!ok) return;
     setBuyingId(id);
     setError("");
     try {
@@ -215,8 +232,8 @@ export default function GoalsPage() {
         { method: "POST", body: JSON.stringify({}) },
       );
       setData(next);
-      setConfirmBuyId("");
       if (actionId === id) closeAction();
+      toast.success(t("actionDone"));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -253,6 +270,7 @@ export default function GoalsPage() {
         );
         setData(next);
         closeAction();
+        toast.success(t("actionSaved"));
       } catch (err) {
         setError(err instanceof Error ? err.message : t("couldNotSave"));
       } finally {
@@ -283,6 +301,7 @@ export default function GoalsPage() {
       );
       setData(next);
       closeAction();
+      toast.success(t("actionDone"));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -472,25 +491,23 @@ export default function GoalsPage() {
                 <li
                   key={g.id}
                   className={`surface overflow-hidden rounded-[1.35rem] ${
-                    isOpen || confirmBuyId === g.id ? "col-span-2" : ""
+                    isOpen ? "col-span-2" : ""
                   }`}
                 >
                   <button
                     type="button"
                     onClick={() => {
-                      if (done) {
+                      if (isOpen) {
                         closeAction();
-                        setConfirmBuyId((prev) =>
-                          prev === g.id ? "" : g.id,
-                        );
+                        return;
+                      }
+                      if (done) {
+                        setActionId(g.id);
+                        setActionMode(null);
                         setError("");
                         return;
                       }
-                      if (isOpen && actionMode === "allocate") {
-                        closeAction();
-                      } else {
-                        openAction(g.id, "allocate");
-                      }
+                      openAction(g.id, "allocate");
                     }}
                     className="flex w-full flex-col p-3.5 text-start transition hover:bg-[var(--panel-soft)]"
                   >
@@ -530,21 +547,19 @@ export default function GoalsPage() {
                     ) : null}
                   </button>
 
-                  {isOpen || confirmBuyId === g.id ? (
+                  {isOpen ? (
                     <div className="space-y-3 border-t border-[var(--surface-border)] px-3.5 py-3">
                       <div className="flex flex-wrap gap-2">
                         {done ? (
                           <button
                             type="button"
                             disabled={!!buyingId}
-                            onClick={() => {
-                              closeAction();
-                              setConfirmBuyId(g.id);
-                              setError("");
-                            }}
+                            onClick={() => void onBuy(g.id)}
                             className="rounded-xl bg-emerald-700 px-3 py-2 text-sm font-semibold text-white shadow-sm disabled:opacity-60"
                           >
-                            🛍 {t("goalsBuy")}
+                            {buyingId === g.id
+                              ? t("goalsBuying")
+                              : `🛍 ${t("goalsBuy")}`}
                           </button>
                         ) : (
                           <button
@@ -595,7 +610,7 @@ export default function GoalsPage() {
                         <button
                           type="button"
                           disabled={!!deletingId}
-                          onClick={() => onDelete(g.id)}
+                          onClick={() => void onDelete(g.id)}
                           className="rounded-xl px-3 py-2 text-sm font-semibold text-red-700 hover:bg-[var(--soft-red)] disabled:opacity-60"
                         >
                           {deletingId === g.id
@@ -604,35 +619,7 @@ export default function GoalsPage() {
                         </button>
                       </div>
 
-                      {confirmBuyId === g.id ? (
-                        <div className="space-y-2 rounded-2xl bg-[var(--soft-emerald)] p-3">
-                          <p className="text-sm font-medium text-[var(--accent-a-text)]">
-                            {t("goalsBuyConfirm")}
-                          </p>
-                          <Hint>{t("goalsBuyHint")}</Hint>
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              disabled={!!buyingId}
-                              onClick={() => onBuy(g.id)}
-                              className="flex min-h-12 flex-1 items-center justify-center rounded-2xl bg-emerald-700 font-semibold text-white disabled:opacity-60"
-                            >
-                              {buyingId === g.id
-                                ? t("goalsBuying")
-                                : t("goalsBuy")}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setConfirmBuyId("")}
-                              className="min-h-12 rounded-2xl bg-[var(--surface-bg)] px-4 font-semibold text-[var(--muted)]"
-                            >
-                              {t("goalsCancel")}
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {isOpen && actionMode ? (
+                      {actionMode ? (
                         <form
                           onSubmit={submitAction}
                           className="space-y-3 rounded-2xl bg-[var(--panel-soft)] p-3"

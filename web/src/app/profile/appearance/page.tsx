@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Hint } from "@/components/Hint";
 import { useBooks, type ThemeMode } from "@/components/BooksProvider";
 import { useI18n } from "@/components/I18nProvider";
+import { useToast } from "@/components/Toast";
 import {
   SettingsCard,
   SettingsPage,
@@ -27,24 +28,18 @@ const THEME_LABEL: Record<ThemeId, MessageKey> = {
 
 export default function AppearanceSettingsPage() {
   const { t, locale } = useI18n();
+  const toast = useToast();
   const { theme, setPreferences } = useBooks();
   const [themeBusy, setThemeBusy] = useState(false);
   const [localeBusy, setLocaleBusy] = useState(false);
   const [error, setError] = useState("");
-  const [saved, setSaved] = useState("");
-
-  function flashSaved() {
-    setSaved(t("prefsSaved"));
-    window.setTimeout(() => setSaved(""), 2200);
-  }
 
   async function onTheme(next: ThemeMode) {
     setThemeBusy(true);
     setError("");
-    setSaved("");
     try {
       await setPreferences({ theme: next });
-      flashSaved();
+      toast.success(t("prefsSaved"));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -56,10 +51,9 @@ export default function AppearanceSettingsPage() {
     if (localeBusy || next === locale) return;
     setLocaleBusy(true);
     setError("");
-    setSaved("");
     try {
       await setPreferences({ locale: next });
-      flashSaved();
+      toast.success(t("prefsSaved"));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -74,7 +68,6 @@ export default function AppearanceSettingsPage() {
           {error}
         </p>
       ) : null}
-      {saved ? <p className="flash">{saved}</p> : null}
 
       <SettingsCard>
         <div className="flex items-center justify-between gap-2">

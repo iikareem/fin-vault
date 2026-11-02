@@ -32,6 +32,7 @@ import {
   saveAddSnapshot,
 } from "@/lib/offline-queue";
 import { offlineAwareReplace } from "@/lib/offline-nav";
+import { setNavFlash } from "@/components/Toast";
 
 type Account = { id: string; name: string; type?: string; balance?: number };
 type Category = {
@@ -377,9 +378,7 @@ function AddForm() {
     setError("");
 
     const finishOfflineSave = () => {
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem("fb_flash", "savedOffline");
-      }
+      setNavFlash("savedOffline");
       setConfirmOpen(false);
       offlineAwareReplace("/");
     };
@@ -433,9 +432,7 @@ function AddForm() {
             note,
           }),
         });
-        if (typeof window !== "undefined") {
-          sessionStorage.setItem("fb_flash", "transferSaved");
-        }
+        setNavFlash("transferSaved");
       } else if (withdrawMode) {
         const value = parseAmount(amount);
         const current = accounts.find(isCurrentWallet);
@@ -469,12 +466,9 @@ function AddForm() {
             }),
           },
         );
-        if (typeof window !== "undefined") {
-          sessionStorage.setItem(
-            "fb_flash",
-            toppedUp ? "cashWithdrawWithTransferSaved" : "cashWithdrawSaved",
-          );
-        }
+        setNavFlash(
+          toppedUp ? "cashWithdrawWithTransferSaved" : "cashWithdrawSaved",
+        );
       } else if (mode === "claim") {
         await api(householdPath(space.householdId, "/claims"), {
           method: "POST",
@@ -485,9 +479,7 @@ function AddForm() {
             note,
           }),
         });
-        if (typeof window !== "undefined") {
-          sessionStorage.setItem("fb_flash", "claimSaved");
-        }
+        setNavFlash("claimSaved");
       } else if (mode === "cover") {
         await api(householdPath(space.householdId, "/covers"), {
           method: "POST",
@@ -500,9 +492,7 @@ function AddForm() {
             note,
           }),
         });
-        if (typeof window !== "undefined") {
-          sessionStorage.setItem("fb_flash", "housePaidForSaved");
-        }
+        setNavFlash("housePaidForSaved");
       } else if (type === "GIVE") {
         await api(householdPath(space.householdId, "/payouts"), {
           method: "POST",
