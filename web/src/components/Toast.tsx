@@ -10,6 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { useI18n } from "./I18nProvider";
 import type { MessageKey } from "@/lib/i18n";
@@ -44,9 +45,9 @@ const NAV_FLASH_KEYS = new Set<string>([
 ]);
 
 const DISMISS_MS: Record<ToastTone, number> = {
-  success: 2800,
-  info: 3200,
-  error: 4200,
+  success: 3200,
+  info: 3600,
+  error: 4800,
 };
 
 export function setNavFlash(key: MessageKey) {
@@ -62,20 +63,28 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const { t } = useI18n();
   const pathname = usePathname();
   const [toast, setToast] = useState<ToastItem | null>(null);
-  const [visible, setVisible] = useState(false);
+  const [entered, setEntered] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const idRef = useRef(0);
   const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const enterRaf = useRef<number | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const clearTimers = useCallback(() => {
     if (hideTimer.current) clearTimeout(hideTimer.current);
     if (clearTimer.current) clearTimeout(clearTimer.current);
+    if (enterRaf.current != null) cancelAnimationFrame(enterRaf.current);
     hideTimer.current = null;
     clearTimer.current = null;
+    enterRaf.current = null;
   }, []);
 
   const dismiss = useCallback(() => {
-    setVisible(false);
+    setEntered(false);
     clearTimers();
     clearTimer.current = setTimeout(() => setToast(null), 220);
   }, [clearTimers]);
@@ -86,8 +95,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       clearTimers();
       const id = ++idRef.current;
       setToast({ id, message, tone });
-      setVisible(true);
-      hideTimer.current = setTimeout(dismiss, DISMISS_MS[tone]);
+      setEntered(false);
+      // Next paint → slide/fade in (also guarantees a non-zero opacity frame).
+      enterRaf.current = requestAnimationFrame(() => {
+        enterRaf.current = requestAnimationFrame(() => {
+          setEntered(true);
+          hideTimer.current = setTimeout(dismiss, DISMISS_MS[tone]);
+        });
+      });
     },
     [clearTimers, dismiss],
   );
@@ -120,52 +135,56 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const toneClass =
     toast?.tone === "error"
-      ? "border-red-700/20 bg-[var(--soft-red)] text-red-800"
+      ? "bg-red-800 text-white"
       : toast?.tone === "info"
-        ? "border-[color-mix(in_srgb,var(--accent-b)_25%,transparent)] bg-[var(--soft-sky)] text-[var(--accent-b-text)]"
-        : "border-emerald-700/20 bg-[var(--soft-emerald)] text-[var(--accent-a-text)]";
+        ? "bg-sky-800 text-white"
+        : "bg-emerald-800 text-white";
+
+  const overlay =
+    mounted && toast ? (
+      <div
+        className="fb-toast-host pointer-events-none fixed inset-x-0 top-0 z-[300] flex justify-center px-3 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] sm:px-4"
+        aria-live="polite"
+        aria-relevant="additions"
+        role="status"
+      >
+        <button
+          type="button"
+          key={toast.id}
+          onClick={dismiss}
+          className={`fb-toast pointer-events-auto w-full max-w-md rounded-2xl px-4 py-3.5 text-start text-[0.95rem] font-semibold shadow-xl transition duration-200 ease-out ${toneClass} ${
+            entered
+              ? "translate-y-0 opacity-100"
+              : "-translate-y-2 opacity-0"
+          }`}
+        >
+          <span className="flex items-start gap-2.5">
+            <ToastIcon tone={toast.tone} />
+            <span className="min-w-0 flex-1 leading-snug">{toast.message}</span>
+          </span>
+        </button>
+      </div>
+    ) : null;
 
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <div
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[calc(5.75rem+env(safe-area-inset-bottom,0px))] sm:px-4"
-        aria-live="polite"
-        aria-relevant="additions"
-      >
-        {toast ? (
-          <button
-            type="button"
-            key={toast.id}
-            onClick={dismiss}
-            className={`pointer-events-auto max-w-md rounded-2xl border px-4 py-3 text-start text-sm font-semibold shadow-lg transition duration-200 ease-out ${toneClass} ${
-              visible
-                ? "translate-y-0 opacity-100"
-                : "translate-y-3 opacity-0"
-            }`}
-          >
-            <span className="flex items-start gap-2.5">
-              <ToastIcon tone={toast.tone} />
-              <span className="min-w-0 flex-1 leading-snug">{toast.message}</span>
-            </span>
-          </button>
-        ) : null}
-      </div>
+      {mounted && overlay ? createPortal(overlay, document.body) : null}
     </ToastContext.Provider>
   );
 }
 
 function ToastIcon({ tone }: { tone: ToastTone }) {
   const common = {
-    width: 18,
-    height: 18,
+    width: 20,
+    height: 20,
     viewBox: "0 0 24 24",
     fill: "none",
     stroke: "currentColor",
-    strokeWidth: 2.2,
+    strokeWidth: 2.4,
     strokeLinecap: "round" as const,
     strokeLinejoin: "round" as const,
-    className: "mt-0.5 shrink-0 opacity-90",
+    className: "mt-0.5 shrink-0",
     "aria-hidden": true as const,
   };
   if (tone === "error") {

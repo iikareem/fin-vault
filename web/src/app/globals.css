@@ -881,6 +881,16 @@ input[type="month"].field {
   color: #065f46;
 }
 
+/* App toasts portal to body so overflow:hidden chrome cannot clip them. */
+.fb-toast-host {
+  isolation: isolate;
+}
+
+.fb-toast {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
 @utility banner-warn {
   border-radius: 1rem;
   background-color: var(--soft-amber);

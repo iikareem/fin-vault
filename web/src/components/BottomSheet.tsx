@@ -1,6 +1,7 @@
 "use client";
 
-import { ReactNode, useEffect } from "react";
+import { ReactNode, useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 type BottomSheetProps = {
   open: boolean;
@@ -22,6 +23,12 @@ export function BottomSheet({
   footer,
   lockDismiss = false,
 }: BottomSheetProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     if (!open || lockDismiss) return;
     const onKey = (e: KeyboardEvent) => {
@@ -31,11 +38,11 @@ export function BottomSheet({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, lockDismiss, onClose]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/45 p-3 sm:items-center"
+      className="fixed inset-0 z-[280] flex items-end justify-center bg-black/45 p-3 sm:items-center"
       role="dialog"
       aria-modal="true"
       aria-labelledby="bottom-sheet-title"
@@ -70,6 +77,7 @@ export function BottomSheet({
           </div>
         ) : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
