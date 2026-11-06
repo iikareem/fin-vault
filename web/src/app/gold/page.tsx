@@ -11,6 +11,7 @@ import { useBooks } from "@/components/BooksProvider";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 import { fill } from "@/lib/i18n";
+import { formatItemDate } from "@/lib/calendar";
 import { DateField } from "@/components/DateField";
 
 type Karat = 18 | 21 | 24;
@@ -415,6 +416,12 @@ export default function GoldPage() {
               const title =
                 h.note?.trim() ||
                 `${karatLabel(h.karat, t)} · ${h.grams}${locale === "ar" ? " جم" : "g"}`;
+              const acquiredLabel = h.acquiredOn
+                ? formatItemDate(h.acquiredOn, locale, {
+                    todayLabel: t("today"),
+                    yesterdayLabel: t("yesterday"),
+                  })
+                : null;
               const gainTone =
                 gain == null
                   ? "bg-[var(--panel-soft)] text-[var(--muted)]"
@@ -444,7 +451,12 @@ export default function GoldPage() {
                             {[
                               karatLabel(h.karat, t),
                               `${h.grams}${locale === "ar" ? " جم" : "g"}`,
-                            ].join(" · ")}
+                              acquiredLabel
+                                ? `${t("goldAcquiredOn")}: ${acquiredLabel}`
+                                : null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")}
                           </p>
                         </div>
                         <p className="shrink-0 text-base font-bold tabular-nums text-[var(--foreground)]">
@@ -460,25 +472,47 @@ export default function GoldPage() {
                         </p>
                       </div>
 
-                      <div className="mt-3 rounded-2xl bg-[var(--panel-soft)] px-3 py-2.5">
-                        <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
-                          {t("goldAcquiredOn")}
-                          {savingDateId === h.id ? (
-                            <span className="ms-1 normal-case tracking-normal opacity-70">
-                              · {t("saving")}
-                            </span>
-                          ) : null}
-                        </p>
-                        <DateField
-                          className="mt-1.5"
-                          value={h.acquiredOn ?? today}
-                          onChange={(nextDate) =>
-                            void onUpdateAcquiredOn(h.id, nextDate)
-                          }
-                        />
-                      </div>
-
-                      <div className="mt-2 grid grid-cols-2 gap-2">
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <label className="relative col-span-2 block cursor-pointer rounded-2xl bg-[var(--soft-amber)] px-3 py-2.5">
+                          <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
+                            {t("goldAcquiredOn")}
+                            {savingDateId === h.id ? (
+                              <span className="ms-1 normal-case tracking-normal opacity-70">
+                                · {t("saving")}
+                              </span>
+                            ) : null}
+                          </p>
+                          <p
+                            className={`mt-0.5 text-sm font-bold ${
+                              acquiredLabel
+                                ? "text-[var(--foreground)]"
+                                : "text-[var(--muted)]"
+                            }`}
+                          >
+                            {acquiredLabel || t("goldAcquiredOnSet")}
+                          </p>
+                          <input
+                            type="date"
+                            value={h.acquiredOn ?? ""}
+                            onChange={(e) => {
+                              if (e.target.value) {
+                                void onUpdateAcquiredOn(h.id, e.target.value);
+                              }
+                            }}
+                            onClick={(e) => {
+                              const input = e.currentTarget;
+                              try {
+                                if (typeof input.showPicker === "function") {
+                                  void input.showPicker();
+                                }
+                              } catch {
+                                // Native picker unavailable — click still focuses.
+                              }
+                            }}
+                            className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
+                            aria-label={t("goldAcquiredOn")}
+                          />
+                        </label>
                         <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-2.5">
                           <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
                             {t("goldPaid")}
@@ -495,7 +529,7 @@ export default function GoldPage() {
                             )}
                           </p>
                         </div>
-                        <div className="rounded-2xl bg-[var(--soft-amber)] px-3 py-2.5">
+                        <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-2.5">
                           <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
                             {t("goldCurrent")}
                           </p>

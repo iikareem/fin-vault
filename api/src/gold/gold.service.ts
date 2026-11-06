@@ -32,7 +32,7 @@ export class GoldService {
     const [holdings, quotes] = await Promise.all([
       this.prisma.goldHolding.findMany({
         where: { householdId },
-        orderBy: [{ createdAt: 'desc' }],
+        orderBy: [{ acquiredOn: 'desc' }, { createdAt: 'desc' }],
       }),
       this.prices.getQuotes(),
     ]);
