@@ -2239,7 +2239,7 @@ const en = {
   goldSaved: "Saved",
   goldCostPerGram: "Your cost /g",
   goldLivePerGramShort: "Live /g",
-  goldAcquiredOn: "Bought",
+  goldAcquiredOn: "Purchase date",
   goldNoPaidHint: "Add what you paid to track gain or loss.",
   goldVsBuy: "Vs buy",
   goalsTitle: "Goals",

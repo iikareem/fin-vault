@@ -11,7 +11,6 @@ import { useBooks } from "@/components/BooksProvider";
 import { householdPath } from "@/lib/space";
 import { Hint } from "@/components/Hint";
 import { fill } from "@/lib/i18n";
-import { formatItemDate } from "@/lib/calendar";
 import { DateField } from "@/components/DateField";
 
 type Karat = 18 | 21 | 24;
@@ -82,6 +81,7 @@ export default function GoldPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [deletingId, setDeletingId] = useState("");
+  const [savingDateId, setSavingDateId] = useState("");
   const today = todayISO();
   const yesterday = yesterdayISO();
 
@@ -152,6 +152,28 @@ export default function GoldPage() {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
       setDeletingId("");
+    }
+  }
+
+  async function onUpdateAcquiredOn(id: string, nextDate: string) {
+    if (!personal || !nextDate) return;
+    const current = data?.holdings.find((h) => h.id === id)?.acquiredOn;
+    if (current === nextDate) return;
+    setSavingDateId(id);
+    setError("");
+    try {
+      const next = await api<GoldSummary>(
+        householdPath(personal.householdId, `/gold/${id}`),
+        {
+          method: "PATCH",
+          body: JSON.stringify({ acquiredOn: nextDate }),
+        },
+      );
+      setData(next);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("couldNotSave"));
+    } finally {
+      setSavingDateId("");
     }
   }
 
@@ -393,9 +415,6 @@ export default function GoldPage() {
               const title =
                 h.note?.trim() ||
                 `${karatLabel(h.karat, t)} · ${h.grams}${locale === "ar" ? " جم" : "g"}`;
-              const acquiredLabel = h.acquiredOn
-                ? formatItemDate(h.acquiredOn, locale)
-                : null;
               const gainTone =
                 gain == null
                   ? "bg-[var(--panel-soft)] text-[var(--muted)]"
@@ -425,12 +444,7 @@ export default function GoldPage() {
                             {[
                               karatLabel(h.karat, t),
                               `${h.grams}${locale === "ar" ? " جم" : "g"}`,
-                              acquiredLabel
-                                ? `${t("goldAcquiredOn")} ${acquiredLabel}`
-                                : null,
-                            ]
-                              .filter(Boolean)
-                              .join(" · ")}
+                            ].join(" · ")}
                           </p>
                         </div>
                         <p className="shrink-0 text-base font-bold tabular-nums text-[var(--foreground)]">
@@ -446,7 +460,25 @@ export default function GoldPage() {
                         </p>
                       </div>
 
-                      <div className="mt-3 grid grid-cols-2 gap-2">
+                      <div className="mt-3 rounded-2xl bg-[var(--panel-soft)] px-3 py-2.5">
+                        <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
+                          {t("goldAcquiredOn")}
+                          {savingDateId === h.id ? (
+                            <span className="ms-1 normal-case tracking-normal opacity-70">
+                              · {t("saving")}
+                            </span>
+                          ) : null}
+                        </p>
+                        <DateField
+                          className="mt-1.5"
+                          value={h.acquiredOn ?? today}
+                          onChange={(nextDate) =>
+                            void onUpdateAcquiredOn(h.id, nextDate)
+                          }
+                        />
+                      </div>
+
+                      <div className="mt-2 grid grid-cols-2 gap-2">
                         <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-2.5">
                           <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
                             {t("goldPaid")}
