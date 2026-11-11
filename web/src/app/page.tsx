@@ -1155,7 +1155,7 @@ export default function HomePage() {
                               className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-red-800"
                             >
                               {t("deleteItem")}
-                            </button}
+                            </button>
                           </div>
                         ) : null}
                         {editId === c.id ? (
