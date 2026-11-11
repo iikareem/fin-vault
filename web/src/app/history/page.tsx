@@ -543,10 +543,8 @@ function HistoryInner() {
                   : "out";
             const wallet = walletLabel(tx.account, t);
             const tripName = tx.travel?.name?.trim() || null;
-            const subParts = [
-              tx.note || null,
-              tx.type === "TRACK" ? t("trackOnlyBadge") : wallet,
-            ].filter(Boolean);
+            const walletOrTrack =
+              tx.type === "TRACK" ? t("trackOnlyBadge") : wallet;
             return (
               <li
                 key={tx.id}
@@ -593,17 +591,25 @@ function HistoryInner() {
                             const showUser =
                               active?.kind === "HOUSE" &&
                               tx.user.name !== "House";
-                            const parts = [
+                            const meta = [
                               showUser ? personLabel(tx.user, locale) : null,
-                              ...subParts,
+                              tx.note || null,
                             ].filter(Boolean);
-                            if (parts.length === 0) return null;
+                            if (meta.length === 0 && !walletOrTrack) return null;
                             return (
-                              <p
-                                className="mt-0.5 truncate text-sm text-[var(--muted)]"
-                                dir="auto"
-                              >
-                                {parts.join(" · ")}
+                              <p className="mt-0.5 flex min-w-0 items-baseline gap-1.5 text-sm text-[var(--muted)]">
+                                {meta.length > 0 ? (
+                                  <span className="min-w-0 truncate" dir="auto">
+                                    {meta.join(" · ")}
+                                  </span>
+                                ) : null}
+                                {walletOrTrack ? (
+                                  <span className="shrink-0" dir="auto">
+                                    {meta.length > 0
+                                      ? `· ${walletOrTrack}`
+                                      : walletOrTrack}
+                                  </span>
+                                ) : null}
                               </p>
                             );
                           })()}

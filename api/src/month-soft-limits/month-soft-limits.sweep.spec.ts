@@ -98,8 +98,8 @@ describe('applyMonthStartSaveSweep', () => {
     // then walletBalance groupBy for Current: income 40k → bal 40k
     prisma.transaction.groupBy
       .mockResolvedValueOnce([
-        { type: 'INCOME', _sum: { amount: 50000 } },
-        { type: 'EXPENSE', _sum: { amount: 20000 } },
+        { accountId: currentId, type: 'INCOME', _sum: { amount: 50000 } },
+        { accountId: currentId, type: 'EXPENSE', _sum: { amount: 20000 } },
       ])
       .mockResolvedValueOnce([{ type: 'INCOME', _sum: { amount: 40000 } }]);
 
@@ -124,8 +124,8 @@ describe('applyMonthStartSaveSweep', () => {
 
     prisma.transaction.groupBy
       .mockResolvedValueOnce([
-        { type: 'INCOME', _sum: { amount: 50000 } },
-        { type: 'EXPENSE', _sum: { amount: 20000 } },
+        { accountId: currentId, type: 'INCOME', _sum: { amount: 50000 } },
+        { accountId: currentId, type: 'EXPENSE', _sum: { amount: 20000 } },
       ])
       .mockResolvedValueOnce([{ type: 'INCOME', _sum: { amount: 12000 } }]);
 
@@ -142,8 +142,8 @@ describe('applyMonthStartSaveSweep', () => {
 
     prisma.transaction.groupBy
       .mockResolvedValueOnce([
-        { type: 'INCOME', _sum: { amount: 10000 } },
-        { type: 'EXPENSE', _sum: { amount: 15000 } },
+        { accountId: currentId, type: 'INCOME', _sum: { amount: 10000 } },
+        { accountId: currentId, type: 'EXPENSE', _sum: { amount: 15000 } },
       ])
       .mockResolvedValueOnce([{ type: 'INCOME', _sum: { amount: 5000 } }]);
 
@@ -152,6 +152,26 @@ describe('applyMonthStartSaveSweep', () => {
 
     expect(result.autoSweptAmount).toBe(0);
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('ignores Savings expenses when computing previous saved for sweep', async () => {
+    const prisma = makePrisma();
+    setupBase(prisma);
+
+    // Current: income 50k, expense 20k; Savings expense 10k must not reduce saved
+    prisma.transaction.groupBy
+      .mockResolvedValueOnce([
+        { accountId: currentId, type: 'INCOME', _sum: { amount: 50000 } },
+        { accountId: currentId, type: 'EXPENSE', _sum: { amount: 20000 } },
+        { accountId: savingsId, type: 'EXPENSE', _sum: { amount: 10000 } },
+      ])
+      .mockResolvedValueOnce([{ type: 'INCOME', _sum: { amount: 40000 } }]);
+
+    const service = new MonthSoftLimitsService(prisma as never);
+    const result = await service.applyMonthStartSaveSweep(householdId, userId);
+
+    expect(result.autoSweptAmount).toBe(30000);
+    expect(prisma.$transaction).toHaveBeenCalled();
   });
 
   it('does not transfer again when autoSweepDone is already true', async () => {
@@ -181,5 +201,71 @@ describe('applyMonthStartSaveSweep', () => {
 
     expect(result.autoSweptAmount).toBe(25000);
     expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe('getStatus cashFlow excludes Savings spends', () => {
+  const householdId = 'hh1';
+  const userId = 'u1';
+  const currentId = 'acc-current';
+  const savingsId = 'acc-savings';
+
+  function setupStatus(prisma: MockPrisma) {
+    prisma.user.findUnique.mockResolvedValue({ budgetMonthStartDay: 1 });
+    // Past period → skip live sweep path; only look up existing row
+    prisma.monthSoftLimit.findUnique.mockResolvedValue({
+      id: 'msl1',
+      householdId,
+      periodKey: '2024-01',
+      saveTargetAmount: 10000,
+      autoSweepDone: false,
+      autoSweptAmount: 0,
+    });
+    prisma.account.findMany.mockResolvedValue([
+      {
+        id: currentId,
+        name: 'Current',
+        archived: false,
+        openingBalance: 0,
+        type: 'CASH',
+      },
+      {
+        id: savingsId,
+        name: 'Savings',
+        archived: false,
+        openingBalance: 0,
+        type: 'CASH',
+      },
+    ]);
+    prisma.transaction.aggregate.mockResolvedValue({
+      _sum: { amount: 5000 },
+    });
+  }
+
+  it('counts Current expenses and Savings income, ignores Savings expenses', async () => {
+    const prisma = makePrisma();
+    setupStatus(prisma);
+
+    prisma.transaction.groupBy.mockResolvedValue([
+      { accountId: currentId, type: 'INCOME', _sum: { amount: 40000 } },
+      { accountId: savingsId, type: 'INCOME', _sum: { amount: 10000 } },
+      { accountId: currentId, type: 'EXPENSE', _sum: { amount: 15000 } },
+      { accountId: savingsId, type: 'EXPENSE', _sum: { amount: 8000 } },
+    ]);
+
+    const service = new MonthSoftLimitsService(prisma as never);
+    const status = await service.getStatus(householdId, userId, '2024-01');
+
+    expect(status.periodIncome).toBe(50000);
+    expect(status.periodOutflow).toBe(15000);
+    expect(status.savedThisMonth).toBe(35000);
+    expect(status.spendAllowance?.spent).toBe(15000);
+    expect(prisma.transaction.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          account: { name: { not: 'Savings' } },
+        }),
+      }),
+    );
   });
 });

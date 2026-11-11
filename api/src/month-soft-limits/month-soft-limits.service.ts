@@ -83,15 +83,23 @@ export class MonthSoftLimitsService {
   private async cashFlow(householdId: string, from: string, to: string) {
     const accounts = await this.prisma.account.findMany({
       where: { householdId, archived: false, type: 'CASH' },
-      select: { id: true },
+      select: { id: true, name: true },
     });
-    const ids = accounts.map((a) => a.id);
-    if (ids.length === 0) {
+    if (accounts.length === 0) {
       return { income: 0, outflow: 0, saved: 0 };
     }
 
+    // Income counts on Current + Savings; outflow only on everyday wallets.
+    // Spending from Savings must not reduce save progress or spend room.
+    const currentIds = new Set(
+      accounts
+        .filter((a) => a.name === 'Current' || a.name === 'Cash')
+        .map((a) => a.id),
+    );
+    const ids = accounts.map((a) => a.id);
+
     const rows = await this.prisma.transaction.groupBy({
-      by: ['type'],
+      by: ['accountId', 'type'],
       where: {
         householdId,
         accountId: { in: ids },
@@ -102,10 +110,19 @@ export class MonthSoftLimitsService {
       _sum: { amount: true },
     });
 
-    const amt = (type: string) =>
-      Number(rows.find((r) => r.type === type)?._sum?.amount ?? 0);
-    const income = amt('INCOME');
-    const outflow = amt('EXPENSE') + amt('REIMBURSEMENT');
+    let income = 0;
+    let outflow = 0;
+    for (const row of rows) {
+      const amount = Number(row._sum?.amount ?? 0);
+      if (row.type === 'INCOME') {
+        income += amount;
+      } else if (
+        (row.type === 'EXPENSE' || row.type === 'REIMBURSEMENT') &&
+        currentIds.has(row.accountId)
+      ) {
+        outflow += amount;
+      }
+    }
     return { income, outflow, saved: income - outflow };
   }
 
@@ -118,6 +135,7 @@ export class MonthSoftLimitsService {
       occurredOn: { gte: monthStart, lte: monthEnd },
       category: nonSpendCategoryFilter,
       travelId: null,
+      account: { name: { not: 'Savings' } },
     };
 
     const [allAgg, personalAgg] = await Promise.all([
