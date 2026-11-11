@@ -573,14 +573,19 @@ function HistoryInner() {
                     />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
+                        <div className="min-w-0 flex-1">
                           <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                             <p
-                              className="truncate text-base font-bold text-[var(--foreground)]"
+                              className="min-w-0 truncate text-base font-bold text-[var(--foreground)]"
                               dir="auto"
                             >
                               {categoryLabel(tx.category, locale, t)}
                             </p>
+                            {walletOrTrack ? (
+                              <span className="inline-flex shrink-0 items-center whitespace-nowrap rounded-lg bg-[var(--panel-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--muted)] ring-1 ring-[var(--surface-border)]">
+                                {walletOrTrack}
+                              </span>
+                            ) : null}
                             {tripName ? (
                               <span className="inline-flex max-w-full items-center truncate rounded-lg bg-sky-800/10 px-2 py-0.5 text-[11px] font-semibold text-sky-900 ring-1 ring-sky-800/15 dark:text-sky-200">
                                 {fill(t("travelsDayOnTrip"), { name: tripName })}
@@ -593,23 +598,15 @@ function HistoryInner() {
                               tx.user.name !== "House";
                             const meta = [
                               showUser ? personLabel(tx.user, locale) : null,
-                              tx.note || null,
+                              tx.note?.trim() || null,
                             ].filter(Boolean);
-                            if (meta.length === 0 && !walletOrTrack) return null;
+                            if (meta.length === 0) return null;
                             return (
-                              <p className="mt-0.5 flex min-w-0 items-baseline gap-1.5 text-sm text-[var(--muted)]">
-                                {meta.length > 0 ? (
-                                  <span className="min-w-0 truncate" dir="auto">
-                                    {meta.join(" · ")}
-                                  </span>
-                                ) : null}
-                                {walletOrTrack ? (
-                                  <span className="shrink-0" dir="auto">
-                                    {meta.length > 0
-                                      ? `· ${walletOrTrack}`
-                                      : walletOrTrack}
-                                  </span>
-                                ) : null}
+                              <p
+                                className="mt-0.5 truncate text-sm text-[var(--muted)]"
+                                dir="auto"
+                              >
+                                {meta.join(" · ")}
                               </p>
                             );
                           })()}
