@@ -292,11 +292,11 @@ function OutflowSourceSplit({
         aria-label={`${t("outFromCurrent")} ${currentPct}%, ${t("outFromSavings")} ${savingsPct}%`}
       >
         <span
-          className="h-full bg-stone-600 transition-[width] duration-500 ease-out"
+          className="h-full bg-stone-600 transition-[width] duration-500 ease-out dark:bg-stone-400"
           style={{ width: `${currentPct}%` }}
         />
         <span
-          className="h-full bg-amber-500 transition-[width] duration-500 ease-out"
+          className="h-full bg-amber-500 transition-[width] duration-500 ease-out dark:bg-amber-400"
           style={{ width: `${savingsPct}%` }}
         />
       </div>
@@ -305,7 +305,7 @@ function OutflowSourceSplit({
         <div className="min-w-0 rounded-2xl bg-[var(--panel-soft)] px-2.5 py-2.5">
           <div className="flex items-center gap-1.5">
             <span
-              className="h-2 w-2 shrink-0 rounded-full bg-stone-600"
+              className="h-2 w-2 shrink-0 rounded-full bg-stone-600 dark:bg-stone-400"
               aria-hidden
             />
             <span
@@ -323,23 +323,23 @@ function OutflowSourceSplit({
           </p>
         </div>
 
-        <div className="min-w-0 rounded-2xl bg-[color-mix(in_srgb,#f59e0b_12%,var(--panel-soft))] px-2.5 py-2.5 ring-1 ring-inset ring-[color-mix(in_srgb,#f59e0b_22%,transparent)]">
+        <div className="min-w-0 rounded-2xl bg-amber-500/15 px-2.5 py-2.5 ring-1 ring-inset ring-amber-600/25 dark:bg-amber-400/20 dark:ring-amber-300/35">
           <div className="flex items-center gap-1.5">
             <span
-              className="h-2 w-2 shrink-0 rounded-full bg-amber-500"
+              className="h-2 w-2 shrink-0 rounded-full bg-amber-500 dark:bg-amber-300"
               aria-hidden
             />
             <span
-              className="min-w-0 truncate text-[11px] font-medium text-amber-900/80"
+              className="min-w-0 truncate text-[11px] font-medium text-amber-900 dark:text-amber-200"
               dir="auto"
             >
               {t("savingsWallet")}
             </span>
           </div>
-          <p className="mt-1.5 text-[0.95rem] font-semibold leading-none tabular-nums text-amber-950">
+          <p className="mt-1.5 text-[0.95rem] font-semibold leading-none tabular-nums text-amber-950 dark:text-amber-100">
             <Money amount={fromSavings} currency={currency} locale={locale} />
           </p>
-          <p className="mt-1 text-[10px] tabular-nums text-amber-900/70">
+          <p className="mt-1 text-[10px] tabular-nums text-amber-900/70 dark:text-amber-200/75">
             {fill(t("outShareOfSpend"), { pct: String(savingsPct) })}
           </p>
         </div>
