@@ -256,58 +256,98 @@ function OutflowSourceSplit({
   total: number;
   currency: string;
   locale: "en" | "ar";
-  t: (key: "outFromCurrent" | "outFromSavings") => string;
+  t: (
+    key:
+      | "outFromCurrent"
+      | "outFromSavings"
+      | "outPaidFrom"
+      | "outShareOfSpend"
+      | "spendFromSavingsHint"
+      | "currentWallet"
+      | "savingsWallet",
+  ) => string;
 }) {
   if (fromSavings < 0.005) return null;
   const safeTotal = Math.max(total, fromCurrent + fromSavings, 0.001);
-  const currentPct = Math.round((fromCurrent / safeTotal) * 100);
+  const currentPct = Math.min(
+    100,
+    Math.max(0, Math.round((fromCurrent / safeTotal) * 100)),
+  );
   const savingsPct = Math.max(0, 100 - currentPct);
 
   return (
-    <div className="mt-3 space-y-2 border-t border-[var(--surface-border)] pt-3">
+    <div className="mt-3 border-t border-[var(--surface-border)] pt-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="text-[11px] font-semibold tracking-wide text-[var(--muted)]">
+          {t("outPaidFrom")}
+        </p>
+        <p className="text-[10px] tabular-nums text-[var(--muted)]" dir="ltr">
+          {currentPct}% · {savingsPct}%
+        </p>
+      </div>
+
       <div
-        className="flex h-1.5 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--foreground)_8%,transparent)]"
-        aria-hidden
+        className="mt-2 flex h-2.5 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--foreground)_7%,transparent)] ring-1 ring-inset ring-[color-mix(in_srgb,var(--foreground)_6%,transparent)]"
+        role="img"
+        aria-label={`${t("outFromCurrent")} ${currentPct}%, ${t("outFromSavings")} ${savingsPct}%`}
       >
         <span
-          className="h-full bg-stone-500 transition-[width] duration-300"
+          className="h-full bg-stone-600 transition-[width] duration-500 ease-out"
           style={{ width: `${currentPct}%` }}
         />
         <span
-          className="h-full bg-amber-500 transition-[width] duration-300"
+          className="h-full bg-amber-500 transition-[width] duration-500 ease-out"
           style={{ width: `${savingsPct}%` }}
         />
       </div>
-      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-        <p className="flex min-w-0 items-baseline justify-between gap-2">
-          <span className="flex min-w-0 items-center gap-1 truncate text-[var(--muted)]">
+
+      <div className="mt-2.5 grid grid-cols-2 gap-2">
+        <div className="min-w-0 rounded-2xl bg-[var(--panel-soft)] px-2.5 py-2.5">
+          <div className="flex items-center gap-1.5">
             <span
-              className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-stone-500"
+              className="h-2 w-2 shrink-0 rounded-full bg-stone-600"
               aria-hidden
             />
-            <span className="truncate" dir="auto">
-              {t("outFromCurrent")}
+            <span
+              className="min-w-0 truncate text-[11px] font-medium text-[var(--muted)]"
+              dir="auto"
+            >
+              {t("currentWallet")}
             </span>
-          </span>
-          <span className="shrink-0 font-medium tabular-nums text-[var(--foreground)]">
+          </div>
+          <p className="mt-1.5 text-[0.95rem] font-semibold leading-none tabular-nums text-[var(--foreground)]">
             <Money amount={fromCurrent} currency={currency} locale={locale} />
-          </span>
-        </p>
-        <p className="flex min-w-0 items-baseline justify-between gap-2">
-          <span className="flex min-w-0 items-center gap-1 truncate text-[var(--muted)]">
+          </p>
+          <p className="mt-1 text-[10px] tabular-nums text-[var(--muted)]">
+            {fill(t("outShareOfSpend"), { pct: String(currentPct) })}
+          </p>
+        </div>
+
+        <div className="min-w-0 rounded-2xl bg-[color-mix(in_srgb,#f59e0b_12%,var(--panel-soft))] px-2.5 py-2.5 ring-1 ring-inset ring-[color-mix(in_srgb,#f59e0b_22%,transparent)]">
+          <div className="flex items-center gap-1.5">
             <span
-              className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
+              className="h-2 w-2 shrink-0 rounded-full bg-amber-500"
               aria-hidden
             />
-            <span className="truncate" dir="auto">
-              {t("outFromSavings")}
+            <span
+              className="min-w-0 truncate text-[11px] font-medium text-amber-900/80"
+              dir="auto"
+            >
+              {t("savingsWallet")}
             </span>
-          </span>
-          <span className="shrink-0 font-medium tabular-nums text-amber-800">
+          </div>
+          <p className="mt-1.5 text-[0.95rem] font-semibold leading-none tabular-nums text-amber-950">
             <Money amount={fromSavings} currency={currency} locale={locale} />
-          </span>
-        </p>
+          </p>
+          <p className="mt-1 text-[10px] tabular-nums text-amber-900/70">
+            {fill(t("outShareOfSpend"), { pct: String(savingsPct) })}
+          </p>
+        </div>
       </div>
+
+      <p className="mt-2 text-[10px] leading-snug text-[var(--muted)]" dir="auto">
+        {t("spendFromSavingsHint")}
+      </p>
     </div>
   );
 }
