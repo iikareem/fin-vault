@@ -31,10 +31,14 @@ export class SavingsGoalsService {
   ) {}
 
   async summary(householdId: string) {
-    const [goals, wallets] = await Promise.all([
+    const [goals, bought, wallets] = await Promise.all([
       this.prisma.savingsGoal.findMany({
         where: { householdId, archived: false },
         orderBy: [{ createdAt: 'desc' }],
+      }),
+      this.prisma.savingsGoal.findMany({
+        where: { householdId, archived: true },
+        orderBy: [{ updatedAt: 'desc' }],
       }),
       this.accounts.list(householdId),
     ]);
@@ -45,6 +49,7 @@ export class SavingsGoalsService {
     const currentBalance = Math.round((current?.balance ?? 0) * 100) / 100;
 
     const rows = goals.map((g) => this.mapGoal(g));
+    const boughtRows = bought.map((g) => this.mapGoal(g));
     const allocated = Math.round(
       rows.reduce((s, g) => s + g.savedAmount, 0) * 100,
     ) / 100;
@@ -59,6 +64,7 @@ export class SavingsGoalsService {
       free,
       totalTarget,
       goals: rows,
+      bought: boughtRows,
       currentAccountId: current?.id ?? null,
       savingsAccountId: savings?.id ?? null,
     };
@@ -108,8 +114,9 @@ export class SavingsGoalsService {
   }
 
   async remove(householdId: string, userId: string, id: string) {
-    await this.requireOwnGoal(householdId, userId, id);
-    // Deleting only drops the label; cash stays in Savings.
+    await this.requireOwnGoal(householdId, userId, id, { includeArchived: true });
+    // Active: drops the label; cash stays in Savings.
+    // Bought history: removes the record only (expense already logged).
     await this.prisma.savingsGoal.delete({ where: { id } });
     return this.summary(householdId);
   }
@@ -231,7 +238,7 @@ export class SavingsGoalsService {
 
   /**
    * Goal finished: spend labeled cash from Savings as an expense whose
-   * category name matches the goal, then close the goal.
+   * category name matches the goal, then archive it into buy history.
    */
   async buy(
     householdId: string,
@@ -281,7 +288,10 @@ export class SavingsGoalsService {
           note,
         },
       }),
-      this.prisma.savingsGoal.delete({ where: { id } }),
+      this.prisma.savingsGoal.update({
+        where: { id },
+        data: { archived: true },
+      }),
     ]);
 
     return this.summary(householdId);
@@ -322,7 +332,9 @@ export class SavingsGoalsService {
     savedAmount: Prisma.Decimal;
     note: string;
     color: string;
+    archived: boolean;
     createdAt: Date;
+    updatedAt: Date;
   }) {
     const targetAmount = Math.round(Number(g.targetAmount) * 100) / 100;
     const savedAmount = Math.round(Number(g.savedAmount) * 100) / 100;
@@ -340,7 +352,9 @@ export class SavingsGoalsService {
       pct,
       note: g.note,
       color: g.color,
+      archived: g.archived,
       createdAt: g.createdAt.toISOString(),
+      boughtAt: g.archived ? g.updatedAt.toISOString() : null,
     };
   }
 
@@ -348,9 +362,14 @@ export class SavingsGoalsService {
     householdId: string,
     userId: string,
     id: string,
+    opts?: { includeArchived?: boolean },
   ) {
     const row = await this.prisma.savingsGoal.findFirst({
-      where: { id, householdId, archived: false },
+      where: {
+        id,
+        householdId,
+        ...(opts?.includeArchived ? {} : { archived: false }),
+      },
     });
     if (!row) throw new NotFoundException();
     if (row.userId !== userId) {

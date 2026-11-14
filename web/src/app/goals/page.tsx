@@ -23,6 +23,8 @@ type Goal = {
   pct: number;
   note: string;
   color: string;
+  archived?: boolean;
+  boughtAt?: string | null;
 };
 
 type GoalsSummary = {
@@ -32,6 +34,7 @@ type GoalsSummary = {
   free: number;
   totalTarget: number;
   goals: Goal[];
+  bought: Goal[];
 };
 
 type ActionMode = "allocate" | "release" | "edit" | null;
@@ -87,9 +90,13 @@ export default function GoalsPage() {
   );
   const [actionBusy, setActionBusy] = useState(false);
 
+  function applySummary(next: GoalsSummary) {
+    setData({ ...next, bought: next.bought ?? [] });
+  }
+
   function load(hid: string) {
     return api<GoalsSummary>(householdPath(hid, "/savings-goals")).then(
-      setData,
+      applySummary,
     );
   }
 
@@ -175,7 +182,7 @@ export default function GoalsPage() {
           }),
         },
       );
-      setData(next);
+      applySummary(next);
       setName("");
       setTarget("");
       setNote("");
@@ -189,12 +196,12 @@ export default function GoalsPage() {
     }
   }
 
-  async function onDelete(id: string) {
+  async function onDelete(id: string, fromHistory = false) {
     if (!personal) return;
     const ok = await confirm({
       title: t("confirmDeleteTitle"),
-      message: t("confirmDeleteHint"),
-      confirmLabel: t("goalsDelete"),
+      message: fromHistory ? t("goalsHistoryRemove") : t("confirmDeleteHint"),
+      confirmLabel: fromHistory ? t("goalsHistoryRemove") : t("goalsDelete"),
       tone: "danger",
     });
     if (!ok) return;
@@ -205,7 +212,7 @@ export default function GoalsPage() {
         householdPath(personal.householdId, `/savings-goals/${id}`),
         { method: "DELETE" },
       );
-      setData(next);
+      applySummary(next);
       if (actionId === id) closeAction();
       toast.success(t("actionDeleted"));
     } catch (err) {
@@ -213,6 +220,16 @@ export default function GoalsPage() {
     } finally {
       setDeletingId("");
     }
+  }
+
+  function formatBoughtDate(iso: string) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
+    return d.toLocaleDateString(locale === "ar" ? "ar" : "en", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
   }
 
   async function onBuy(id: string) {
@@ -231,7 +248,7 @@ export default function GoalsPage() {
         householdPath(personal.householdId, `/savings-goals/${id}/buy`),
         { method: "POST", body: JSON.stringify({}) },
       );
-      setData(next);
+      applySummary(next);
       if (actionId === id) closeAction();
       toast.success(t("actionDone"));
     } catch (err) {
@@ -268,7 +285,7 @@ export default function GoalsPage() {
             }),
           },
         );
-        setData(next);
+        applySummary(next);
         closeAction();
         toast.success(t("actionSaved"));
       } catch (err) {
@@ -299,7 +316,7 @@ export default function GoalsPage() {
         householdPath(personal.householdId, path),
         { method: "POST", body: JSON.stringify(body) },
       );
-      setData(next);
+      applySummary(next);
       closeAction();
       toast.success(t("actionDone"));
     } catch (err) {
@@ -808,6 +825,66 @@ export default function GoalsPage() {
                 </li>
               );
             })}
+          </ul>
+        )}
+      </section>
+
+      <section className="mt-8">
+        <h2 className="text-base font-semibold text-[var(--foreground)]">
+          {t("goalsHistory")}
+        </h2>
+        <p className="mt-1 text-sm text-[var(--muted)]">
+          {t("goalsHistoryHint")}
+        </p>
+
+        {!data ? (
+          <p className="mt-3 text-[var(--muted)]">…</p>
+        ) : (data.bought ?? []).length === 0 ? (
+          <p className="mt-3 text-sm text-[var(--muted)]">
+            {t("goalsHistoryEmpty")}
+          </p>
+        ) : (
+          <ul className="mt-3 space-y-2">
+            {(data.bought ?? []).map((g) => (
+              <li
+                key={g.id}
+                className="surface flex items-center gap-3 rounded-[1.35rem] px-3.5 py-3"
+              >
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  style={{ background: g.color }}
+                  aria-hidden
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold" dir="auto">
+                    {g.name}
+                  </p>
+                  <p className="mt-0.5 text-xs tabular-nums text-[var(--muted)]">
+                    <Money
+                      amount={g.savedAmount}
+                      currency={currency}
+                      locale={locale}
+                    />
+                    {g.boughtAt ? (
+                      <>
+                        <span> · </span>
+                        {fill(t("goalsBoughtOn"), {
+                          date: formatBoughtDate(g.boughtAt),
+                        })}
+                      </>
+                    ) : null}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  disabled={!!deletingId}
+                  onClick={() => void onDelete(g.id, true)}
+                  className="shrink-0 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-[var(--soft-red)] disabled:opacity-60"
+                >
+                  {deletingId === g.id ? t("saving") : t("goalsHistoryRemove")}
+                </button>
+              </li>
+            ))}
           </ul>
         )}
       </section>
