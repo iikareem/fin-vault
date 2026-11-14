@@ -381,6 +381,7 @@ export default function AnalyticsPage() {
   const [days, setDays] = useState<DayRow[]>([]);
   const [prevIn, setPrevIn] = useState<number | null>(null);
   const [prevOut, setPrevOut] = useState<number | null>(null);
+  const [prevOutCurrent, setPrevOutCurrent] = useState<number | null>(null);
   const [cats, setCats] = useState<CatRow[]>([]);
   const [excludeCommitments, setExcludeCommitments] = useState(false);
   const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
@@ -468,6 +469,7 @@ export default function AnalyticsPage() {
     if (!active || period === "range") {
       setPrevIn(null);
       setPrevOut(null);
+      setPrevOutCurrent(null);
       return;
     }
     const prevCursor = shift(period, cursor, -1, startDay);
@@ -481,11 +483,19 @@ export default function AnalyticsPage() {
         if (cancelled) return;
         setPrevIn(rows.reduce((s, d) => s + d.income, 0));
         setPrevOut(rows.reduce((s, d) => s + d.expense, 0));
+        setPrevOutCurrent(
+          rows.reduce((s, d) => {
+            if (d.expenseFromCurrent != null) return s + d.expenseFromCurrent;
+            // Older API: treat all expense as current.
+            return s + d.expense - (d.expenseFromSavings ?? 0);
+          }, 0),
+        );
       })
       .catch(() => {
         if (!cancelled) {
           setPrevIn(null);
           setPrevOut(null);
+          setPrevOutCurrent(null);
         }
       });
     return () => {
@@ -828,10 +838,13 @@ export default function AnalyticsPage() {
     ...yearSavings.map((m) => Math.abs(m.saved)),
   );
 
+  // Saved = income − Current outflow. Savings-wallet spend must not reduce it.
   const periodSaved =
-    period === "month" ? monthSavings.saved : totalIn - totalOut;
+    period === "month" ? monthSavings.saved : totalIn - outFromCurrent;
   const prevSaved =
-    prevIn != null && prevOut != null ? prevIn - prevOut : null;
+    prevIn != null && prevOutCurrent != null
+      ? prevIn - prevOutCurrent
+      : null;
   const heroAmount = heroIsSpend ? totalOut : periodSaved;
   const heroPrev = heroIsSpend ? prevOut : prevSaved;
 

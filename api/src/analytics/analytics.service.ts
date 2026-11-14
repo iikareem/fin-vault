@@ -105,10 +105,16 @@ export class AnalyticsService {
     const day = clampBudgetStartDay(startDay);
     const accounts = await this.prisma.account.findMany({
       where: { householdId, archived: false, type: 'CASH' },
+      select: { id: true, name: true, openingBalance: true },
     });
     const opening = accounts.reduce(
       (sum, account) => sum + Number(account.openingBalance),
       0,
+    );
+    const currentIds = new Set(
+      accounts
+        .filter((a) => a.name === 'Current' || a.name === 'Cash')
+        .map((a) => a.id),
     );
     const ids = accounts.map((a) => a.id);
     const txs = ids.length
@@ -118,18 +124,30 @@ export class AnalyticsService {
             accountId: { in: ids },
             category: { name: { not: 'Wallet transfer' } },
           },
-          select: { occurredOn: true, type: true, amount: true },
+          select: { occurredOn: true, type: true, amount: true, accountId: true },
         })
       : [];
 
-    const byMonth = new Map<string, { income: number; expense: number }>();
+    // Match month-plan cashFlow: income on all cash wallets; "saved" outflow
+    // only on Current/Cash. Spending from Savings must not reduce saved.
+    // Real cash remaining still subtracts Savings spends.
+    const byMonth = new Map<
+      string,
+      { income: number; expenseCurrent: number; expenseAll: number }
+    >();
     for (const tx of txs) {
       const key = budgetMonthKeyFromDbDate(tx.occurredOn, day);
-      const cur = byMonth.get(key) ?? { income: 0, expense: 0 };
+      const cur = byMonth.get(key) ?? {
+        income: 0,
+        expenseCurrent: 0,
+        expenseAll: 0,
+      };
       const amt = Number(tx.amount);
-      if (tx.type === 'INCOME') cur.income += amt;
-      else if (tx.type === 'EXPENSE' || tx.type === 'REIMBURSEMENT') {
-        cur.expense += amt;
+      if (tx.type === 'INCOME') {
+        cur.income += amt;
+      } else if (tx.type === 'EXPENSE' || tx.type === 'REIMBURSEMENT') {
+        cur.expenseAll += amt;
+        if (currentIds.has(tx.accountId)) cur.expenseCurrent += amt;
       }
       // TRACK is log-only and does not change cash.
       byMonth.set(key, cur);
@@ -139,20 +157,24 @@ export class AnalyticsService {
     const activity = [...byMonth.keys()].sort();
     const startKey = activity[0] && activity[0] < endKey ? activity[0] : endKey;
     const months = this.monthsThrough(startKey, endKey).map((month) => {
-      const flow = byMonth.get(month) ?? { income: 0, expense: 0 };
+      const flow = byMonth.get(month) ?? {
+        income: 0,
+        expenseCurrent: 0,
+        expenseAll: 0,
+      };
       return { month, ...flow };
     });
 
     let remaining = opening;
     const rows = months.map((m) => {
       const broughtForward = remaining;
-      const saved = m.income - m.expense;
-      remaining = broughtForward + saved;
+      const saved = m.income - m.expenseCurrent;
+      remaining = broughtForward + m.income - m.expenseAll;
       return {
         month: m.month,
         broughtForward,
         income: m.income,
-        expense: m.expense,
+        expense: m.expenseCurrent,
         saved,
         remaining,
       };
