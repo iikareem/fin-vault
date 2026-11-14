@@ -27,7 +27,13 @@ import {
 import type { CashWithdrawalChartItem } from "@/components/CashWithdrawalChart";
 
 type Period = "day" | "week" | "month" | "year" | "range";
-type DayRow = { day: string; income: number; expense: number };
+type DayRow = {
+  day: string;
+  income: number;
+  expense: number;
+  expenseFromCurrent?: number;
+  expenseFromSavings?: number;
+};
 type CatChild = {
   categoryId: string;
   name: string;
@@ -232,6 +238,77 @@ function TrendChip({
     >
       {text}
     </span>
+  );
+}
+
+/** Shown only when some period spend was paid from the Savings wallet.
+ *  Out total stays the primary number; this clarifies current vs savings. */
+function OutflowSourceSplit({
+  fromCurrent,
+  fromSavings,
+  total,
+  currency,
+  locale,
+  t,
+}: {
+  fromCurrent: number;
+  fromSavings: number;
+  total: number;
+  currency: string;
+  locale: string;
+  t: (key: "outFromCurrent" | "outFromSavings") => string;
+}) {
+  if (fromSavings < 0.005) return null;
+  const safeTotal = Math.max(total, fromCurrent + fromSavings, 0.001);
+  const currentPct = Math.round((fromCurrent / safeTotal) * 100);
+  const savingsPct = Math.max(0, 100 - currentPct);
+
+  return (
+    <div className="mt-3 space-y-2 border-t border-[var(--surface-border)] pt-3">
+      <div
+        className="flex h-1.5 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--foreground)_8%,transparent)]"
+        aria-hidden
+      >
+        <span
+          className="h-full bg-stone-500 transition-[width] duration-300"
+          style={{ width: `${currentPct}%` }}
+        />
+        <span
+          className="h-full bg-amber-500 transition-[width] duration-300"
+          style={{ width: `${savingsPct}%` }}
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+        <p className="flex min-w-0 items-baseline justify-between gap-2">
+          <span className="flex min-w-0 items-center gap-1 truncate text-[var(--muted)]">
+            <span
+              className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-stone-500"
+              aria-hidden
+            />
+            <span className="truncate" dir="auto">
+              {t("outFromCurrent")}
+            </span>
+          </span>
+          <span className="shrink-0 font-medium tabular-nums text-[var(--foreground)]">
+            <Money amount={fromCurrent} currency={currency} locale={locale} />
+          </span>
+        </p>
+        <p className="flex min-w-0 items-baseline justify-between gap-2">
+          <span className="flex min-w-0 items-center gap-1 truncate text-[var(--muted)]">
+            <span
+              className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500"
+              aria-hidden
+            />
+            <span className="truncate" dir="auto">
+              {t("outFromSavings")}
+            </span>
+          </span>
+          <span className="shrink-0 font-medium tabular-nums text-amber-800">
+            <Money amount={fromSavings} currency={currency} locale={locale} />
+          </span>
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -510,6 +587,13 @@ export default function AnalyticsPage() {
   const catOut = cats.reduce((s, c) => s + c.total, 0);
   // When commitment payments are excluded, category totals are the period base.
   const totalOut = excludeCommitments ? catOut : dayOut || catOut;
+  const outFromSavings = days.reduce(
+    (s, d) => s + (d.expenseFromSavings ?? 0),
+    0,
+  );
+  // Keep current + savings aligned with the Out total shown (incl. excludeCommitments).
+  const outFromCurrent = Math.max(0, totalOut - outFromSavings);
+  const showOutSplit = outFromSavings >= 0.005;
 
   const prevCursor =
     period === "range" ? null : shift(period, cursor, -1, startDay);
@@ -909,6 +993,17 @@ export default function AnalyticsPage() {
               ) : null}
             </div>
 
+            {heroIsSpend && showOutSplit ? (
+              <OutflowSourceSplit
+                fromCurrent={outFromCurrent}
+                fromSavings={outFromSavings}
+                total={totalOut}
+                currency={currency}
+                locale={locale}
+                t={t}
+              />
+            ) : null}
+
             <div
               className={`mt-4 grid gap-2.5 ${
                 heroIsSpend ? "grid-cols-1" : "grid-cols-2"
@@ -955,6 +1050,17 @@ export default function AnalyticsPage() {
                 </div>
               ) : null}
             </div>
+
+            {!heroIsSpend && showOutSplit ? (
+              <OutflowSourceSplit
+                fromCurrent={outFromCurrent}
+                fromSavings={outFromSavings}
+                total={totalOut}
+                currency={currency}
+                locale={locale}
+                t={t}
+              />
+            ) : null}
 
             {period === "month" ? (
               <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1 border-t border-[var(--surface-border)] pt-3 text-xs">

@@ -374,28 +374,50 @@ export class AnalyticsService {
   async byDay(membership: MembershipContext, from: string, to: string) {
     const householdId = membership.householdId;
     const rows = await this.prisma.$queryRaw<
-      { day: Date; type: string; total: unknown }[]
+      { day: Date; type: string; accountName: string; total: unknown }[]
     >`
-      SELECT t."occurredOn" as day, t.type, SUM(t.amount) as total
+      SELECT t."occurredOn" as day, t.type, a.name as "accountName", SUM(t.amount) as total
       FROM "Transaction" t
       INNER JOIN "Category" c ON c.id = t."categoryId"
+      INNER JOIN "Account" a ON a.id = t."accountId"
       WHERE t."householdId" = ${householdId}
         AND t."occurredOn" >= ${dateOnlyUtc(from)}
         AND t."occurredOn" <= ${dateOnlyUtc(to)}
         AND t.type IN ('INCOME', 'EXPENSE', 'TRACK')
         AND c.name NOT IN ('Wallet transfer', 'Cash withdrawal')
-      GROUP BY t."occurredOn", t.type
+      GROUP BY t."occurredOn", t.type, a.name
       ORDER BY t."occurredOn" ASC
     `;
-    const map = new Map<
-      string,
-      { day: string; income: number; expense: number }
-    >();
+    type DayAcc = {
+      day: string;
+      income: number;
+      expense: number;
+      expenseFromCurrent: number;
+      expenseFromSavings: number;
+    };
+    const map = new Map<string, DayAcc>();
     for (const row of rows) {
       const key = isoFromDbDate(row.day);
-      const cur = map.get(key) ?? { day: key, income: 0, expense: 0 };
-      if (row.type === 'INCOME') cur.income = Number(row.total);
-      else cur.expense += Number(row.total); // EXPENSE + TRACK (not cash withdraw)
+      const cur =
+        map.get(key) ?? {
+          day: key,
+          income: 0,
+          expense: 0,
+          expenseFromCurrent: 0,
+          expenseFromSavings: 0,
+        };
+      const amount = Number(row.total);
+      if (row.type === 'INCOME') {
+        cur.income += amount;
+      } else {
+        // EXPENSE + TRACK (not cash withdraw)
+        cur.expense += amount;
+        if (row.accountName === 'Savings') {
+          cur.expenseFromSavings += amount;
+        } else {
+          cur.expenseFromCurrent += amount;
+        }
+      }
       map.set(key, cur);
     }
     if (membership.kind === 'HOUSE') {
@@ -407,8 +429,17 @@ export class AnalyticsService {
       });
       for (const claim of claims) {
         const key = isoFromDbDate(claim.occurredOn);
-        const cur = map.get(key) ?? { day: key, income: 0, expense: 0 };
-        cur.expense += Number(claim.amount);
+        const cur =
+          map.get(key) ?? {
+            day: key,
+            income: 0,
+            expense: 0,
+            expenseFromCurrent: 0,
+            expenseFromSavings: 0,
+          };
+        const amount = Number(claim.amount);
+        cur.expense += amount;
+        cur.expenseFromCurrent += amount;
         map.set(key, cur);
       }
     }
