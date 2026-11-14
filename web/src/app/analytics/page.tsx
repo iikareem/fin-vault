@@ -255,7 +255,7 @@ function OutflowSourceSplit({
   fromSavings: number;
   total: number;
   currency: string;
-  locale: string;
+  locale: "en" | "ar";
   t: (key: "outFromCurrent" | "outFromSavings") => string;
 }) {
   if (fromSavings < 0.005) return null;
