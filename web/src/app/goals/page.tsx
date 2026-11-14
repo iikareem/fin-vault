@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { api, parseAmount, money } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
@@ -89,10 +89,21 @@ export default function GoalsPage() {
     "CURRENT",
   );
   const [actionBusy, setActionBusy] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(true);
+  const [historyFocusId, setHistoryFocusId] = useState("");
+  const historyFocusRef = useRef<HTMLLIElement | null>(null);
 
   function applySummary(next: GoalsSummary) {
     setData({ ...next, bought: next.bought ?? [] });
   }
+
+  useEffect(() => {
+    if (!historyFocusId) return;
+    historyFocusRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+  }, [historyFocusId, historyOpen]);
 
   function load(hid: string) {
     return api<GoalsSummary>(householdPath(hid, "/savings-goals")).then(
@@ -214,6 +225,7 @@ export default function GoalsPage() {
       );
       applySummary(next);
       if (actionId === id) closeAction();
+      if (historyFocusId === id) setHistoryFocusId("");
       toast.success(t("actionDeleted"));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
@@ -250,6 +262,8 @@ export default function GoalsPage() {
       );
       applySummary(next);
       if (actionId === id) closeAction();
+      setHistoryOpen(true);
+      setHistoryFocusId(id);
       toast.success(t("actionDone"));
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
@@ -342,6 +356,10 @@ export default function GoalsPage() {
           Math.round((data.allocated / data.savingsBalance) * 1000) / 10,
         )
       : 0;
+
+  const bought = data?.bought ?? [];
+  const boughtTotal =
+    Math.round(bought.reduce((s, g) => s + g.savedAmount, 0) * 100) / 100;
 
   return (
     <PageShell>
@@ -491,9 +509,18 @@ export default function GoalsPage() {
       ) : null}
 
       <section className="mt-6">
-        <h2 className="text-base font-semibold text-[var(--foreground)]">
-          {t("goalsList")}
-        </h2>
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="text-base font-semibold text-[var(--foreground)]">
+            {t("goalsList")}
+          </h2>
+          {data && data.goals.length > 0 ? (
+            <p className="text-xs font-semibold tabular-nums text-[var(--muted)]">
+              {data.goals.length === 1
+                ? t("goalsCountOne")
+                : fill(t("goalsCount"), { n: String(data.goals.length) })}
+            </p>
+          ) : null}
+        </div>
 
         {!data ? (
           <p className="mt-3 text-[var(--muted)]">…</p>
@@ -558,7 +585,13 @@ export default function GoalsPage() {
                       />
                     </p>
                     {done ? (
-                      <p className="mt-1 text-xs font-semibold text-[var(--accent-a-text)]">
+                      <p className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-emerald-800">
+                        <span
+                          className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100"
+                          aria-hidden
+                        >
+                          ✓
+                        </span>
                         {t("goalsDone")}
                       </p>
                     ) : null}
@@ -829,65 +862,148 @@ export default function GoalsPage() {
         )}
       </section>
 
-      <section className="mt-8">
-        <h2 className="text-base font-semibold text-[var(--foreground)]">
-          {t("goalsHistory")}
-        </h2>
-        <p className="mt-1 text-sm text-[var(--muted)]">
-          {t("goalsHistoryHint")}
-        </p>
+      {bought.length > 0 ? (
+        <section className="mt-8 pb-2">
+          <button
+            type="button"
+            onClick={() => setHistoryOpen((v) => !v)}
+            className="flex w-full items-center justify-between gap-3 rounded-2xl px-1 py-1 text-start"
+            aria-expanded={historyOpen}
+            aria-label={
+              historyOpen ? t("goalsHistoryHide") : t("goalsHistoryShow")
+            }
+          >
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--muted)]">
+                  {t("goalsHistory")}
+                </h2>
+                <span className="inline-flex min-h-5 min-w-5 items-center justify-center rounded-full bg-emerald-100 px-1.5 text-[11px] font-bold tabular-nums text-emerald-800">
+                  {bought.length}
+                </span>
+              </div>
+              <p className="mt-0.5 text-xs text-[var(--muted)]">
+                {t("goalsHistorySpent")} ·{" "}
+                <span className="font-semibold tabular-nums text-[var(--foreground)]">
+                  <Money
+                    amount={boughtTotal}
+                    currency={currency}
+                    locale={locale}
+                  />
+                </span>
+              </p>
+            </div>
+            <span
+              className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--panel-soft)] text-[var(--muted)] transition-transform ${
+                historyOpen ? "rotate-180" : ""
+              }`}
+              aria-hidden
+            >
+              ⌄
+            </span>
+          </button>
 
-        {!data ? (
-          <p className="mt-3 text-[var(--muted)]">…</p>
-        ) : (data.bought ?? []).length === 0 ? (
-          <p className="mt-3 text-sm text-[var(--muted)]">
-            {t("goalsHistoryEmpty")}
-          </p>
-        ) : (
-          <ul className="mt-3 space-y-2">
-            {(data.bought ?? []).map((g) => (
-              <li
-                key={g.id}
-                className="surface flex items-center gap-3 rounded-[1.35rem] px-3.5 py-3"
-              >
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ background: g.color }}
-                  aria-hidden
-                />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold" dir="auto">
-                    {g.name}
-                  </p>
-                  <p className="mt-0.5 text-xs tabular-nums text-[var(--muted)]">
-                    <Money
-                      amount={g.savedAmount}
-                      currency={currency}
-                      locale={locale}
-                    />
-                    {g.boughtAt ? (
-                      <>
-                        <span> · </span>
-                        {fill(t("goalsBoughtOn"), {
-                          date: formatBoughtDate(g.boughtAt),
-                        })}
-                      </>
+          {historyOpen ? (
+            <ul className="mt-3 space-y-2">
+              {bought.map((g) => {
+                const focused = historyFocusId === g.id;
+                return (
+                  <li
+                    key={g.id}
+                    ref={focused ? historyFocusRef : undefined}
+                    className={`surface overflow-hidden rounded-[1.35rem] transition ${
+                      focused
+                        ? "ring-2 ring-emerald-600/40 ring-offset-2 ring-offset-[var(--surface-bg)]"
+                        : ""
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setHistoryFocusId((cur) => (cur === g.id ? "" : g.id))
+                      }
+                      className="flex w-full items-stretch text-start transition hover:bg-[var(--panel-soft)]"
+                    >
+                      <div
+                        className="w-1.5 shrink-0"
+                        style={{ backgroundColor: g.color }}
+                        aria-hidden
+                      />
+                      <div className="flex min-w-0 flex-1 items-center gap-3 px-3.5 py-3">
+                        <div
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full"
+                          style={{ background: `${g.color}18`, color: g.color }}
+                          aria-hidden
+                        >
+                          <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 16 16"
+                            fill="none"
+                          >
+                            <path
+                              d="M3.5 8.2 6.4 11l6.1-6.5"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <p
+                              className="truncate text-sm font-semibold"
+                              dir="auto"
+                            >
+                              {g.name}
+                            </p>
+                            <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800">
+                              {t("goalsBoughtBadge")}
+                            </span>
+                          </div>
+                          {g.boughtAt ? (
+                            <p className="mt-0.5 text-xs text-[var(--muted)]">
+                              {fill(t("goalsBoughtOn"), {
+                                date: formatBoughtDate(g.boughtAt),
+                              })}
+                            </p>
+                          ) : null}
+                        </div>
+                        <p className="shrink-0 text-sm font-bold tabular-nums">
+                          <Money
+                            amount={g.savedAmount}
+                            currency={currency}
+                            locale={locale}
+                          />
+                        </p>
+                      </div>
+                    </button>
+
+                    {focused ? (
+                      <div className="flex items-center justify-between gap-2 border-t border-[var(--surface-border)] bg-[var(--panel-soft)] px-3.5 py-2.5">
+                        <p className="text-xs text-[var(--muted)]">
+                          {t("goalsHistoryHint")}
+                        </p>
+                        <button
+                          type="button"
+                          disabled={!!deletingId}
+                          onClick={() => void onDelete(g.id, true)}
+                          className="shrink-0 rounded-xl px-3 py-2 text-sm font-semibold text-red-700 hover:bg-[var(--soft-red)] disabled:opacity-60"
+                        >
+                          {deletingId === g.id
+                            ? t("saving")
+                            : t("goalsHistoryRemove")}
+                        </button>
+                      </div>
                     ) : null}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={!!deletingId}
-                  onClick={() => void onDelete(g.id, true)}
-                  className="shrink-0 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-red-700 hover:bg-[var(--soft-red)] disabled:opacity-60"
-                >
-                  {deletingId === g.id ? t("saving") : t("goalsHistoryRemove")}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+        </section>
+      ) : null}
       <BottomNav />
     </PageShell>
   );
