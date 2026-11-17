@@ -36,8 +36,8 @@ type Props = {
 };
 
 const W = 320;
-const H = 180;
-const PAD = { top: 18, right: 14, bottom: 30, left: 44 };
+const H = 188;
+const PAD = { top: 22, right: 18, bottom: 30, left: 44 };
 
 function formatDay(iso: string, locale: "ar" | "en") {
   const d = new Date(iso);
@@ -360,30 +360,97 @@ export function GoldPriceChart({
           </g>
         ))}
 
-        {layout.nowY != null ? (
-          <g>
-            <circle
-              cx={layout.nowX}
-              cy={layout.nowY}
-              r="5.5"
-              fill="#fff"
-              stroke={layout.stroke}
-              strokeWidth="2.5"
-            />
-            <text
-              x={layout.nowX}
-              y={PAD.top - 4}
-              textAnchor="end"
-              fill={layout.stroke}
-              fontSize="8"
-              fontWeight="700"
-            >
-              {nowLabel}
-            </text>
-          </g>
-        ) : null}
+        {layout.nowY != null && liveEgpPerGram != null
+          ? (() => {
+              const priceText = money(liveEgpPerGram, currency, locale);
+              const padX = 8;
+              const badgeW = Math.min(
+                132,
+                Math.max(72, padX * 2 + priceText.length * 4.6),
+              );
+              const badgeH = 30;
+              let badgeX = layout.nowX - badgeW - 12;
+              if (badgeX < PAD.left) badgeX = PAD.left;
+              let badgeY = layout.nowY - badgeH - 12;
+              if (badgeY < PAD.top - 6) badgeY = Math.min(layout.nowY + 14, H - PAD.bottom - badgeH);
+              const tipX = badgeX + badgeW;
+              const tipY = badgeY + badgeH / 2;
+              return (
+                <g aria-label={`${nowLabel}: ${priceText}`}>
+                  <line
+                    x1={layout.nowX}
+                    x2={layout.nowX}
+                    y1={PAD.top}
+                    y2={H - PAD.bottom}
+                    stroke={layout.stroke}
+                    strokeWidth="1.75"
+                    opacity="0.55"
+                  />
+                  <line
+                    x1={tipX}
+                    x2={layout.nowX - 8}
+                    y1={tipY}
+                    y2={layout.nowY}
+                    stroke={layout.stroke}
+                    strokeWidth="1.35"
+                    opacity="0.65"
+                  />
+                  <circle
+                    cx={layout.nowX}
+                    cy={layout.nowY}
+                    r="12"
+                    fill={layout.stroke}
+                    opacity="0.18"
+                  />
+                  <circle
+                    cx={layout.nowX}
+                    cy={layout.nowY}
+                    r="7"
+                    fill={layout.stroke}
+                    stroke="#fff"
+                    strokeWidth="3"
+                  />
+                  <rect
+                    x={badgeX}
+                    y={badgeY}
+                    width={badgeW}
+                    height={badgeH}
+                    rx="8"
+                    ry="8"
+                    fill={layout.stroke}
+                  />
+                  <text
+                    x={badgeX + badgeW / 2}
+                    y={badgeY + 11}
+                    textAnchor="middle"
+                    fill="#fff"
+                    fontSize="7.5"
+                    fontWeight="700"
+                    opacity="0.92"
+                  >
+                    {nowLabel}
+                  </text>
+                  <text
+                    x={badgeX + badgeW / 2}
+                    y={badgeY + 23}
+                    textAnchor="middle"
+                    fill="#fff"
+                    fontSize="9.5"
+                    fontWeight="700"
+                    className="tabular-nums"
+                  >
+                    {priceText}
+                  </text>
+                  <title>{`${nowLabel}: ${priceText} /g`}</title>
+                </g>
+              );
+            })()
+          : null}
 
-        {active && layout.points.length ? (
+        {active &&
+        layout.points.length &&
+        activeIdx != null &&
+        activeIdx < layout.points.length - 1 ? (
           <g>
             <line
               x1={active.x}
@@ -417,8 +484,9 @@ export function GoldPriceChart({
           x={W - PAD.right}
           y={H - 8}
           textAnchor="end"
-          className="fill-[var(--muted)]"
-          fontSize="8"
+          fill={layout.stroke}
+          fontSize="8.5"
+          fontWeight="700"
         >
           {nowLabel}
         </text>
