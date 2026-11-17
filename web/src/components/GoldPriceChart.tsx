@@ -36,8 +36,8 @@ type Props = {
 };
 
 const W = 320;
-const H = 188;
-const PAD = { top: 22, right: 18, bottom: 30, left: 44 };
+const H = 280;
+const PAD = { top: 36, right: 16, bottom: 28, left: 44 };
 
 function formatDay(iso: string, locale: "ar" | "en") {
   const d = new Date(iso);
@@ -103,7 +103,8 @@ export function GoldPriceChart({
 
     const minRaw = Math.min(...refs);
     const maxRaw = Math.max(...refs);
-    const pad = Math.max((maxRaw - minRaw) * 0.14, maxRaw * 0.004, 1);
+    // Tighter vertical padding so buy vs live spreads more on a tall chart.
+    const pad = Math.max((maxRaw - minRaw) * 0.08, maxRaw * 0.003, 1);
     const yMin = minRaw - pad;
     const yMax = maxRaw + pad;
     const innerW = W - PAD.left - PAD.right;
@@ -363,79 +364,66 @@ export function GoldPriceChart({
         {layout.nowY != null && liveEgpPerGram != null
           ? (() => {
               const priceText = money(liveEgpPerGram, currency, locale);
-              const padX = 8;
               const badgeW = Math.min(
-                132,
-                Math.max(72, padX * 2 + priceText.length * 4.6),
+                124,
+                Math.max(70, 16 + priceText.length * 4.5),
               );
-              const badgeH = 30;
-              let badgeX = layout.nowX - badgeW - 12;
-              if (badgeX < PAD.left) badgeX = PAD.left;
-              let badgeY = layout.nowY - badgeH - 12;
-              if (badgeY < PAD.top - 6) badgeY = Math.min(layout.nowY + 14, H - PAD.bottom - badgeH);
-              const tipX = badgeX + badgeW;
-              const tipY = badgeY + badgeH / 2;
+              const badgeH = 28;
+              // Park the Now badge in the top margin so it never covers buys.
+              const badgeX = W - PAD.right - badgeW;
+              const badgeY = 4;
               return (
                 <g aria-label={`${nowLabel}: ${priceText}`}>
                   <line
                     x1={layout.nowX}
                     x2={layout.nowX}
-                    y1={PAD.top}
+                    y1={badgeY + badgeH + 2}
                     y2={H - PAD.bottom}
                     stroke={layout.stroke}
-                    strokeWidth="1.75"
-                    opacity="0.55"
-                  />
-                  <line
-                    x1={tipX}
-                    x2={layout.nowX - 8}
-                    y1={tipY}
-                    y2={layout.nowY}
-                    stroke={layout.stroke}
-                    strokeWidth="1.35"
-                    opacity="0.65"
+                    strokeWidth="1.5"
+                    opacity="0.4"
                   />
                   <circle
                     cx={layout.nowX}
                     cy={layout.nowY}
-                    r="12"
+                    r="9"
                     fill={layout.stroke}
-                    opacity="0.18"
+                    opacity="0.15"
                   />
                   <circle
                     cx={layout.nowX}
                     cy={layout.nowY}
-                    r="7"
+                    r="5.5"
                     fill={layout.stroke}
                     stroke="#fff"
-                    strokeWidth="3"
+                    strokeWidth="2.5"
                   />
                   <rect
                     x={badgeX}
                     y={badgeY}
                     width={badgeW}
                     height={badgeH}
-                    rx="8"
-                    ry="8"
+                    rx="7"
+                    ry="7"
                     fill={layout.stroke}
                   />
                   <text
                     x={badgeX + badgeW / 2}
-                    y={badgeY + 11}
+                    y={badgeY + 10.5}
                     textAnchor="middle"
                     fill="#fff"
-                    fontSize="7.5"
+                    fontSize="7"
                     fontWeight="700"
-                    opacity="0.92"
+                    opacity="0.9"
                   >
                     {nowLabel}
                   </text>
                   <text
                     x={badgeX + badgeW / 2}
-                    y={badgeY + 23}
+                    y={badgeY + 21.5}
                     textAnchor="middle"
                     fill="#fff"
-                    fontSize="9.5"
+                    fontSize="9"
                     fontWeight="700"
                     className="tabular-nums"
                   >
