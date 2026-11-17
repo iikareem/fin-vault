@@ -13,6 +13,7 @@ import { Hint } from "@/components/Hint";
 import { fill } from "@/lib/i18n";
 import { formatItemDate } from "@/lib/calendar";
 import { DateField } from "@/components/DateField";
+import { BottomSheet } from "@/components/BottomSheet";
 import {
   GoldPriceChart,
   type GoldChartBuy,
@@ -105,7 +106,12 @@ export default function GoldPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [deletingId, setDeletingId] = useState("");
-  const [savingDateId, setSavingDateId] = useState("");
+  const [editing, setEditing] = useState<Holding | null>(null);
+  const [editGrams, setEditGrams] = useState("");
+  const [editPaidAmount, setEditPaidAmount] = useState("");
+  const [editKarat, setEditKarat] = useState<Karat>(21);
+  const [editAcquiredOn, setEditAcquiredOn] = useState(todayISO());
+  const [editNote, setEditNote] = useState("");
   const today = todayISO();
   const yesterday = yesterdayISO();
 
@@ -206,26 +212,60 @@ export default function GoldPage() {
     }
   }
 
-  async function onUpdateAcquiredOn(id: string, nextDate: string) {
-    if (!personal || !nextDate) return;
-    const current = data?.holdings.find((h) => h.id === id)?.acquiredOn;
-    if (current === nextDate) return;
-    setSavingDateId(id);
+  function openEdit(holding: Holding) {
+    setShowAdd(false);
+    setEditing(holding);
+    setEditGrams(String(holding.grams));
+    setEditPaidAmount(
+      holding.paidAmount != null ? String(holding.paidAmount) : "",
+    );
+    setEditKarat(holding.karat);
+    setEditAcquiredOn(holding.acquiredOn ?? todayISO());
+    setEditNote(holding.note ?? "");
+    setError("");
+  }
+
+  function closeEdit() {
+    if (busy) return;
+    setEditing(null);
+  }
+
+  async function saveEdit() {
+    if (!personal || !editing) return;
+    const value = parseAmount(editGrams);
+    if (!(value > 0)) {
+      setError(t("goldGramsHint"));
+      return;
+    }
+    const paidRaw = editPaidAmount.trim();
+    const paid = paidRaw ? parseAmount(paidRaw) : null;
+    if (paidRaw && (paid == null || !(paid > 0))) {
+      setError(t("goldPaidAmountHint"));
+      return;
+    }
+    setBusy(true);
     setError("");
     try {
       const next = await api<GoldSummary>(
-        householdPath(personal.householdId, `/gold/${id}`),
+        householdPath(personal.householdId, `/gold/${editing.id}`),
         {
           method: "PATCH",
-          body: JSON.stringify({ acquiredOn: nextDate }),
+          body: JSON.stringify({
+            grams: value,
+            karat: editKarat,
+            paidAmount: paid,
+            acquiredOn: editAcquiredOn || null,
+            note: editNote.trim(),
+          }),
         },
       );
       setData(next);
+      setEditing(null);
       void loadChart(personal.householdId, chartKarat);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
-      setSavingDateId("");
+      setBusy(false);
     }
   }
 
@@ -675,14 +715,9 @@ export default function GoldPage() {
                       </div>
 
                       <div className="mt-3 grid grid-cols-2 gap-2">
-                        <label className="relative col-span-2 block cursor-pointer rounded-2xl bg-[var(--soft-amber)] px-3 py-2.5">
+                        <div className="rounded-2xl bg-[var(--soft-amber)] px-3 py-2.5">
                           <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
                             {t("goldAcquiredOn")}
-                            {savingDateId === h.id ? (
-                              <span className="ms-1 normal-case tracking-normal opacity-70">
-                                · {t("saving")}
-                              </span>
-                            ) : null}
                           </p>
                           <p
                             className={`mt-0.5 text-sm font-bold ${
@@ -691,30 +726,9 @@ export default function GoldPage() {
                                 : "text-[var(--muted)]"
                             }`}
                           >
-                            {acquiredLabel || t("goldAcquiredOnSet")}
+                            {acquiredLabel || "—"}
                           </p>
-                          <input
-                            type="date"
-                            value={h.acquiredOn ?? ""}
-                            onChange={(e) => {
-                              if (e.target.value) {
-                                void onUpdateAcquiredOn(h.id, e.target.value);
-                              }
-                            }}
-                            onClick={(e) => {
-                              const input = e.currentTarget;
-                              try {
-                                if (typeof input.showPicker === "function") {
-                                  void input.showPicker();
-                                }
-                              } catch {
-                                // Native picker unavailable — click still focuses.
-                              }
-                            }}
-                            className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0"
-                            aria-label={t("goldAcquiredOn")}
-                          />
-                        </label>
+                        </div>
                         <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-2.5">
                           <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
                             {t("goldPaid")}
@@ -731,7 +745,7 @@ export default function GoldPage() {
                             )}
                           </p>
                         </div>
-                        <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-2.5">
+                        <div className="col-span-2 rounded-2xl bg-[var(--panel-soft)] px-3 py-2.5">
                           <p className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
                             {t("goldCurrent")}
                           </p>
@@ -817,14 +831,24 @@ export default function GoldPage() {
                         </p>
                       )}
 
-                      <button
-                        type="button"
-                        disabled={!!deletingId}
-                        onClick={() => onDelete(h.id)}
-                        className="mt-2.5 text-xs font-semibold text-red-700 disabled:opacity-60"
-                      >
-                        {deletingId === h.id ? t("saving") : t("goldDelete")}
-                      </button>
+                      <div className="mt-2.5 flex items-center gap-4">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => openEdit(h)}
+                          className="text-xs font-semibold text-[var(--accent-b-text)] disabled:opacity-60"
+                        >
+                          ✎ {t("goldEdit")}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!!deletingId}
+                          onClick={() => onDelete(h.id)}
+                          className="text-xs font-semibold text-red-700 disabled:opacity-60"
+                        >
+                          {deletingId === h.id ? t("saving") : t("goldDelete")}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </li>
@@ -833,6 +857,112 @@ export default function GoldPage() {
           </ul>
         )}
       </section>
+
+      <BottomSheet
+        open={editing !== null}
+        onClose={closeEdit}
+        lockDismiss={busy}
+        title={t("goldEditTitle")}
+        hint={t("goldEditHint")}
+        footer={
+          <button
+            type="button"
+            disabled={busy || !personal}
+            onClick={() => void saveEdit()}
+            className="flex min-h-12 w-full items-center justify-center rounded-2xl bg-amber-800 text-base font-semibold text-white disabled:opacity-60"
+          >
+            {busy ? t("saving") : t("goldEditSave")}
+          </button>
+        }
+      >
+        {editing ? (
+          <>
+            <label className="block">
+              <span className="mb-1 block font-medium">{t("goldGrams")}</span>
+              <input
+                inputMode="decimal"
+                dir="ltr"
+                required
+                value={editGrams}
+                onChange={(e) => setEditGrams(e.target.value)}
+                className="field amount-input w-full rounded-2xl px-4 py-4 text-2xl"
+              />
+              <Hint>{t("goldGramsHint")}</Hint>
+            </label>
+            <div>
+              <p className="mb-1 font-medium">{t("goldKarat")}</p>
+              <div className="grid grid-cols-3 gap-2">
+                {([18, 21, 24] as Karat[]).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setEditKarat(k)}
+                    className={`rounded-2xl px-2 py-3 text-lg font-bold ${
+                      editKarat === k
+                        ? "bg-amber-800 text-white shadow"
+                        : "bg-[var(--panel-soft)] text-[var(--foreground)]"
+                    }`}
+                  >
+                    {karatLabel(k, t)}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <label className="block">
+              <span className="mb-1 block font-medium">
+                {t("goldPaidAmount")}
+              </span>
+              <input
+                inputMode="decimal"
+                dir="ltr"
+                value={editPaidAmount}
+                onChange={(e) => setEditPaidAmount(e.target.value)}
+                className="field amount-input w-full rounded-2xl px-4 py-4 text-2xl"
+                placeholder="50000"
+              />
+              <Hint>{t("goldPaidAmountHint")}</Hint>
+            </label>
+            <div>
+              <p className="mb-1 font-medium">{t("goldAcquiredOn")}</p>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setEditAcquiredOn(today)}
+                  className={`chip flex-1 ${
+                    editAcquiredOn === today ? "chip-active" : ""
+                  }`}
+                >
+                  {t("today")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditAcquiredOn(yesterday)}
+                  className={`chip flex-1 ${
+                    editAcquiredOn === yesterday ? "chip-active" : ""
+                  }`}
+                >
+                  {t("yesterday")}
+                </button>
+              </div>
+              <DateField
+                className="mt-2"
+                value={editAcquiredOn}
+                onChange={setEditAcquiredOn}
+              />
+            </div>
+            <label className="block">
+              <span className="mb-1 block font-medium">{t("noteOptional")}</span>
+              <input
+                value={editNote}
+                onChange={(e) => setEditNote(e.target.value)}
+                className="field w-full rounded-2xl px-4 py-3 text-lg"
+                dir="auto"
+              />
+            </label>
+          </>
+        ) : null}
+      </BottomSheet>
+
       <BottomNav />
     </PageShell>
   );
