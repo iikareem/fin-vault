@@ -1,10 +1,26 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 export type GoldKaratCode = 18 | 21 | 24;
+export type GoldHistoryRange = '1d' | '7d' | '30d';
 
 export type GoldQuotes = {
   unit: string;
   prices: { karat: GoldKaratCode; egpPerGram: number }[];
+  updatedAt: string | null;
+  stale: boolean;
+  error: string | null;
+};
+
+export type GoldHistoryPoint = {
+  at: string;
+  egpPerGram: number;
+};
+
+export type GoldHistory = {
+  karat: GoldKaratCode;
+  range: GoldHistoryRange;
+  unit: string;
+  series: GoldHistoryPoint[];
   updatedAt: string | null;
   stale: boolean;
   error: string | null;
@@ -16,13 +32,29 @@ type CacheEntry = {
   fetchedAt: number;
 };
 
+type HistoryCacheEntry = {
+  series: GoldHistoryPoint[];
+  updatedAt: string;
+  fetchedAt: number;
+};
+
 const CACHE_MS = 20 * 60 * 1000;
+const HISTORY_CACHE_MS = 5 * 60 * 1000;
 const NAHARDA_URL = 'https://api.naharda.com/v1/gold';
+const NAHARDA_HISTORY_URL = 'https://api.naharda.com/v1/gold/history';
+
+/** ~15 min samples from Naharda; map UI ranges to fetch limits. */
+const RANGE_LIMIT: Record<GoldHistoryRange, number> = {
+  '1d': 100,
+  '7d': 500,
+  '30d': 500,
+};
 
 @Injectable()
 export class GoldPriceService {
   private readonly log = new Logger(GoldPriceService.name);
   private cache: CacheEntry | null = null;
+  private historyCache = new Map<string, HistoryCacheEntry>();
 
   async getQuotes(): Promise<GoldQuotes> {
     const now = Date.now();
@@ -93,6 +125,103 @@ export class GoldPriceService {
       return {
         unit: 'EGP per gram',
         prices: [],
+        updatedAt: null,
+        stale: true,
+        error: message,
+      };
+    }
+  }
+
+  async getHistory(
+    karat: GoldKaratCode,
+    range: GoldHistoryRange = '7d',
+  ): Promise<GoldHistory> {
+    const key = `${karat}:${range}`;
+    const now = Date.now();
+    const cached = this.historyCache.get(key);
+    if (cached && now - cached.fetchedAt < HISTORY_CACHE_MS) {
+      return {
+        karat,
+        range,
+        unit: 'EGP per gram',
+        series: cached.series,
+        updatedAt: cached.updatedAt,
+        stale: false,
+        error: null,
+      };
+    }
+
+    try {
+      const limit = RANGE_LIMIT[range];
+      const url = `${NAHARDA_HISTORY_URL}?karat=${karat}&limit=${limit}`;
+      const res = await fetch(url, {
+        headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!res.ok) {
+        throw new Error(`Naharda history HTTP ${res.status}`);
+      }
+      const body = (await res.json()) as {
+        data?: {
+          karat?: number;
+          history?: {
+            karat?: number;
+            value_egp?: number;
+            fetched_at?: string;
+          }[];
+        };
+        meta?: { cached_at?: string };
+      };
+      const raw = body.data?.history ?? [];
+      const series = raw
+        .map((row) => {
+          const at = row.fetched_at;
+          const egpPerGram = Number(row.value_egp);
+          if (!at || !Number.isFinite(egpPerGram)) return null;
+          return {
+            at,
+            egpPerGram: Math.round(egpPerGram * 100) / 100,
+          };
+        })
+        .filter((p): p is GoldHistoryPoint => !!p)
+        // Naharda returns newest-first; chart wants oldest → newest.
+        .sort((a, b) => a.at.localeCompare(b.at));
+
+      if (!series.length) {
+        throw new Error('No gold history in response');
+      }
+
+      const updatedAt =
+        body.meta?.cached_at ?? series[series.length - 1]?.at ?? new Date().toISOString();
+      this.historyCache.set(key, { series, updatedAt, fetchedAt: now });
+      return {
+        karat,
+        range,
+        unit: 'EGP per gram',
+        series,
+        updatedAt,
+        stale: false,
+        error: null,
+      };
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'History fetch failed';
+      this.log.warn(`Gold history fetch failed: ${message}`);
+      if (cached) {
+        return {
+          karat,
+          range,
+          unit: 'EGP per gram',
+          series: cached.series,
+          updatedAt: cached.updatedAt,
+          stale: true,
+          error: message,
+        };
+      }
+      return {
+        karat,
+        range,
+        unit: 'EGP per gram',
+        series: [],
         updatedAt: null,
         stale: true,
         error: message,

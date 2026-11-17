@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { GoldService } from './gold.service';
@@ -27,6 +28,15 @@ export class GoldController {
   @Get()
   summary(@CurrentMembership() membership: MembershipContext) {
     return this.gold.summary(membership.householdId);
+  }
+
+  @Get('chart')
+  chart(
+    @CurrentMembership() membership: MembershipContext,
+    @Query('karat') karat?: string,
+    @Query('range') range?: string,
+  ) {
+    return this.gold.chart(membership.householdId, karat, range);
   }
 
   @Post()

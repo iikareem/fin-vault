@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, parseAmount, todayISO, yesterdayISO } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
@@ -13,8 +13,14 @@ import { Hint } from "@/components/Hint";
 import { fill } from "@/lib/i18n";
 import { formatItemDate } from "@/lib/calendar";
 import { DateField } from "@/components/DateField";
+import {
+  GoldPriceChart,
+  type GoldChartBuy,
+  type GoldChartPoint,
+} from "@/components/GoldPriceChart";
 
 type Karat = 18 | 21 | 24;
+type ChartRange = "1d" | "7d" | "30d";
 
 type GoldQuotes = {
   unit: string;
@@ -47,6 +53,47 @@ type GoldSummary = {
   totalGainLossPct: number | null;
 };
 
+type GoldChart = {
+  karat: Karat;
+  range: ChartRange;
+  unit: string;
+  series: GoldChartPoint[];
+  change: { absolute: number | null; pct: number | null };
+  liveEgpPerGram: number | null;
+  avgBuyCost: number | null;
+  buys: GoldChartBuy[];
+  distribution: {
+    totalGrams: number;
+    totalValue: number;
+    byKarat: {
+      karat: Karat;
+      grams: number;
+      value: number;
+      paid: number | null;
+      pieces: number;
+      pctGrams: number;
+      pctValue: number;
+    }[];
+    byHolding: {
+      id: string;
+      karat: Karat;
+      grams: number;
+      paidAmount: number | null;
+      value: number | null;
+      note: string;
+      acquiredOn: string | null;
+      pctValue: number;
+      pctGrams: number;
+    }[];
+  };
+  quotes: GoldQuotes;
+  updatedAt: string | null;
+  stale: boolean;
+  error: string | null;
+};
+
+const CHART_POLL_MS = 3 * 60 * 1000;
+
 function karatLabel(
   karat: Karat,
   t: (k: "goldKarat18" | "goldKarat21" | "goldKarat24") => string,
@@ -73,6 +120,9 @@ export default function GoldPage() {
   // Live gold quotes and holdings are always denominated in EGP.
   const currency = "EGP";
   const [data, setData] = useState<GoldSummary | null>(null);
+  const [chart, setChart] = useState<GoldChart | null>(null);
+  const [chartKarat, setChartKarat] = useState<Karat>(21);
+  const [chartRange, setChartRange] = useState<ChartRange>("7d");
   const [showAdd, setShowAdd] = useState(false);
   const [grams, setGrams] = useState("");
   const [paidAmount, setPaidAmount] = useState("");
@@ -90,11 +140,42 @@ export default function GoldPage() {
     return api<GoldSummary>(householdPath(hid, "/gold")).then(setData);
   }
 
+  const loadChart = useCallback(
+    (hid: string, nextKarat: Karat, nextRange: ChartRange) => {
+      return api<GoldChart>(
+        householdPath(
+          hid,
+          `/gold/chart?karat=${nextKarat}&range=${nextRange}`,
+        ),
+      ).then(setChart);
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!personal) return;
     setKind("PERSONAL");
     load(personal.householdId).catch((e) => setError(e.message));
   }, [personal?.householdId]);
+
+  useEffect(() => {
+    if (!personal) return;
+    let cancelled = false;
+    const hid = personal.householdId;
+
+    function refresh() {
+      loadChart(hid, chartKarat, chartRange).catch((e) => {
+        if (!cancelled) setError(e.message);
+      });
+    }
+
+    refresh();
+    const timer = window.setInterval(refresh, CHART_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [personal?.householdId, chartKarat, chartRange, loadChart]);
 
   async function onAdd(e: FormEvent) {
     e.preventDefault();
@@ -132,6 +213,7 @@ export default function GoldPage() {
       setAcquiredOn(todayISO());
       setNote("");
       setShowAdd(false);
+      void loadChart(personal.householdId, chartKarat, chartRange);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -149,6 +231,7 @@ export default function GoldPage() {
         { method: "DELETE" },
       );
       setData(next);
+      void loadChart(personal.householdId, chartKarat, chartRange);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -171,6 +254,7 @@ export default function GoldPage() {
         },
       );
       setData(next);
+      void loadChart(personal.householdId, chartKarat, chartRange);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -290,6 +374,194 @@ export default function GoldPage() {
           </p>
         ) : null}
       </section>
+
+      <section className="surface mt-4 rounded-[1.5rem] p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-[var(--foreground)]">
+              {t("goldChartTitle")}
+            </h2>
+            <p className="mt-0.5 text-xs leading-relaxed text-[var(--muted)]">
+              {t("goldChartHint")}
+            </p>
+          </div>
+          <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
+            {t("goldChartLive")}
+          </span>
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {([18, 21, 24] as Karat[]).map((k) => (
+            <button
+              key={k}
+              type="button"
+              onClick={() => setChartKarat(k)}
+              className={`chip ${chartKarat === k ? "chip-active" : ""}`}
+            >
+              {karatLabel(k, t)}
+            </button>
+          ))}
+        </div>
+        <div className="mt-2 flex gap-1.5">
+          {(
+            [
+              ["1d", "goldChartRange1d"],
+              ["7d", "goldChartRange7d"],
+              ["30d", "goldChartRange30d"],
+            ] as const
+          ).map(([range, key]) => (
+            <button
+              key={range}
+              type="button"
+              onClick={() => setChartRange(range)}
+              className={`chip flex-1 ${chartRange === range ? "chip-active" : ""}`}
+            >
+              {t(key)}
+            </button>
+          ))}
+        </div>
+
+        {chart?.change.absolute != null && chart.change.pct != null ? (
+          <p
+            className={`mt-3 text-sm font-semibold tabular-nums ${gainLossClass(chart.change.absolute)}`}
+          >
+            {t("goldChartChange")}:{" "}
+            <Money
+              amount={chart.change.absolute}
+              currency={currency}
+              locale={locale}
+              extraSign={chart.change.absolute >= 0 ? "+" : "−"}
+            />
+            <span className="ms-1 opacity-80">
+              ({chart.change.pct >= 0 ? "+" : ""}
+              {chart.change.pct}%)
+            </span>
+          </p>
+        ) : null}
+
+        <div className="mt-2">
+          <GoldPriceChart
+            series={chart?.series ?? []}
+            buys={chart?.buys ?? []}
+            avgBuyCost={chart?.avgBuyCost ?? null}
+            currency={currency}
+            locale={locale}
+            label={t("goldChartTitle")}
+            buyLabel={t("goldChartBuy")}
+            avgBuyLabel={t("goldChartAvgBuy")}
+            emptyLabel={
+              chart == null ? "…" : t("goldChartEmpty")
+            }
+          />
+        </div>
+
+        <ul className="mt-3 space-y-1 text-[11px] text-[var(--muted)]">
+          <li className="flex items-center gap-2">
+            <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-amber-700 bg-amber-50" />
+            {t("goldChartLegendBuy")}
+          </li>
+          <li className="flex items-center gap-2">
+            <span
+              className="inline-block h-0.5 w-4 border-t-2 border-dashed border-amber-800"
+              aria-hidden
+            />
+            {t("goldChartLegendAvg")}
+          </li>
+        </ul>
+      </section>
+
+      {chart?.distribution &&
+      (chart.distribution.byKarat.length > 0 ||
+        chart.distribution.byHolding.length > 0) ? (
+        <section className="surface mt-4 rounded-[1.5rem] p-4">
+          <h2 className="text-sm font-semibold text-[var(--foreground)]">
+            {t("goldDistTitle")}
+          </h2>
+          <p className="mt-0.5 text-xs text-[var(--muted)]">
+            {t("goldDistHint")}
+          </p>
+
+          {chart.distribution.byKarat.length > 0 ? (
+            <div className="mt-3">
+              <p className="text-xs font-semibold text-[var(--muted)]">
+                {t("goldDistByKarat")}
+              </p>
+              <ul className="mt-2 space-y-2.5">
+                {chart.distribution.byKarat.map((row) => (
+                  <li key={row.karat}>
+                    <div className="flex items-baseline justify-between gap-2 text-sm">
+                      <span className="font-semibold">
+                        {karatLabel(row.karat, t)}
+                      </span>
+                      <span className="tabular-nums text-[var(--muted)]">
+                        {row.grams}
+                        {locale === "ar" ? " جم" : "g"} · {row.pctValue}%
+                      </span>
+                    </div>
+                    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[var(--panel-soft)]">
+                      <div
+                        className="h-full rounded-full bg-amber-700"
+                        style={{
+                          width: `${Math.max(row.pctValue, row.pctGrams ? 2 : 0)}%`,
+                        }}
+                      />
+                    </div>
+                    <p className="mt-1 text-[11px] text-[var(--muted)]">
+                      {row.pctGrams}% {t("goldDistGramsShare")} ·{" "}
+                      {row.pctValue}% {t("goldDistValueShare")}
+                      {row.value > 0 ? (
+                        <>
+                          {" · "}
+                          <Money
+                            amount={row.value}
+                            currency={currency}
+                            locale={locale}
+                          />
+                        </>
+                      ) : null}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {chart.distribution.byHolding.length > 1 ? (
+            <div className="mt-4">
+              <p className="text-xs font-semibold text-[var(--muted)]">
+                {t("goldDistByPiece")}
+              </p>
+              <ul className="mt-2 space-y-2">
+                {chart.distribution.byHolding.map((row) => {
+                  const title =
+                    row.note?.trim() ||
+                    `${karatLabel(row.karat, t)} · ${row.grams}${locale === "ar" ? " جم" : "g"}`;
+                  return (
+                    <li key={row.id}>
+                      <div className="flex items-baseline justify-between gap-2 text-sm">
+                        <span className="truncate font-medium" dir="auto">
+                          {title}
+                        </span>
+                        <span className="shrink-0 tabular-nums text-[var(--muted)]">
+                          {row.pctValue}%
+                        </span>
+                      </div>
+                      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--panel-soft)]">
+                        <div
+                          className="h-full rounded-full bg-amber-600/80"
+                          style={{
+                            width: `${Math.max(row.pctValue, 2)}%`,
+                          }}
+                        />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <button
         type="button"
