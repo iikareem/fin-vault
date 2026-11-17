@@ -34,9 +34,8 @@ export class GoldController {
   chart(
     @CurrentMembership() membership: MembershipContext,
     @Query('karat') karat?: string,
-    @Query('range') range?: string,
   ) {
-    return this.gold.chart(membership.householdId, karat, range);
+    return this.gold.chart(membership.householdId, karat);
   }
 
   @Post()

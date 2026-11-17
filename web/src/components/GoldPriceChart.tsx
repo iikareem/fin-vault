@@ -17,36 +17,34 @@ export type GoldChartBuy = {
   note: string;
   acquiredOn: string | null;
   at: string;
-  matchesChartKarat: boolean;
-  inRange: boolean;
+  vsLive: number | null;
+  vsLivePct: number | null;
 };
 
 type Props = {
   series: GoldChartPoint[];
   buys: GoldChartBuy[];
+  liveEgpPerGram: number | null;
   avgBuyCost: number | null;
   currency: string;
   locale: "ar" | "en";
   label: string;
   buyLabel: string;
+  nowLabel: string;
   avgBuyLabel: string;
   emptyLabel: string;
 };
 
 const W = 320;
-const H = 168;
-const PAD = { top: 16, right: 12, bottom: 28, left: 44 };
+const H = 180;
+const PAD = { top: 18, right: 14, bottom: 30, left: 44 };
 
-function formatAxisTime(iso: string, locale: "ar" | "en", rangeSpanMs: number) {
+function formatDay(iso: string, locale: "ar" | "en") {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  const shortDay = rangeSpanMs > 36 * 60 * 60 * 1000;
-  return d.toLocaleString(locale === "ar" ? "ar-EG" : "en-GB", {
-    day: shortDay ? "numeric" : undefined,
-    month: shortDay ? "short" : undefined,
-    hour: shortDay ? undefined : "2-digit",
-    minute: shortDay ? undefined : "2-digit",
-    hour12: false,
+  return d.toLocaleDateString(locale === "ar" ? "ar-EG" : "en-GB", {
+    day: "numeric",
+    month: "short",
   });
 }
 
@@ -62,90 +60,138 @@ function formatTooltipTime(iso: string, locale: "ar" | "en") {
 export function GoldPriceChart({
   series,
   buys,
+  liveEgpPerGram,
   avgBuyCost,
   currency,
   locale,
   label,
   buyLabel,
+  nowLabel,
   avgBuyLabel,
   emptyLabel,
 }: Props) {
   const [activeIdx, setActiveIdx] = useState<number | null>(null);
 
   const layout = useMemo(() => {
-    if (series.length < 2) return null;
+    const nowMs = Date.now();
+    const buyTimes = buys
+      .map((b) => Date.parse(b.at))
+      .filter((ms) => Number.isFinite(ms));
+    const seriesTimes = series.map((p) => Date.parse(p.at));
+    const earliestBuy = buyTimes.length ? Math.min(...buyTimes) : null;
+    const earliestSeries = seriesTimes.length ? Math.min(...seriesTimes) : null;
 
-    const values = series.map((p) => p.egpPerGram);
+    // Timeline: first purchase → now (falls back to market history if no buys).
+    const t0 =
+      earliestBuy != null
+        ? Math.min(earliestBuy, earliestSeries ?? earliestBuy)
+        : (earliestSeries ?? nowMs - 86_400_000);
+    const t1 = nowMs;
+    const span = Math.max(t1 - t0, 1);
+
     const buyCosts = buys
       .filter((b) => b.costPerGram != null)
       .map((b) => b.costPerGram as number);
+    const marketValues = series.map((p) => p.egpPerGram);
     const refs = [
-      ...values,
+      ...marketValues,
       ...buyCosts,
       ...(avgBuyCost != null ? [avgBuyCost] : []),
+      ...(liveEgpPerGram != null ? [liveEgpPerGram] : []),
     ];
+    if (!refs.length) return null;
+
     const minRaw = Math.min(...refs);
     const maxRaw = Math.max(...refs);
-    const pad = Math.max((maxRaw - minRaw) * 0.12, maxRaw * 0.004, 1);
+    const pad = Math.max((maxRaw - minRaw) * 0.14, maxRaw * 0.004, 1);
     const yMin = minRaw - pad;
     const yMax = maxRaw + pad;
-    const times = series.map((p) => Date.parse(p.at));
-    const t0 = times[0];
-    const t1 = times[times.length - 1];
-    const span = Math.max(t1 - t0, 1);
     const innerW = W - PAD.left - PAD.right;
     const innerH = H - PAD.top - PAD.bottom;
 
-    const xAt = (ms: number) => PAD.left + ((ms - t0) / span) * innerW;
+    const xAt = (ms: number) =>
+      PAD.left + ((Math.min(Math.max(ms, t0), t1) - t0) / span) * innerW;
     const yAt = (v: number) =>
       PAD.top + ((yMax - v) / (yMax - yMin || 1)) * innerH;
 
-    const points = series.map((p, i) => ({
-      x: xAt(times[i]),
-      y: yAt(p.egpPerGram),
-      ...p,
-      ms: times[i],
-    }));
-
-    const line = points
-      .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(2)} ${p.y.toFixed(2)}`)
-      .join(" ");
-    const area =
-      `${line} L${points[points.length - 1].x.toFixed(2)} ${(PAD.top + innerH).toFixed(2)}` +
-      ` L${points[0].x.toFixed(2)} ${(PAD.top + innerH).toFixed(2)} Z`;
-
-    const up = values[values.length - 1] >= values[0];
-    const stroke = up ? "#047857" : "#b91c1c";
-
-    // Include older buys too: clamp to the left edge so cost levels stay visible
-    // even when purchase dates fall before the available history window.
-    const buyMarkers = buys
-      .filter((b) => b.costPerGram != null || b.inRange)
-      .map((b) => {
-        const ms = Date.parse(b.at);
-        let x: number;
-        let beforeWindow = false;
-        if (!Number.isFinite(ms) || ms < t0) {
-          x = PAD.left;
-          beforeWindow = true;
-        } else if (ms > t1) {
-          x = PAD.left + innerW;
-        } else {
-          x = xAt(ms);
-        }
+    const points = series
+      .map((p, i) => {
+        const ms = seriesTimes[i];
+        if (!Number.isFinite(ms)) return null;
         return {
-          ...b,
-          x,
-          y: b.costPerGram != null ? yAt(b.costPerGram) : yAt(values[0]),
-          beforeWindow,
+          x: xAt(ms),
+          y: yAt(p.egpPerGram),
+          ...p,
+          ms,
         };
-      });
+      })
+      .filter((p): p is NonNullable<typeof p> => !!p);
+
+    // Append live tip so the curve ends at "now".
+    if (liveEgpPerGram != null) {
+      const last = points[points.length - 1];
+      if (!last || Math.abs(last.ms - t1) > 60_000) {
+        points.push({
+          at: new Date(t1).toISOString(),
+          egpPerGram: liveEgpPerGram,
+          x: xAt(t1),
+          y: yAt(liveEgpPerGram),
+          ms: t1,
+        });
+      } else {
+        last.x = xAt(t1);
+        last.y = yAt(liveEgpPerGram);
+        last.egpPerGram = liveEgpPerGram;
+        last.ms = t1;
+      }
+    }
+
+    const line =
+      points.length >= 2
+        ? points
+            .map(
+              (p, i) =>
+                `${i === 0 ? "M" : "L"}${p.x.toFixed(2)} ${p.y.toFixed(2)}`,
+            )
+            .join(" ")
+        : "";
+    const area =
+      points.length >= 2
+        ? `${line} L${points[points.length - 1].x.toFixed(2)} ${(PAD.top + innerH).toFixed(2)}` +
+          ` L${points[0].x.toFixed(2)} ${(PAD.top + innerH).toFixed(2)} Z`
+        : "";
+
+    const liveAboveBuy =
+      liveEgpPerGram != null && avgBuyCost != null
+        ? liveEgpPerGram >= avgBuyCost
+        : points.length >= 2
+          ? points[points.length - 1].egpPerGram >= points[0].egpPerGram
+          : true;
+    const stroke = liveAboveBuy ? "#047857" : "#b91c1c";
+
+    const nowX = xAt(t1);
+    const nowY = liveEgpPerGram != null ? yAt(liveEgpPerGram) : null;
+
+    const buyMarkers = buys.map((b, index) => {
+      const ms = Date.parse(b.at);
+      const x = Number.isFinite(ms) ? xAt(ms) : PAD.left;
+      const y =
+        b.costPerGram != null
+          ? yAt(b.costPerGram)
+          : nowY ?? PAD.top + innerH / 2;
+      return {
+        ...b,
+        x,
+        y,
+        index: index + 1,
+      };
+    });
 
     const avgY = avgBuyCost != null ? yAt(avgBuyCost) : null;
-    const yTicks = [0.2, 0.5, 0.8].map((t) => yMin + (yMax - yMin) * t);
+    const yTicks = [0.18, 0.5, 0.82].map((t) => yMin + (yMax - yMin) * t);
     const step =
       points.length < 2
-        ? 8
+        ? 10
         : Math.max(Math.abs(points[1].x - points[0].x), 4);
 
     return {
@@ -157,13 +203,16 @@ export function GoldPriceChart({
       avgY,
       yTicks,
       yAt,
-      span,
+      nowX,
+      nowY,
+      t0,
+      t1,
       step,
-      up,
+      liveAboveBuy,
     };
-  }, [series, buys, avgBuyCost]);
+  }, [series, buys, liveEgpPerGram, avgBuyCost]);
 
-  if (!layout) {
+  if (!layout || (layout.points.length < 2 && !layout.buyMarkers.length)) {
     return (
       <p className="py-8 text-center text-sm text-[var(--muted)]">{emptyLabel}</p>
     );
@@ -172,7 +221,7 @@ export function GoldPriceChart({
   const active =
     activeIdx != null
       ? layout.points[activeIdx]
-      : layout.points[layout.points.length - 1];
+      : layout.points[layout.points.length - 1] ?? null;
 
   return (
     <figure aria-label={label} className="w-full" dir="ltr">
@@ -228,12 +277,11 @@ export function GoldPriceChart({
               stroke="#92400e"
               strokeWidth="1.25"
               strokeDasharray="5 4"
-              opacity="0.85"
+              opacity="0.8"
             />
             <text
-              x={W - PAD.right}
+              x={PAD.left + 2}
               y={layout.avgY - 4}
-              textAnchor="end"
               fill="#92400e"
               fontSize="8"
               fontWeight="600"
@@ -243,41 +291,67 @@ export function GoldPriceChart({
           </g>
         ) : null}
 
-        <path d={layout.area} fill="url(#goldChartFill)" />
-        <path
-          d={layout.line}
-          fill="none"
-          stroke={layout.stroke}
-          strokeWidth="2.25"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
+        {layout.area ? <path d={layout.area} fill="url(#goldChartFill)" /> : null}
+        {layout.line ? (
+          <path
+            d={layout.line}
+            fill="none"
+            stroke={layout.stroke}
+            strokeWidth="2.25"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        ) : null}
+
+        {/* Buy → now guide: shows your entry level against today */}
+        {layout.buyMarkers.map((b) =>
+          b.costPerGram != null && layout.nowX > b.x ? (
+            <line
+              key={`guide-${b.id}`}
+              x1={b.x}
+              x2={layout.nowX}
+              y1={b.y}
+              y2={b.y}
+              stroke="#b45309"
+              strokeWidth="1"
+              strokeDasharray="3 3"
+              opacity="0.35"
+            />
+          ) : null,
+        )}
 
         {layout.buyMarkers.map((b) => (
-          <g key={b.id} opacity={b.beforeWindow ? 0.85 : 1}>
-            {!b.beforeWindow ? (
-              <line
-                x1={b.x}
-                x2={b.x}
-                y1={PAD.top}
-                y2={H - PAD.bottom}
-                stroke="#b45309"
-                strokeWidth="1"
-                strokeDasharray="2 3"
-                opacity="0.45"
-              />
-            ) : null}
+          <g key={b.id}>
+            <line
+              x1={b.x}
+              x2={b.x}
+              y1={PAD.top}
+              y2={H - PAD.bottom}
+              stroke="#b45309"
+              strokeWidth="1"
+              strokeDasharray="2 3"
+              opacity="0.4"
+            />
             <circle
               cx={b.x}
               cy={b.y}
-              r="5.5"
+              r="7"
               fill="#fffbeb"
               stroke="#b45309"
               strokeWidth="2"
             />
-            <circle cx={b.x} cy={b.y} r="2" fill="#b45309" />
+            <text
+              x={b.x}
+              y={b.y + 3}
+              textAnchor="middle"
+              fill="#92400e"
+              fontSize="8"
+              fontWeight="700"
+            >
+              {b.index}
+            </text>
             <title>
-              {`${buyLabel}: ${b.grams}g · ${
+              {`${buyLabel} ${b.index}: ${b.grams}g · ${
                 b.costPerGram != null
                   ? money(b.costPerGram, currency, locale)
                   : "—"
@@ -286,7 +360,30 @@ export function GoldPriceChart({
           </g>
         ))}
 
-        {active ? (
+        {layout.nowY != null ? (
+          <g>
+            <circle
+              cx={layout.nowX}
+              cy={layout.nowY}
+              r="5.5"
+              fill="#fff"
+              stroke={layout.stroke}
+              strokeWidth="2.5"
+            />
+            <text
+              x={layout.nowX}
+              y={PAD.top - 4}
+              textAnchor="end"
+              fill={layout.stroke}
+              fontSize="8"
+              fontWeight="700"
+            >
+              {nowLabel}
+            </text>
+          </g>
+        ) : null}
+
+        {active && layout.points.length ? (
           <g>
             <line
               x1={active.x}
@@ -295,15 +392,15 @@ export function GoldPriceChart({
               y2={H - PAD.bottom}
               stroke={layout.stroke}
               strokeWidth="1"
-              opacity="0.35"
+              opacity="0.3"
             />
             <circle
               cx={active.x}
               cy={active.y}
-              r="4.5"
+              r="3.5"
               fill="#fff"
               stroke={layout.stroke}
-              strokeWidth="2"
+              strokeWidth="1.5"
             />
           </g>
         ) : null}
@@ -314,7 +411,7 @@ export function GoldPriceChart({
           className="fill-[var(--muted)]"
           fontSize="8"
         >
-          {formatAxisTime(series[0].at, locale, layout.span)}
+          {formatDay(new Date(layout.t0).toISOString(), locale)}
         </text>
         <text
           x={W - PAD.right}
@@ -323,12 +420,12 @@ export function GoldPriceChart({
           className="fill-[var(--muted)]"
           fontSize="8"
         >
-          {formatAxisTime(series[series.length - 1].at, locale, layout.span)}
+          {nowLabel}
         </text>
 
         {layout.points.map((p, i) => (
           <rect
-            key={p.at}
+            key={`${p.at}-${i}`}
             x={p.x - layout.step / 2}
             y={PAD.top}
             width={layout.step}

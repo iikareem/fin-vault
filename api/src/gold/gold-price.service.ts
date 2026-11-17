@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
 export type GoldKaratCode = 18 | 21 | 24;
-export type GoldHistoryRange = '1d' | '7d' | '30d';
 
 export type GoldQuotes = {
   unit: string;
@@ -18,7 +17,6 @@ export type GoldHistoryPoint = {
 
 export type GoldHistory = {
   karat: GoldKaratCode;
-  range: GoldHistoryRange;
   unit: string;
   series: GoldHistoryPoint[];
   updatedAt: string | null;
@@ -42,19 +40,14 @@ const CACHE_MS = 20 * 60 * 1000;
 const HISTORY_CACHE_MS = 5 * 60 * 1000;
 const NAHARDA_URL = 'https://api.naharda.com/v1/gold';
 const NAHARDA_HISTORY_URL = 'https://api.naharda.com/v1/gold/history';
-
-/** ~15 min samples from Naharda; map UI ranges to fetch limits. */
-const RANGE_LIMIT: Record<GoldHistoryRange, number> = {
-  '1d': 100,
-  '7d': 500,
-  '30d': 500,
-};
+/** Max samples Naharda returns (~15 min cadence). */
+const HISTORY_LIMIT = 500;
 
 @Injectable()
 export class GoldPriceService {
   private readonly log = new Logger(GoldPriceService.name);
   private cache: CacheEntry | null = null;
-  private historyCache = new Map<string, HistoryCacheEntry>();
+  private historyCache = new Map<GoldKaratCode, HistoryCacheEntry>();
 
   async getQuotes(): Promise<GoldQuotes> {
     const now = Date.now();
@@ -132,17 +125,12 @@ export class GoldPriceService {
     }
   }
 
-  async getHistory(
-    karat: GoldKaratCode,
-    range: GoldHistoryRange = '7d',
-  ): Promise<GoldHistory> {
-    const key = `${karat}:${range}`;
+  async getHistory(karat: GoldKaratCode): Promise<GoldHistory> {
     const now = Date.now();
-    const cached = this.historyCache.get(key);
+    const cached = this.historyCache.get(karat);
     if (cached && now - cached.fetchedAt < HISTORY_CACHE_MS) {
       return {
         karat,
-        range,
         unit: 'EGP per gram',
         series: cached.series,
         updatedAt: cached.updatedAt,
@@ -152,8 +140,7 @@ export class GoldPriceService {
     }
 
     try {
-      const limit = RANGE_LIMIT[range];
-      const url = `${NAHARDA_HISTORY_URL}?karat=${karat}&limit=${limit}`;
+      const url = `${NAHARDA_HISTORY_URL}?karat=${karat}&limit=${HISTORY_LIMIT}`;
       const res = await fetch(url, {
         headers: { Accept: 'application/json' },
         signal: AbortSignal.timeout(12000),
@@ -192,11 +179,12 @@ export class GoldPriceService {
       }
 
       const updatedAt =
-        body.meta?.cached_at ?? series[series.length - 1]?.at ?? new Date().toISOString();
-      this.historyCache.set(key, { series, updatedAt, fetchedAt: now });
+        body.meta?.cached_at ??
+        series[series.length - 1]?.at ??
+        new Date().toISOString();
+      this.historyCache.set(karat, { series, updatedAt, fetchedAt: now });
       return {
         karat,
-        range,
         unit: 'EGP per gram',
         series,
         updatedAt,
@@ -209,7 +197,6 @@ export class GoldPriceService {
       if (cached) {
         return {
           karat,
-          range,
           unit: 'EGP per gram',
           series: cached.series,
           updatedAt: cached.updatedAt,
@@ -219,7 +206,6 @@ export class GoldPriceService {
       }
       return {
         karat,
-        range,
         unit: 'EGP per gram',
         series: [],
         updatedAt: null,
