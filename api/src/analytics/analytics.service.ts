@@ -1144,6 +1144,117 @@ export class AnalyticsService {
     };
   }
 
+  /** Spend paid from the Savings wallet in a from–to range, day by day. */
+  async savingsLog(
+    membership: MembershipContext,
+    from: string,
+    to: string,
+  ) {
+    const householdId = membership.householdId;
+    const periodBounds = {
+      gte: dateOnlyUtc(from),
+      lte: dateOnlyUtc(to),
+    };
+    const ITEM_CAP = 500;
+
+    const txs = await this.prisma.transaction.findMany({
+      where: {
+        householdId,
+        type: { in: ['EXPENSE', 'TRACK'] },
+        occurredOn: periodBounds,
+        account: { name: 'Savings' },
+        category: nonSpendCategoryFilter,
+      },
+      include: {
+        account: { select: { id: true, name: true } },
+        category: {
+          select: {
+            id: true,
+            name: true,
+            nameAr: true,
+            color: true,
+            emoji: true,
+            parentId: true,
+          },
+        },
+        user: { select: { id: true, name: true, nameAr: true } },
+      },
+      orderBy: [{ occurredOn: 'desc' }, { createdAt: 'desc' }],
+      take: ITEM_CAP,
+    });
+
+    type DayGroup = {
+      date: string;
+      total: number;
+      items: {
+        id: string;
+        kind: 'tx';
+        amount: number;
+        note: string;
+        type: string;
+        createdAt: string;
+        category: {
+          id: string;
+          name: string;
+          nameAr: string | null;
+          color: string;
+          emoji: string | null;
+          parentId: string | null;
+        };
+        account: { id: string; name: string };
+        user: { id: string; name: string; nameAr: string | null };
+      }[];
+    };
+
+    const byDay = new Map<string, DayGroup>();
+    for (const tx of txs) {
+      const date = isoFromDbDate(tx.occurredOn);
+      const cur =
+        byDay.get(date) ?? ({ date, total: 0, items: [] } satisfies DayGroup);
+      const amount = Number(tx.amount);
+      cur.total += amount;
+      cur.items.push({
+        id: tx.id,
+        kind: 'tx',
+        amount,
+        note: tx.note,
+        type: tx.type,
+        createdAt: tx.createdAt.toISOString(),
+        category: {
+          id: tx.category.id,
+          name: tx.category.name,
+          nameAr: tx.category.nameAr,
+          color: tx.category.color,
+          emoji: tx.category.emoji,
+          parentId: tx.category.parentId,
+        },
+        account: tx.account,
+        user: {
+          id: tx.user.id,
+          name: tx.user.name,
+          nameAr: tx.user.nameAr,
+        },
+      });
+      byDay.set(date, cur);
+    }
+
+    const days = [...byDay.values()].sort((a, b) =>
+      b.date.localeCompare(a.date),
+    );
+    const total = days.reduce((s, d) => s + d.total, 0);
+    const purchaseCount = days.reduce((s, d) => s + d.items.length, 0);
+
+    return {
+      from,
+      to,
+      total,
+      purchaseCount,
+      dayCount: days.length,
+      truncated: txs.length >= ITEM_CAP,
+      days,
+    };
+  }
+
   /** Income entries in a payday (personal) or calendar (house) budget period. */
   async listPeriodIncome(
     membership: MembershipContext,

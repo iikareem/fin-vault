@@ -250,12 +250,14 @@ function OutflowSourceSplit({
   currency,
   locale,
   t,
+  savingsHref,
 }: {
   fromCurrent: number;
   fromSavings: number;
   total: number;
   currency: string;
   locale: "en" | "ar";
+  savingsHref?: string;
   t: (
     key:
       | "outFromCurrent"
@@ -264,7 +266,8 @@ function OutflowSourceSplit({
       | "outShareOfSpend"
       | "spendFromSavingsHint"
       | "currentWallet"
-      | "savingsWallet",
+      | "savingsWallet"
+      | "savingsSpendOpenDetails",
   ) => string;
 }) {
   if (fromSavings < 0.005) return null;
@@ -274,6 +277,44 @@ function OutflowSourceSplit({
     Math.max(0, Math.round((fromCurrent / safeTotal) * 100)),
   );
   const savingsPct = Math.max(0, 100 - currentPct);
+
+  const savingsCardClass =
+    "min-w-0 rounded-2xl bg-amber-500/15 px-2.5 py-2.5 ring-1 ring-inset ring-amber-600/25 transition dark:bg-amber-400/20 dark:ring-amber-300/35";
+  const savingsCardInner = (
+    <>
+      <div className="flex items-center gap-1.5">
+        <span
+          className="h-2 w-2 shrink-0 rounded-full bg-amber-500 dark:bg-amber-300"
+          aria-hidden
+        />
+        <span
+          className="min-w-0 truncate text-[11px] font-medium text-amber-900 dark:text-amber-200"
+          dir="auto"
+        >
+          {t("savingsWallet")}
+        </span>
+        {savingsHref ? (
+          <span
+            className="ms-auto shrink-0 text-[11px] text-amber-900/70 dark:text-amber-200/75"
+            aria-hidden
+          >
+            ›
+          </span>
+        ) : null}
+      </div>
+      <p className="mt-1.5 text-[0.95rem] font-semibold leading-none tabular-nums text-amber-950 dark:text-amber-100">
+        <Money amount={fromSavings} currency={currency} locale={locale} />
+      </p>
+      <p className="mt-1 text-[10px] tabular-nums text-amber-900/70 dark:text-amber-200/75">
+        {fill(t("outShareOfSpend"), { pct: String(savingsPct) })}
+      </p>
+      {savingsHref ? (
+        <p className="mt-1 text-[10px] font-semibold text-amber-900 dark:text-amber-200">
+          {t("savingsSpendOpenDetails")}
+        </p>
+      ) : null}
+    </>
+  );
 
   return (
     <div className="mt-3 border-t border-[var(--surface-border)] pt-3">
@@ -323,26 +364,17 @@ function OutflowSourceSplit({
           </p>
         </div>
 
-        <div className="min-w-0 rounded-2xl bg-amber-500/15 px-2.5 py-2.5 ring-1 ring-inset ring-amber-600/25 dark:bg-amber-400/20 dark:ring-amber-300/35">
-          <div className="flex items-center gap-1.5">
-            <span
-              className="h-2 w-2 shrink-0 rounded-full bg-amber-500 dark:bg-amber-300"
-              aria-hidden
-            />
-            <span
-              className="min-w-0 truncate text-[11px] font-medium text-amber-900 dark:text-amber-200"
-              dir="auto"
-            >
-              {t("savingsWallet")}
-            </span>
-          </div>
-          <p className="mt-1.5 text-[0.95rem] font-semibold leading-none tabular-nums text-amber-950 dark:text-amber-100">
-            <Money amount={fromSavings} currency={currency} locale={locale} />
-          </p>
-          <p className="mt-1 text-[10px] tabular-nums text-amber-900/70 dark:text-amber-200/75">
-            {fill(t("outShareOfSpend"), { pct: String(savingsPct) })}
-          </p>
-        </div>
+        {savingsHref ? (
+          <Link
+            href={savingsHref}
+            className={`${savingsCardClass} hover:bg-amber-500/25 active:scale-[0.99] dark:hover:bg-amber-400/30`}
+            aria-label={`${t("savingsWallet")} — ${t("savingsSpendOpenDetails")}`}
+          >
+            {savingsCardInner}
+          </Link>
+        ) : (
+          <div className={savingsCardClass}>{savingsCardInner}</div>
+        )}
       </div>
 
       <p className="mt-2 text-[10px] leading-snug text-[var(--muted)]" dir="auto">
@@ -644,6 +676,9 @@ export default function AnalyticsPage() {
   // Keep current + savings aligned with the Out total shown (incl. excludeCommitments).
   const outFromCurrent = Math.max(0, totalOut - outFromSavings);
   const showOutSplit = outFromSavings >= 0.005;
+  const savingsLogHref = showOutSplit
+    ? `/analytics/savings-log?${new URLSearchParams({ from, to })}`
+    : undefined;
 
   const prevCursor =
     period === "range" ? null : shift(period, cursor, -1, startDay);
@@ -1054,6 +1089,7 @@ export default function AnalyticsPage() {
                 currency={currency}
                 locale={locale}
                 t={t}
+                savingsHref={savingsLogHref}
               />
             ) : null}
 
@@ -1112,6 +1148,7 @@ export default function AnalyticsPage() {
                 currency={currency}
                 locale={locale}
                 t={t}
+                savingsHref={savingsLogHref}
               />
             ) : null}
 
@@ -1461,7 +1498,8 @@ export default function AnalyticsPage() {
         </section>
       ) : null}
 
-      {period === "month" && (periodIncome || cashWithdrawals) ? (
+      {period === "month" &&
+      (periodIncome || cashWithdrawals || savingsLogHref) ? (
         <section className="mt-5">
           <div className="mb-2 flex items-end justify-between gap-3 px-0.5">
             <div>
@@ -1546,6 +1584,43 @@ export default function AnalyticsPage() {
                   </p>
                   <p className="mt-0.5 text-[11px] font-semibold text-[var(--accent-b-text)]">
                     {t("cashWithdrawalsOpenDetails")}
+                  </p>
+                </div>
+                <span
+                  className="shrink-0 text-xl text-[var(--muted)] transition-transform group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5"
+                  aria-hidden
+                >
+                  ›
+                </span>
+              </Link>
+            ) : null}
+
+            {savingsLogHref ? (
+              <Link
+                href={savingsLogHref}
+                className="group flex min-h-[4.75rem] items-center gap-3 px-4 py-3 transition hover:bg-[var(--panel-soft)] active:bg-[var(--panel-soft)]"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-amber-500/15 text-lg font-bold text-amber-900 dark:text-amber-200">
+                  −
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="truncate text-sm font-semibold text-[var(--foreground)]">
+                    {t("savingsSpendLog")}
+                  </h3>
+                  <p className="mt-0.5 truncate text-xs text-[var(--muted)]">
+                    {t("savingsSpendLogHint")}
+                  </p>
+                </div>
+                <div className="shrink-0 text-end">
+                  <p className="text-base font-bold tabular-nums text-amber-950 dark:text-amber-100">
+                    <Money
+                      amount={outFromSavings}
+                      currency={currency}
+                      locale={locale}
+                    />
+                  </p>
+                  <p className="mt-0.5 text-[11px] font-semibold text-amber-900 dark:text-amber-200">
+                    {t("savingsSpendOpenDetails")}
                   </p>
                 </div>
                 <span

@@ -113,6 +113,21 @@ export class AnalyticsController {
     return this.analytics.listPeriodIncome(membership, user.id, period);
   }
 
+  @Get('savings-log')
+  async savingsLog(
+    @CurrentMembership() membership: MembershipContext,
+    @CurrentUser() user: AuthUser,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+  ) {
+    const fallback = await this.periodFallback(membership, user.id);
+    return this.analytics.savingsLog(
+      membership,
+      from ?? fallback.from,
+      to ?? fallback.to,
+    );
+  }
+
   @Get('category-log')
   async categoryLog(
     @CurrentMembership() membership: MembershipContext,

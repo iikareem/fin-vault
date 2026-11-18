@@ -99,12 +99,17 @@ function isIsoDay(value: string | null): value is string {
   return !!value && /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
-/** Only allow returning to category logs (no open redirects). */
+/** Only allow returning to analytics logs (no open redirects). */
 function safeCategoryLogBack(raw: string | null): string | null {
   if (!raw) return null;
   try {
     const path = decodeURIComponent(raw);
-    if (path.startsWith("/analytics/category-log")) return path;
+    if (
+      path.startsWith("/analytics/category-log") ||
+      path.startsWith("/analytics/savings-log")
+    ) {
+      return path;
+    }
   } catch {
     /* ignore */
   }
