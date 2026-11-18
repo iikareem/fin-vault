@@ -624,6 +624,66 @@ export default function GoldPage() {
           />
         </div>
 
+        {(chart?.avgBuyCost != null || chart?.liveEgpPerGram != null) && (
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="rounded-2xl bg-[var(--soft-amber)] px-3 py-3">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">
+                {t("goldAvgBuy")}
+              </p>
+              <p className="mt-1 text-base font-bold tabular-nums text-[var(--foreground)]">
+                {chart?.avgBuyCost != null ? (
+                  <Money
+                    amount={chart.avgBuyCost}
+                    currency={currency}
+                    locale={locale}
+                  />
+                ) : (
+                  "—"
+                )}
+              </p>
+              <p className="mt-0.5 text-[10px] text-[var(--muted)]">
+                {karatLabel(chartKarat, t)} · {t("goldPerGram")}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-[var(--panel-soft)] px-3 py-3">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-[var(--muted)]">
+                {t("goldLivePerGramShort")}
+              </p>
+              <p className="mt-1 text-base font-bold tabular-nums text-[var(--foreground)]">
+                {chart?.liveEgpPerGram != null ? (
+                  <Money
+                    amount={chart.liveEgpPerGram}
+                    currency={currency}
+                    locale={locale}
+                  />
+                ) : (
+                  "—"
+                )}
+              </p>
+              {chart?.vsBuy.absolute != null && chart.vsBuy.pct != null ? (
+                <p
+                  className={`mt-0.5 text-[11px] font-semibold tabular-nums ${gainLossClass(chart.vsBuy.absolute)}`}
+                >
+                  <Money
+                    amount={chart.vsBuy.absolute}
+                    currency={currency}
+                    locale={locale}
+                    extraSign={chart.vsBuy.absolute >= 0 ? "+" : "−"}
+                  />
+                  <span className="ms-1 opacity-80">
+                    ({chart.vsBuy.pct >= 0 ? "+" : ""}
+                    {chart.vsBuy.pct}%)
+                  </span>
+                </p>
+              ) : (
+                <p className="mt-0.5 text-[10px] text-[var(--muted)]">
+                  {t("goldPerGram")}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
         {chart?.buys.length ? (
           <ul className="mt-3 space-y-2">
             {chart.buys.map((b, i) => {
