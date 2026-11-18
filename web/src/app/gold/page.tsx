@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { api, parseAmount, todayISO, yesterdayISO } from "@/lib/api";
 import { BottomNav } from "@/components/BottomNav";
@@ -14,11 +14,6 @@ import { fill } from "@/lib/i18n";
 import { formatItemDate } from "@/lib/calendar";
 import { DateField } from "@/components/DateField";
 import { BottomSheet } from "@/components/BottomSheet";
-import {
-  GoldPriceChart,
-  type GoldChartBuy,
-  type GoldChartPoint,
-} from "@/components/GoldPriceChart";
 
 type Karat = 18 | 21 | 24;
 
@@ -52,22 +47,6 @@ type GoldSummary = {
   totalGainLoss: number | null;
   totalGainLossPct: number | null;
 };
-
-type GoldChart = {
-  karat: Karat;
-  unit: string;
-  series: GoldChartPoint[];
-  vsBuy: { absolute: number | null; pct: number | null };
-  liveEgpPerGram: number | null;
-  avgBuyCost: number | null;
-  buys: GoldChartBuy[];
-  quotes: GoldQuotes;
-  updatedAt: string | null;
-  stale: boolean;
-  error: string | null;
-};
-
-const CHART_POLL_MS = 3 * 60 * 1000;
 
 type PaidMode = "total" | "perGram";
 
@@ -149,14 +128,26 @@ function paidPreview(
   };
 }
 
+/** Weighted average purchase price per gram across holdings with paid amounts. */
+function avgBuyPerGram(holdings: Holding[]): number | null {
+  let paid = 0;
+  let grams = 0;
+  for (const h of holdings) {
+    if (h.paidAmount != null && h.grams > 0) {
+      paid += h.paidAmount;
+      grams += h.grams;
+    }
+  }
+  if (!(paid > 0) || !(grams > 0)) return null;
+  return roundMoney(paid / grams);
+}
+
 export default function GoldPage() {
   const { t, locale } = useI18n();
   const { personal, setKind, active } = useBooks();
   // Live gold quotes and holdings are always denominated in EGP.
   const currency = "EGP";
   const [data, setData] = useState<GoldSummary | null>(null);
-  const [chart, setChart] = useState<GoldChart | null>(null);
-  const [chartKarat, setChartKarat] = useState<Karat>(21);
   const [showAdd, setShowAdd] = useState(false);
   const [grams, setGrams] = useState("");
   const [paidMode, setPaidMode] = useState<PaidMode>("total");
@@ -209,36 +200,11 @@ export default function GoldPage() {
     return api<GoldSummary>(householdPath(hid, "/gold")).then(setData);
   }
 
-  const loadChart = useCallback((hid: string, nextKarat: Karat) => {
-    return api<GoldChart>(
-      householdPath(hid, `/gold/chart?karat=${nextKarat}`),
-    ).then(setChart);
-  }, []);
-
   useEffect(() => {
     if (!personal) return;
     setKind("PERSONAL");
     load(personal.householdId).catch((e) => setError(e.message));
   }, [personal?.householdId]);
-
-  useEffect(() => {
-    if (!personal) return;
-    let cancelled = false;
-    const hid = personal.householdId;
-
-    function refresh() {
-      loadChart(hid, chartKarat).catch((e) => {
-        if (!cancelled) setError(e.message);
-      });
-    }
-
-    refresh();
-    const timer = window.setInterval(refresh, CHART_POLL_MS);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
-  }, [personal?.householdId, chartKarat, loadChart]);
 
   async function onAdd(e: FormEvent) {
     e.preventDefault();
@@ -286,7 +252,6 @@ export default function GoldPage() {
       setAcquiredOn(todayISO());
       setNote("");
       setShowAdd(false);
-      void loadChart(personal.householdId, chartKarat);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -304,7 +269,6 @@ export default function GoldPage() {
         { method: "DELETE" },
       );
       setData(next);
-      void loadChart(personal.householdId, chartKarat);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -375,7 +339,6 @@ export default function GoldPage() {
       );
       setData(next);
       setEditing(null);
-      void loadChart(personal.householdId, chartKarat);
     } catch (err) {
       setError(err instanceof Error ? err.message : t("couldNotSave"));
     } finally {
@@ -401,6 +364,7 @@ export default function GoldPage() {
   }
 
   const quotes = data?.quotes;
+  const avgBuy = data ? avgBuyPerGram(data.holdings) : null;
   const updated =
     quotes?.updatedAt != null
       ? new Date(quotes.updatedAt).toLocaleString(
@@ -442,10 +406,50 @@ export default function GoldPage() {
             })}
           </p>
         ) : null}
+
+        {(data?.totalPaid != null || avgBuy != null) && (
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="rounded-2xl bg-white/12 px-3 py-3">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-white/70">
+                {t("goldTotalPaid")}
+              </p>
+              <p className="mt-1 text-base font-bold tabular-nums">
+                {data?.totalPaid != null ? (
+                  <Money
+                    amount={data.totalPaid}
+                    currency={currency}
+                    locale={locale}
+                  />
+                ) : (
+                  "—"
+                )}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white/12 px-3 py-3">
+              <p className="text-[11px] font-medium uppercase tracking-wide text-white/70">
+                {t("goldAvgBuy")}
+              </p>
+              <p className="mt-1 text-base font-bold tabular-nums">
+                {avgBuy != null ? (
+                  <Money amount={avgBuy} currency={currency} locale={locale} />
+                ) : (
+                  "—"
+                )}
+              </p>
+              <p className="mt-0.5 text-[10px] text-white/65">
+                {t("goldAvgBuyHint")}
+              </p>
+            </div>
+          </div>
+        )}
+
         {data?.totalGainLoss != null ? (
           <p
             className={`mt-3 inline-flex flex-wrap items-baseline gap-1 rounded-full bg-white/15 px-2.5 py-1 text-sm font-semibold ${gainLossClass(data.totalGainLoss, true)}`}
           >
+            <span className="opacity-90">
+              {data.totalGainLoss >= 0 ? t("goldGain") : t("goldLoss")}
+            </span>
             <Money
               amount={data.totalGainLoss}
               currency={currency}
@@ -502,157 +506,6 @@ export default function GoldPage() {
             {t("goldUpdated")}: {updated}
           </p>
         ) : null}
-      </section>
-
-      <section className="surface mt-4 rounded-[1.5rem] p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-[var(--foreground)]">
-              {t("goldChartTitle")}
-            </h2>
-            <p className="mt-0.5 text-xs leading-relaxed text-[var(--muted)]">
-              {t("goldChartHint")}
-            </p>
-          </div>
-          <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200">
-            {t("goldChartLive")}
-          </span>
-        </div>
-
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {([18, 21, 24] as Karat[]).map((k) => (
-            <button
-              key={k}
-              type="button"
-              onClick={() => setChartKarat(k)}
-              className={`chip ${chartKarat === k ? "chip-active" : ""}`}
-            >
-              {karatLabel(k, t)}
-            </button>
-          ))}
-        </div>
-
-        {chart?.vsBuy.absolute != null && chart.vsBuy.pct != null ? (
-          <p
-            className={`mt-3 text-sm font-semibold tabular-nums ${gainLossClass(chart.vsBuy.absolute)}`}
-          >
-            {t("goldChartVsBuy")}:{" "}
-            <Money
-              amount={chart.vsBuy.absolute}
-              currency={currency}
-              locale={locale}
-              extraSign={chart.vsBuy.absolute >= 0 ? "+" : "−"}
-            />
-            <span className="ms-1 opacity-80">
-              ({chart.vsBuy.pct >= 0 ? "+" : ""}
-              {chart.vsBuy.pct}%)
-            </span>
-            <span className="ms-1 font-normal text-[var(--muted)]">
-              /{t("goldPerGram")}
-            </span>
-          </p>
-        ) : null}
-
-        <div className="mt-2">
-          <GoldPriceChart
-            series={chart?.series ?? []}
-            buys={chart?.buys ?? []}
-            liveEgpPerGram={chart?.liveEgpPerGram ?? null}
-            avgBuyCost={chart?.avgBuyCost ?? null}
-            currency={currency}
-            locale={locale}
-            label={t("goldChartTitle")}
-            buyLabel={t("goldChartBuy")}
-            nowLabel={t("goldChartNow")}
-            avgBuyLabel={t("goldChartAvgBuy")}
-            emptyLabel={chart == null ? "…" : t("goldChartEmpty")}
-          />
-        </div>
-
-        {chart?.buys.length ? (
-          <ul className="mt-3 space-y-2">
-            {chart.buys.map((b, i) => {
-              const acquiredLabel = b.acquiredOn
-                ? formatItemDate(b.acquiredOn, locale, {
-                    todayLabel: t("today"),
-                    yesterdayLabel: t("yesterday"),
-                  })
-                : null;
-              return (
-                <li
-                  key={b.id}
-                  className="flex items-start gap-2.5 rounded-2xl bg-[var(--panel-soft)] px-3 py-2.5"
-                >
-                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-amber-700 bg-amber-50 text-[11px] font-bold text-amber-900">
-                    {i + 1}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold text-[var(--foreground)]">
-                      {b.grams}
-                      {locale === "ar" ? " جم" : "g"}
-                      {acquiredLabel ? (
-                        <span className="ms-1.5 font-normal text-[var(--muted)]">
-                          · {acquiredLabel}
-                        </span>
-                      ) : null}
-                    </p>
-                    <p className="mt-0.5 text-xs tabular-nums text-[var(--muted)]">
-                      {t("goldChartBuyAt")}:{" "}
-                      {b.costPerGram != null ? (
-                        <Money
-                          amount={b.costPerGram}
-                          currency={currency}
-                          locale={locale}
-                        />
-                      ) : (
-                        "—"
-                      )}
-                      {" /g"}
-                    </p>
-                  </div>
-                  {b.vsLive != null ? (
-                    <p
-                      className={`shrink-0 text-xs font-bold tabular-nums ${gainLossClass(b.vsLive)}`}
-                    >
-                      <Money
-                        amount={b.vsLive}
-                        currency={currency}
-                        locale={locale}
-                        extraSign={b.vsLive >= 0 ? "+" : "−"}
-                      />
-                      {b.vsLivePct != null ? (
-                        <span className="ms-1 opacity-80">
-                          ({b.vsLivePct >= 0 ? "+" : ""}
-                          {b.vsLivePct}%)
-                        </span>
-                      ) : null}
-                    </p>
-                  ) : null}
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <p className="mt-3 text-xs text-[var(--muted)]">
-            {t("goldChartNoBuys")}
-          </p>
-        )}
-
-        <ul className="mt-3 space-y-1 text-[11px] text-[var(--muted)]">
-          <li className="flex items-center gap-2">
-            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full border-2 border-amber-700 bg-amber-50 text-[9px] font-bold text-amber-900">
-              1
-            </span>
-            {t("goldChartLegendBuy")}
-          </li>
-          <li className="flex items-center gap-2">
-            <span
-              className="inline-block h-0.5 w-4 border-t-2 border-dashed border-amber-800"
-              aria-hidden
-            />
-            {t("goldChartLegendAvg")}
-          </li>
-        </ul>
       </section>
 
       <button
