@@ -69,6 +69,8 @@ type GoldChart = {
 
 const CHART_POLL_MS = 3 * 60 * 1000;
 
+type PaidMode = "total" | "perGram";
+
 function karatLabel(
   karat: Karat,
   t: (k: "goldKarat18" | "goldKarat21" | "goldKarat24") => string,
@@ -89,6 +91,64 @@ function gainLossClass(value: number, onDark = false) {
   return "text-stone-600";
 }
 
+function roundMoney(n: number) {
+  return Math.round(n * 100) / 100;
+}
+
+function formatAmountInput(n: number) {
+  const rounded = roundMoney(n);
+  return Number.isInteger(rounded) ? String(rounded) : String(rounded);
+}
+
+/** Resolve optional paid amount from total or per-gram entry. */
+function resolvePaidAmount(
+  mode: PaidMode,
+  gramsRaw: string,
+  totalRaw: string,
+  perGramRaw: string,
+): { paid: number | null; invalid: boolean } {
+  if (mode === "total") {
+    const raw = totalRaw.trim();
+    if (!raw) return { paid: null, invalid: false };
+    const paid = parseAmount(raw);
+    if (!(paid > 0)) return { paid: null, invalid: true };
+    return { paid: roundMoney(paid), invalid: false };
+  }
+  const raw = perGramRaw.trim();
+  if (!raw) return { paid: null, invalid: false };
+  const perGram = parseAmount(raw);
+  const grams = parseAmount(gramsRaw);
+  if (!(perGram > 0) || !(grams > 0)) return { paid: null, invalid: true };
+  return { paid: roundMoney(grams * perGram), invalid: false };
+}
+
+function paidPreview(
+  mode: PaidMode,
+  gramsRaw: string,
+  totalRaw: string,
+  perGramRaw: string,
+): { total: number | null; perGram: number | null } {
+  const grams = parseAmount(gramsRaw);
+  if (mode === "total") {
+    const raw = totalRaw.trim();
+    if (!raw || !(grams > 0)) return { total: null, perGram: null };
+    const total = parseAmount(raw);
+    if (!(total > 0)) return { total: null, perGram: null };
+    return {
+      total: roundMoney(total),
+      perGram: roundMoney(total / grams),
+    };
+  }
+  const raw = perGramRaw.trim();
+  if (!raw || !(grams > 0)) return { total: null, perGram: null };
+  const perGram = parseAmount(raw);
+  if (!(perGram > 0)) return { total: null, perGram: null };
+  return {
+    total: roundMoney(grams * perGram),
+    perGram: roundMoney(perGram),
+  };
+}
+
 export default function GoldPage() {
   const { t, locale } = useI18n();
   const { personal, setKind, active } = useBooks();
@@ -99,7 +159,9 @@ export default function GoldPage() {
   const [chartKarat, setChartKarat] = useState<Karat>(21);
   const [showAdd, setShowAdd] = useState(false);
   const [grams, setGrams] = useState("");
+  const [paidMode, setPaidMode] = useState<PaidMode>("total");
   const [paidAmount, setPaidAmount] = useState("");
+  const [paidPerGram, setPaidPerGram] = useState("");
   const [karat, setKarat] = useState<Karat>(21);
   const [acquiredOn, setAcquiredOn] = useState(todayISO());
   const [note, setNote] = useState("");
@@ -108,12 +170,40 @@ export default function GoldPage() {
   const [deletingId, setDeletingId] = useState("");
   const [editing, setEditing] = useState<Holding | null>(null);
   const [editGrams, setEditGrams] = useState("");
+  const [editPaidMode, setEditPaidMode] = useState<PaidMode>("total");
   const [editPaidAmount, setEditPaidAmount] = useState("");
+  const [editPaidPerGram, setEditPaidPerGram] = useState("");
   const [editKarat, setEditKarat] = useState<Karat>(21);
   const [editAcquiredOn, setEditAcquiredOn] = useState(todayISO());
   const [editNote, setEditNote] = useState("");
   const today = todayISO();
   const yesterday = yesterdayISO();
+
+  function switchPaidMode(
+    next: PaidMode,
+    current: PaidMode,
+    gramsRaw: string,
+    total: string,
+    perGram: string,
+    setMode: (m: PaidMode) => void,
+    setTotal: (v: string) => void,
+    setPerGram: (v: string) => void,
+  ) {
+    if (next === current) return;
+    const g = parseAmount(gramsRaw);
+    if (next === "perGram") {
+      const paid = parseAmount(total);
+      if (total.trim() && g > 0 && paid > 0) {
+        setPerGram(formatAmountInput(paid / g));
+      }
+    } else {
+      const pg = parseAmount(perGram);
+      if (perGram.trim() && g > 0 && pg > 0) {
+        setTotal(formatAmountInput(g * pg));
+      }
+    }
+    setMode(next);
+  }
 
   function load(hid: string) {
     return api<GoldSummary>(householdPath(hid, "/gold")).then(setData);
@@ -158,10 +248,18 @@ export default function GoldPage() {
       setError(t("goldGramsHint"));
       return;
     }
-    const paidRaw = paidAmount.trim();
-    const paid = paidRaw ? parseAmount(paidRaw) : null;
-    if (paidRaw && (paid == null || !(paid > 0))) {
-      setError(t("goldPaidAmountHint"));
+    const { paid, invalid } = resolvePaidAmount(
+      paidMode,
+      grams,
+      paidAmount,
+      paidPerGram,
+    );
+    if (invalid) {
+      setError(
+        paidMode === "perGram"
+          ? t("goldPaidPerGramHint")
+          : t("goldPaidAmountHint"),
+      );
       return;
     }
     setBusy(true);
@@ -182,7 +280,9 @@ export default function GoldPage() {
       );
       setData(next);
       setGrams("");
+      setPaidMode("total");
       setPaidAmount("");
+      setPaidPerGram("");
       setAcquiredOn(todayISO());
       setNote("");
       setShowAdd(false);
@@ -216,8 +316,14 @@ export default function GoldPage() {
     setShowAdd(false);
     setEditing(holding);
     setEditGrams(String(holding.grams));
+    setEditPaidMode("total");
     setEditPaidAmount(
-      holding.paidAmount != null ? String(holding.paidAmount) : "",
+      holding.paidAmount != null ? formatAmountInput(holding.paidAmount) : "",
+    );
+    setEditPaidPerGram(
+      holding.paidAmount != null && holding.grams > 0
+        ? formatAmountInput(holding.paidAmount / holding.grams)
+        : "",
     );
     setEditKarat(holding.karat);
     setEditAcquiredOn(holding.acquiredOn ?? todayISO());
@@ -237,10 +343,18 @@ export default function GoldPage() {
       setError(t("goldGramsHint"));
       return;
     }
-    const paidRaw = editPaidAmount.trim();
-    const paid = paidRaw ? parseAmount(paidRaw) : null;
-    if (paidRaw && (paid == null || !(paid > 0))) {
-      setError(t("goldPaidAmountHint"));
+    const { paid, invalid } = resolvePaidAmount(
+      editPaidMode,
+      editGrams,
+      editPaidAmount,
+      editPaidPerGram,
+    );
+    if (invalid) {
+      setError(
+        editPaidMode === "perGram"
+          ? t("goldPaidPerGramHint")
+          : t("goldPaidAmountHint"),
+      );
       return;
     }
     setBusy(true);
@@ -268,6 +382,14 @@ export default function GoldPage() {
       setBusy(false);
     }
   }
+
+  const addPaidPreview = paidPreview(paidMode, grams, paidAmount, paidPerGram);
+  const editPaidPreview = paidPreview(
+    editPaidMode,
+    editGrams,
+    editPaidAmount,
+    editPaidPerGram,
+  );
 
   if (active?.kind === "HOUSE" && !personal) {
     return (
@@ -579,18 +701,118 @@ export default function GoldPage() {
             </div>
             <Hint>{t("goldKaratHint")}</Hint>
           </div>
-          <label className="block">
-            <span className="mb-1 block font-medium">{t("goldPaidAmount")}</span>
-            <input
-              inputMode="decimal"
-              dir="ltr"
-              value={paidAmount}
-              onChange={(e) => setPaidAmount(e.target.value)}
-              className="field amount-input w-full rounded-2xl px-4 py-4 text-2xl"
-              placeholder="50000"
-            />
-            <Hint>{t("goldPaidAmountHint")}</Hint>
-          </label>
+          <div>
+            <p className="mb-1 font-medium">{t("goldPaidModeLabel")}</p>
+            <div className="seg grid-cols-2">
+              <button
+                type="button"
+                onClick={() =>
+                  switchPaidMode(
+                    "total",
+                    paidMode,
+                    grams,
+                    paidAmount,
+                    paidPerGram,
+                    setPaidMode,
+                    setPaidAmount,
+                    setPaidPerGram,
+                  )
+                }
+                className={`seg-item ${paidMode === "total" ? "seg-active" : ""}`}
+                aria-pressed={paidMode === "total"}
+              >
+                {t("goldPaidModeTotal")}
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  switchPaidMode(
+                    "perGram",
+                    paidMode,
+                    grams,
+                    paidAmount,
+                    paidPerGram,
+                    setPaidMode,
+                    setPaidAmount,
+                    setPaidPerGram,
+                  )
+                }
+                className={`seg-item ${
+                  paidMode === "perGram" ? "seg-active" : ""
+                }`}
+                aria-pressed={paidMode === "perGram"}
+              >
+                {t("goldPaidModePerGram")}
+              </button>
+            </div>
+            <Hint>{t("goldPaidOptional")}</Hint>
+            {paidMode === "total" ? (
+              <label className="mt-3 block">
+                <span className="mb-1 block font-medium">
+                  {t("goldPaidAmount")}
+                </span>
+                <input
+                  inputMode="decimal"
+                  dir="ltr"
+                  value={paidAmount}
+                  onChange={(e) => setPaidAmount(e.target.value)}
+                  className="field amount-input w-full rounded-2xl px-4 py-4 text-2xl"
+                  placeholder="50000"
+                />
+                {addPaidPreview.perGram != null ? (
+                  <p className="mt-2 text-sm tabular-nums text-[var(--muted)]">
+                    {t("goldCostPerGram")}:{" "}
+                    <Money
+                      amount={addPaidPreview.perGram}
+                      currency={currency}
+                      locale={locale}
+                    />
+                    <span className="ms-1">/{t("goldPerGram")}</span>
+                  </p>
+                ) : (
+                  <Hint>{t("goldPaidAmountHint")}</Hint>
+                )}
+              </label>
+            ) : (
+              <label className="mt-3 block">
+                <span className="mb-1 block font-medium">
+                  {t("goldPaidPerGram")}
+                </span>
+                <input
+                  inputMode="decimal"
+                  dir="ltr"
+                  value={paidPerGram}
+                  onChange={(e) => setPaidPerGram(e.target.value)}
+                  className="field amount-input w-full rounded-2xl px-4 py-4 text-2xl"
+                  placeholder="6250"
+                />
+                {addPaidPreview.total != null ? (
+                  <p className="mt-2 rounded-2xl bg-[var(--soft-amber)] px-3 py-2.5 text-sm font-semibold tabular-nums text-amber-950 dark:text-amber-100">
+                    {t("goldPaidCalculated")}:{" "}
+                    <Money
+                      amount={addPaidPreview.total}
+                      currency={currency}
+                      locale={locale}
+                    />
+                    {addPaidPreview.perGram != null && grams.trim() ? (
+                      <span className="ms-1.5 font-normal text-[var(--muted)]">
+                        ({grams.trim()}
+                        {locale === "ar" ? " جم" : "g"} ×{" "}
+                        <Money
+                          amount={addPaidPreview.perGram}
+                          currency={currency}
+                          locale={locale}
+                        />
+                        )
+                      </span>
+                    ) : null}
+                  </p>
+                ) : (
+                  <Hint>{t("goldPaidPerGramHint")}</Hint>
+                )}
+              </label>
+            )}
+          </div>
           <div>
             <p className="mb-1 font-medium">{t("goldAcquiredOn")}</p>
             <div className="flex gap-1.5">
@@ -908,20 +1130,120 @@ export default function GoldPage() {
                 ))}
               </div>
             </div>
-            <label className="block">
-              <span className="mb-1 block font-medium">
-                {t("goldPaidAmount")}
-              </span>
-              <input
-                inputMode="decimal"
-                dir="ltr"
-                value={editPaidAmount}
-                onChange={(e) => setEditPaidAmount(e.target.value)}
-                className="field amount-input w-full rounded-2xl px-4 py-4 text-2xl"
-                placeholder="50000"
-              />
-              <Hint>{t("goldPaidAmountHint")}</Hint>
-            </label>
+            <div>
+              <p className="mb-1 font-medium">{t("goldPaidModeLabel")}</p>
+              <div className="seg grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    switchPaidMode(
+                      "total",
+                      editPaidMode,
+                      editGrams,
+                      editPaidAmount,
+                      editPaidPerGram,
+                      setEditPaidMode,
+                      setEditPaidAmount,
+                      setEditPaidPerGram,
+                    )
+                  }
+                  className={`seg-item ${
+                    editPaidMode === "total" ? "seg-active" : ""
+                  }`}
+                  aria-pressed={editPaidMode === "total"}
+                >
+                  {t("goldPaidModeTotal")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    switchPaidMode(
+                      "perGram",
+                      editPaidMode,
+                      editGrams,
+                      editPaidAmount,
+                      editPaidPerGram,
+                      setEditPaidMode,
+                      setEditPaidAmount,
+                      setEditPaidPerGram,
+                    )
+                  }
+                  className={`seg-item ${
+                    editPaidMode === "perGram" ? "seg-active" : ""
+                  }`}
+                  aria-pressed={editPaidMode === "perGram"}
+                >
+                  {t("goldPaidModePerGram")}
+                </button>
+              </div>
+              <Hint>{t("goldPaidOptional")}</Hint>
+              {editPaidMode === "total" ? (
+                <label className="mt-3 block">
+                  <span className="mb-1 block font-medium">
+                    {t("goldPaidAmount")}
+                  </span>
+                  <input
+                    inputMode="decimal"
+                    dir="ltr"
+                    value={editPaidAmount}
+                    onChange={(e) => setEditPaidAmount(e.target.value)}
+                    className="field amount-input w-full rounded-2xl px-4 py-4 text-2xl"
+                    placeholder="50000"
+                  />
+                  {editPaidPreview.perGram != null ? (
+                    <p className="mt-2 text-sm tabular-nums text-[var(--muted)]">
+                      {t("goldCostPerGram")}:{" "}
+                      <Money
+                        amount={editPaidPreview.perGram}
+                        currency={currency}
+                        locale={locale}
+                      />
+                      <span className="ms-1">/{t("goldPerGram")}</span>
+                    </p>
+                  ) : (
+                    <Hint>{t("goldPaidAmountHint")}</Hint>
+                  )}
+                </label>
+              ) : (
+                <label className="mt-3 block">
+                  <span className="mb-1 block font-medium">
+                    {t("goldPaidPerGram")}
+                  </span>
+                  <input
+                    inputMode="decimal"
+                    dir="ltr"
+                    value={editPaidPerGram}
+                    onChange={(e) => setEditPaidPerGram(e.target.value)}
+                    className="field amount-input w-full rounded-2xl px-4 py-4 text-2xl"
+                    placeholder="6250"
+                  />
+                  {editPaidPreview.total != null ? (
+                    <p className="mt-2 rounded-2xl bg-[var(--soft-amber)] px-3 py-2.5 text-sm font-semibold tabular-nums text-amber-950 dark:text-amber-100">
+                      {t("goldPaidCalculated")}:{" "}
+                      <Money
+                        amount={editPaidPreview.total}
+                        currency={currency}
+                        locale={locale}
+                      />
+                      {editPaidPreview.perGram != null && editGrams.trim() ? (
+                        <span className="ms-1.5 font-normal text-[var(--muted)]">
+                          ({editGrams.trim()}
+                          {locale === "ar" ? " جم" : "g"} ×{" "}
+                          <Money
+                            amount={editPaidPreview.perGram}
+                            currency={currency}
+                            locale={locale}
+                          />
+                          )
+                        </span>
+                      ) : null}
+                    </p>
+                  ) : (
+                    <Hint>{t("goldPaidPerGramHint")}</Hint>
+                  )}
+                </label>
+              )}
+            </div>
             <div>
               <p className="mb-1 font-medium">{t("goldAcquiredOn")}</p>
               <div className="flex gap-1.5">
